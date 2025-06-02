@@ -1,8 +1,8 @@
 import * as fs from "fs";
 import * as path from "path";
 import { Horse } from "./horse";
-import { RaceRenderer } from "./RaceRenderer";
-import { RaceSimulator } from "./RaceSimulator";
+import { RaceRenderer } from "./raceRenderer";
+import { RaceSimulator } from "./raceSimulator";
 import { TrackOptions } from "./types";
 
 // horses.json 읽기

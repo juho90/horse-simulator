@@ -1,44 +1,44 @@
 [
-    {
-        "name": "Seoul Racecourse",
-        "finishLine": 100,
-        "corners": [
-            {
-                "start": 20,
-                "end": 30
-            },
-            {
-                "start": 50,
-                "end": 60
-            }
-        ]
-    },
-    {
-        "name": "Short Track",
-        "finishLine": 60,
-        "corners": [
-            {
-                "start": 25,
-                "end": 35
-            }
-        ]
-    },
-    {
-        "name": "Long Track",
-        "finishLine": 200,
-        "corners": [
-            {
-                "start": 40,
-                "end": 60
-            },
-            {
-                "start": 100,
-                "end": 120
-            },
-            {
-                "start": 160,
-                "end": 180
-            }
-        ]
-    }
+  {
+    "name": "Seoul Racecourse",
+    "finishLine": 10000,
+    "corners": [
+      {
+        "start": 2000,
+        "end": 3000
+      },
+      {
+        "start": 5000,
+        "end": 6000
+      }
+    ]
+  },
+  {
+    "name": "Short Track",
+    "finishLine": 6000,
+    "corners": [
+      {
+        "start": 2500,
+        "end": 3500
+      }
+    ]
+  },
+  {
+    "name": "Long Track",
+    "finishLine": 20000,
+    "corners": [
+      {
+        "start": 4000,
+        "end": 6000
+      },
+      {
+        "start": 10000,
+        "end": 12000
+      },
+      {
+        "start": 16000,
+        "end": 1800
+      }
+    ]
+  }
 ]
