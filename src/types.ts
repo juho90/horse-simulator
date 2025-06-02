@@ -9,6 +9,7 @@ export type HorseStats = {
 export type Corner = { start: number; end: number };
 
 export type TrackOptions = {
+  name: string;
   finishLine: number;
   corners?: Corner[];
 };
