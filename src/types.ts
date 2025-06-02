@@ -1,10 +1,8 @@
-export type HorseStats = {
-  speed: number;
-  stamina: number;
-  burst: number;
-  temperament: number;
-  weight: number;
-};
+export enum RacePhase {
+  Early = "early",
+  Middle = "middle",
+  Final = "final",
+}
 
 export type Corner = { start: number; end: number };
 

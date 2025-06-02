@@ -1,10 +1,5 @@
-import { Horse } from "./horse";
-import { TrackOptions } from "./types";
-
-type HorseState = {
-  horse: Horse;
-  gate: number;
-};
+import { Horse, HorseRaceState } from "./horse";
+import { RacePhase, TrackOptions } from "./types";
 
 type TurnLog = {
   turn: number;
@@ -22,44 +17,77 @@ export class RaceSimulator {
 
   private shuffle<T>(array: T[]): T[] {
     return array
-      .map((value) => ({ value, sort: Math.random() }))
-      .sort((a, b) => a.sort - b.sort)
+      .map((value) => {
+        return { value, sort: Math.random() };
+      })
+      .sort((a, b) => {
+        return a.sort - b.sort;
+      })
       .map(({ value }) => value);
   }
 
+  private shouldSpurt(state: HorseRaceState, finishLine: number): boolean {
+    const horse = state.horse;
+    const staminaLeft = state.staminaLeft;
+    const distLeft = finishLine - state.position;
+    const optimalSpurtDist = 18 + (100 - (horse.stats.paceSense ?? 5) * 10);
+
+    if (
+      !state.isSpurting &&
+      staminaLeft > (horse.stats.burst ?? 8) * 1.5 &&
+      distLeft <= optimalSpurtDist
+    ) {
+      return true;
+    }
+    return false;
+  }
+
   private tryOvertake(
-    states: HorseState[],
+    states: HorseRaceState[],
     corner: { start: number; end: number }
   ) {
     for (let i = states.length - 1; i >= 0; i--) {
       const curr = states[i];
-      if (
-        curr.horse.position >= corner.start &&
-        curr.horse.position < corner.end
-      ) {
+
+      const inCorner =
+        curr.position >= corner.start && curr.position < corner.end;
+
+      if (inCorner) {
         const targetGate = curr.gate - 1;
-        if (targetGate < 1) continue;
-        const blocking = states.find(
-          (s) =>
-            s.gate === targetGate &&
-            Math.abs(s.horse.position - curr.horse.position) < 1.0
-        );
+
+        if (targetGate < 1) {
+          continue;
+        }
+
+        const blocking = states.find((s) => {
+          const sameGate = s.gate === targetGate;
+          const closePosition = Math.abs(s.position - curr.position) < 1.0;
+          return sameGate && closePosition;
+        });
+
         if (!blocking) {
-          const power =
-            curr.horse.stats.burst +
-            curr.horse.stats.temperament +
+          const myPower =
+            (curr.horse.stats.cornering ?? 7) +
+            (curr.horse.stats.positioning ?? 7) +
+            (curr.horse.stats.temperament ?? 6) +
             Math.random();
-          const inner = states.find(
-            (s) =>
-              s.gate === targetGate &&
-              Math.abs(s.horse.position - curr.horse.position) < 3.0
-          );
-          const innerPower = inner
-            ? inner.horse.stats.burst +
-              inner.horse.stats.temperament +
-              Math.random()
-            : 0;
-          if (!inner || power > innerPower) {
+
+          const inner = states.find((s) => {
+            const sameGate = s.gate === targetGate;
+            const closePosition = Math.abs(s.position - curr.position) < 3.0;
+            return sameGate && closePosition;
+          });
+
+          let innerPower = 0;
+          if (inner) {
+            innerPower =
+              (inner.horse.stats.cornering ?? 7) +
+              (inner.horse.stats.positioning ?? 7) +
+              (inner.horse.stats.temperament ?? 6) +
+              Math.random();
+          }
+
+          if (!inner || myPower > innerPower) {
             curr.gate = targetGate;
           }
         }
@@ -67,60 +95,88 @@ export class RaceSimulator {
     }
   }
 
-  // run()이 로그 배열을 반환하도록 변경
   public run(): TurnLog[] {
-    let states: HorseState[] = this.shuffle(this.horses).map((horse, idx) => ({
-      horse,
-      gate: idx + 1,
-    }));
+    let states: HorseRaceState[] = this.shuffle(this.horses).map(
+      (horse, idx) => {
+        return horse.createRaceState(idx + 1);
+      }
+    );
 
     let winner: Horse | null = null;
     let turn = 0;
     const logs: TurnLog[] = [];
 
+    const finishLine = this.track.finishLine;
+
     while (!winner) {
       turn++;
+
       if (this.track.corners) {
-        for (const corner of this.track.corners) {
+        for (let c = 0; c < this.track.corners.length; c++) {
+          const corner = this.track.corners[c];
           this.tryOvertake(states, corner);
         }
       }
 
-      states.forEach((s) => {
+      for (let sIdx = 0; sIdx < states.length; sIdx++) {
+        const s = states[sIdx];
+        const horse = s.horse;
+
+        const progress = s.position / finishLine;
+        let phase: RacePhase;
+        if (progress < 0.3) {
+          phase = RacePhase.Early;
+        } else if (progress < 0.7) {
+          phase = RacePhase.Middle;
+        } else {
+          phase = RacePhase.Final;
+        }
+
+        if (this.shouldSpurt(s, finishLine)) {
+          s.isSpurting = true;
+        }
+
         let inCorner = false;
         if (this.track.corners) {
-          for (const corner of this.track.corners) {
-            if (
-              s.horse.position >= corner.start &&
-              s.horse.position < corner.end
-            ) {
-              const cornerPenalty = 1 - (s.gate - 1) * 0.005;
-              s.horse.run(turn);
-              s.horse.position *= cornerPenalty;
+          for (let c = 0; c < this.track.corners.length; c++) {
+            const corner = this.track.corners[c];
+            if (s.position >= corner.start && s.position < corner.end) {
+              const cornering = horse.stats.cornering ?? 7;
+              const gatePenalty = 1 - (s.gate - 1) * 0.005;
+              const cornerBonus = cornering * 0.01;
+              s.run(phase);
+              s.applyCornerPenalty(cornering, gatePenalty, cornerBonus);
               inCorner = true;
               break;
             }
           }
         }
-        if (!inCorner) {
-          s.horse.run(turn);
-        }
-      });
 
-      states.forEach((s) => {
-        if (s.horse.position >= this.track.finishLine && !winner) {
+        if (!inCorner) {
+          s.run(phase);
+        }
+      }
+
+      for (let sIdx = 0; sIdx < states.length; sIdx++) {
+        const s = states[sIdx];
+        if (s.position >= finishLine && !winner) {
           winner = s.horse;
         }
-      });
+      }
 
-      // 로그 저장
-      logs.push({
-        turn,
-        states: states.map((s) => ({
+      const turnStates = [];
+      for (let sIdx = 0; sIdx < states.length; sIdx++) {
+        const s = states[sIdx];
+        turnStates.push({
           name: s.horse.name,
           gate: s.gate,
-          position: s.horse.position,
-        })),
+          position: s.position,
+        });
+      }
+
+      logs.push({
+        turn,
+        states: turnStates,
       });
     }
 
