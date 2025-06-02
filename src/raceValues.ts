@@ -1,4 +1,4 @@
-export const RACE_CONST = {
+export const RACE_VALUES = {
   // 단위 및 위치 계산
   UNIT: 100, // 1 = 100 (ex: 1m = 100)
   CLOSE_POSITION_BLOCK: 1 * 100, // 블로킹 판정 거리(1m)
@@ -42,4 +42,7 @@ export const RACE_CONST = {
   SLIPSTREAM_MAX_DIST: 30 * 100, // 슬립스트림 최대 거리(30m)
   SLIPSTREAM_SPEED_BONUS: 0.5, // 슬립스트림 속도 보너스
   SLIPSTREAM_ACCEL_BONUS: 0.1, // 슬립스트림 가속 보너스
+
+  // 코너 진입 전 포지션 싸움 거리
+  POSITION_FIGHT_RANGE: 100, // 코너 진입 전 포지션 싸움 거리(m)
 };

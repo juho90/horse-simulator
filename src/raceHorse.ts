@@ -1,5 +1,5 @@
 import { Horse } from "./horse";
-import { RACE_CONST } from "./raceConfig";
+import { RACE_VALUES } from "./raceValues";
 import { RacePhase } from "./types";
 
 export class RaceHorse {
@@ -48,14 +48,14 @@ export class RaceHorse {
   /** 구간별 스태미나 소모 */
   applyStaminaChange(phase: RacePhase): void {
     if (phase === RacePhase.Early) {
-      this.staminaLeft -= RACE_CONST.EARLY_PHASE_STAMINA;
+      this.staminaLeft -= RACE_VALUES.EARLY_PHASE_STAMINA;
     } else if (phase === RacePhase.Middle) {
-      this.staminaLeft -= RACE_CONST.MIDDLE_PHASE_STAMINA;
+      this.staminaLeft -= RACE_VALUES.MIDDLE_PHASE_STAMINA;
     } else {
       if (this.isSpurting && this.staminaLeft > 0) {
-        this.staminaLeft -= RACE_CONST.FINAL_PHASE_SPURT_STAMINA;
+        this.staminaLeft -= RACE_VALUES.FINAL_PHASE_SPURT_STAMINA;
       } else {
-        this.staminaLeft -= RACE_CONST.FINAL_PHASE_STAMINA;
+        this.staminaLeft -= RACE_VALUES.FINAL_PHASE_STAMINA;
       }
     }
   }
@@ -65,25 +65,25 @@ export class RaceHorse {
     if (this.ignoreStaminaPenalty) {
       return speed;
     }
-    const staminaThreshold = this.stamina * RACE_CONST.STAMINA_PENALTY_RATIO;
+    const staminaThreshold = this.stamina * RACE_VALUES.STAMINA_PENALTY_RATIO;
     const isLowStamina = this.staminaLeft < staminaThreshold;
     if (isLowStamina) {
-      return speed * RACE_CONST.LOW_STAMINA_SPEED;
+      return speed * RACE_VALUES.LOW_STAMINA_SPEED;
     }
     return speed;
   }
 
   /** 체중 패널티 */
   private applyWeightPenalty(speed: number): number {
-    const penalty = this.weight * RACE_CONST.WEIGHT_PENALTY;
+    const penalty = this.weight * RACE_VALUES.WEIGHT_PENALTY;
     return speed - penalty;
   }
 
   /** 기질 랜덤 변동 */
   private applyRandomVariance(speed: number): number {
-    const randomFactor = Math.random() - RACE_CONST.RANDOM_BASE;
+    const randomFactor = Math.random() - RACE_VALUES.RANDOM_BASE;
     const temperamentVariance =
-      this.temperament * RACE_CONST.TEMPERAMENT_VARIANCE;
+      this.temperament * RACE_VALUES.TEMPERAMENT_VARIANCE;
     const variance = randomFactor * temperamentVariance;
     return speed + variance;
   }
@@ -113,13 +113,13 @@ export class RaceHorse {
   /** 페이즈별 기본 속도 */
   private basePhaseSpeed(phase: RacePhase): number {
     if (phase === RacePhase.Early) {
-      return this.baseSpeed * RACE_CONST.EARLY_PHASE_SPEED;
+      return this.baseSpeed * RACE_VALUES.EARLY_PHASE_SPEED;
     }
     if (phase === RacePhase.Middle) {
-      return this.baseSpeed * RACE_CONST.MIDDLE_PHASE_SPEED;
+      return this.baseSpeed * RACE_VALUES.MIDDLE_PHASE_SPEED;
     }
     if (this.isSpurting && this.staminaLeft > 0) {
-      return this.baseSpeed + this.burst * RACE_CONST.FINAL_PHASE_SPURT_BONUS;
+      return this.baseSpeed + this.burst * RACE_VALUES.FINAL_PHASE_SPURT_BONUS;
     }
     return this.baseSpeed;
   }
@@ -154,11 +154,11 @@ export class RaceHorse {
     }
 
     // 3. 이동량 계산 (currentSpeed는 m/s, 단위 변환)
-    const minMoveFactor = RACE_CONST.MOVE_FACTOR_MIN;
-    const moveFactorRange = RACE_CONST.MOVE_FACTOR_RANGE;
+    const minMoveFactor = RACE_VALUES.MOVE_FACTOR_MIN;
+    const moveFactorRange = RACE_VALUES.MOVE_FACTOR_RANGE;
     const randomValue = Math.random();
     const moveFactor = minMoveFactor + randomValue * moveFactorRange;
-    let moveDistance = this.currentSpeed * moveFactor * RACE_CONST.UNIT;
+    let moveDistance = this.currentSpeed * moveFactor * RACE_VALUES.UNIT;
     if (moveDistance < 0) {
       moveDistance = 0;
     }
@@ -174,7 +174,7 @@ export class RaceHorse {
       this.cornering +
       this.positioning +
       this.temperament +
-      (Math.random() - RACE_CONST.RANDOM_BASE);
+      (Math.random() - RACE_VALUES.RANDOM_BASE);
     basePower *= difficulty;
     return basePower;
   }

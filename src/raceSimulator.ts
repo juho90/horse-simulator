@@ -1,6 +1,6 @@
 import { Horse } from "./horse";
-import { RACE_CONST } from "./raceConfig";
 import { RaceHorse } from "./raceHorse";
+import { RACE_VALUES } from "./raceValues";
 import { RacePhase, TrackOptions } from "./types";
 
 type TurnLog = {
@@ -86,7 +86,7 @@ export class RaceSimulator {
       const h = horses[i];
       const sameLane = h.lane === targetLane;
       const diff = Math.abs(h.distance - curr.distance);
-      const blocked = sameLane && diff < RACE_CONST.CLOSE_POSITION_BLOCK;
+      const blocked = sameLane && diff < RACE_VALUES.CLOSE_POSITION_BLOCK;
       if (blocked) {
         return true;
       }
@@ -104,7 +104,7 @@ export class RaceSimulator {
       const h = horses[i];
       const sameLane = h.lane === targetLane;
       const diff = Math.abs(h.distance - curr.distance);
-      const isInner = sameLane && diff < RACE_CONST.CLOSE_POSITION_INNER;
+      const isInner = sameLane && diff < RACE_VALUES.CLOSE_POSITION_INNER;
       if (isInner) {
         return h;
       }
@@ -148,14 +148,14 @@ export class RaceSimulator {
     // 2. 앞말과의 거리 계산
     const distanceToAhead = sameLaneAhead.distance - self.distance;
     const inSlipstreamZone =
-      distanceToAhead >= RACE_CONST.SLIPSTREAM_MIN_DIST &&
-      distanceToAhead <= RACE_CONST.SLIPSTREAM_MAX_DIST;
+      distanceToAhead >= RACE_VALUES.SLIPSTREAM_MIN_DIST &&
+      distanceToAhead <= RACE_VALUES.SLIPSTREAM_MAX_DIST;
     // 3. 보너스 적용
     let slipstreamBonus = 0;
     let accelBonus = 0;
     if (inSlipstreamZone) {
-      slipstreamBonus = RACE_CONST.SLIPSTREAM_SPEED_BONUS;
-      accelBonus = RACE_CONST.SLIPSTREAM_ACCEL_BONUS;
+      slipstreamBonus = RACE_VALUES.SLIPSTREAM_SPEED_BONUS;
+      accelBonus = RACE_VALUES.SLIPSTREAM_ACCEL_BONUS;
     }
     return { speed: slipstreamBonus, accel: accelBonus };
   }
@@ -223,6 +223,30 @@ export class RaceSimulator {
     horse.run(phase);
   }
 
+  /** 직선 구간에서 추월 포지션 싸움(인코스 진입 시도) */
+  private tryPositioningFight(horses: RaceHorse[], curr: RaceHorse) {
+    // 이미 1레인(인코스)이면 시도 안 함
+    if (curr.lane === 1) return;
+    // 인코스(내측)로 진입 가능한지 체크
+    const targetLane = curr.lane - 1;
+    const blocked = this.isBlocked(horses, curr, targetLane);
+    if (!blocked) {
+      // 포지셔닝 능력치 + 랜덤성으로 진입 성공 판정
+      const myScore =
+        curr.positioning + (Math.random() - RACE_VALUES.RANDOM_BASE);
+      // 내측마(인코스)와 비교
+      const inner = this.findInnerHorse(horses, curr, targetLane);
+      let innerScore = 0;
+      if (inner) {
+        innerScore =
+          inner.positioning + (Math.random() - RACE_VALUES.RANDOM_BASE);
+      }
+      if (!inner || myScore > innerScore) {
+        curr.lane = targetLane;
+      }
+    }
+  }
+
   /**
    * 레이스 전체 시뮬레이션 실행
    * - 매 턴마다 말 상태 갱신, 코너 추월, 스퍼트, 로그 기록
@@ -246,6 +270,23 @@ export class RaceSimulator {
         for (let c = 0; c < this.track.corners.length; c++) {
           const corner = this.track.corners[c];
           this.tryOvertake(horses, corner);
+        }
+      }
+
+      // --- 직선 구간에서 포지션 싸움(코너 진입 전) ---
+      if (this.track.corners) {
+        for (let c = 0; c < this.track.corners.length; c++) {
+          const corner = this.track.corners[c];
+          // 코너 시작점 POSITION_FIGHT_RANGE(m) 전~코너 시작점 구간에서만 포지션 싸움
+          const fightStart =
+            corner.start - RACE_VALUES.POSITION_FIGHT_RANGE * RACE_VALUES.UNIT;
+          const fightEnd = corner.start;
+          for (let hIdx = 0; hIdx < horses.length; hIdx++) {
+            const horse = horses[hIdx];
+            if (horse.distance >= fightStart && horse.distance < fightEnd) {
+              this.tryPositioningFight(horses, horse);
+            }
+          }
         }
       }
 
