@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { Horse } from "./horse";
-import { simulateRace } from "./simulateRace";
+import { RaceSimulator } from "./simulateRace";
 
 // horses.json 읽기
 const horsesJsonPath = path.join(__dirname, "..", "data", "horses.json");
@@ -16,4 +16,5 @@ const tracksData = JSON.parse(fs.readFileSync(tracksJsonPath, "utf-8"));
 const track = tracksData[0];
 console.log(`\n🏟️ 경기장: ${track.name}`);
 
-simulateRace(horses, track);
+const simulator = new RaceSimulator(horses, track);
+simulator.run();
