@@ -1,9 +1,9 @@
 type HorseStats = {
-  speed: number; // 기본 속도
-  stamina: number; // 지구력 (경주 후반에 영향)
-  burst: number; // 순간 가속력 (초반/중반에 영향)
-  temperament: number; // 기질 (변동성, 예측 불가성)
-  weight: number; // 체중 (가벼울수록 유리)
+  speed: number;
+  stamina: number;
+  burst: number;
+  temperament: number;
+  weight: number;
 };
 
 class Horse {
@@ -15,35 +15,99 @@ class Horse {
   }
 
   run(turn: number) {
-    // 기본 속도
     let effectiveSpeed = this.stats.speed;
 
-    // stamina가 줄면 속도 감소
     if (this.staminaLeft < this.stats.stamina * 0.5) {
       effectiveSpeed *= 0.9;
     }
-
-    // burst: 초반 20% 구간에서 추가 가속
     if (turn < 5) {
       effectiveSpeed += this.stats.burst * 0.3;
     }
-
-    // temperament: 변동성 반영
     const temperamentEffect =
       (Math.random() - 0.5) * this.stats.temperament * 0.1;
     effectiveSpeed += temperamentEffect;
-
-    // weight: 무거우면 속도 감소
     effectiveSpeed -= this.stats.weight * 0.05;
 
-    // 실제 이동
     this.position += effectiveSpeed * (0.8 + Math.random() * 0.4);
-
-    // stamina 소모
     this.staminaLeft -= 1;
   }
 }
 
+type Corner = { start: number; end: number };
+type TrackOptions = {
+  finishLine: number;
+  corners?: Corner[];
+};
+
+function shuffle<T>(array: T[]): T[] {
+  return array
+    .map((value) => ({ value, sort: Math.random() }))
+    .sort((a, b) => a.sort - b.sort)
+    .map(({ value }) => value);
+}
+
+function simulateRace(
+  horses: Horse[],
+  track: TrackOptions = { finishLine: 100 }
+): Horse {
+  const shuffled = shuffle(horses);
+  const gateAssignments = shuffled.map((horse, idx) => ({
+    horse,
+    gate: idx + 1,
+  }));
+
+  console.log("게이트 배치:");
+  gateAssignments.forEach(({ horse, gate }) => {
+    console.log(`${gate}번 게이트: ${horse.name}`);
+  });
+
+  let winner: Horse | null = null;
+  let turn = 0;
+
+  while (!winner) {
+    turn++;
+    gateAssignments.forEach(({ horse, gate }) => {
+      // 여러 코너 지원
+      let inCorner = false;
+      if (track.corners) {
+        for (const corner of track.corners) {
+          if (horse.position >= corner.start && horse.position < corner.end) {
+            // 바깥쪽 게이트일수록 속도 감소
+            const cornerPenalty = 1 - (gate - 1) * 0.005;
+            horse.run(turn);
+            horse.position *= cornerPenalty;
+            inCorner = true;
+            break;
+          }
+        }
+      }
+      if (!inCorner) {
+        horse.run(turn);
+      }
+    });
+
+    gateAssignments.forEach(({ horse }) => {
+      if (horse.position >= track.finishLine && !winner) {
+        winner = horse;
+      }
+    });
+
+    // 현재 상황 출력
+    console.log(
+      gateAssignments
+        .map(
+          ({ horse, gate }) =>
+            `${gate}번(${horse.name}): ${horse.position.toFixed(1)}m`
+        )
+        .join(" | ")
+    );
+  }
+
+  console.log(`🏆 Winner: ${(winner as Horse).name}!`);
+  return winner;
+}
+
+// 예시 사용
 const horses = [
   new Horse("Thunder", {
     speed: 10,
@@ -117,44 +181,11 @@ const horses = [
   }),
 ];
 
-// 1~10번 게이트에 말 무작위 배치
-function shuffle<T>(array: T[]): T[] {
-  return array
-    .map((value) => ({ value, sort: Math.random() }))
-    .sort((a, b) => a.sort - b.sort)
-    .map(({ value }) => value);
-}
-
-const shuffledHorses = shuffle(horses);
-
-console.log("게이트 배치:");
-shuffledHorses.forEach((horse, idx) => {
-  console.log(`${idx + 1}번 게이트: ${horse.name}`);
+simulateRace(horses, {
+  finishLine: 100,
+  corners: [
+    { start: 20, end: 30 },
+    { start: 50, end: 60 },
+    { start: 80, end: 90 },
+  ],
 });
-
-const finishLine = 100;
-let winner: Horse | null = null;
-let turn = 0;
-
-while (!winner) {
-  turn++;
-  shuffledHorses.forEach((horse) => horse.run(turn));
-  shuffledHorses.forEach((horse) => {
-    if (horse.position >= finishLine && !winner) {
-      winner = horse;
-    }
-  });
-
-  // 현재 상황 출력
-  console.log(
-    shuffledHorses
-      .map((h) => `${h.name}: ${h.position.toFixed(1)}m`)
-      .join(" | ")
-  );
-}
-
-if (!winner) {
-  console.log("No winner found.");
-} else {
-  console.log(`🏆 Winner: ${(winner as Horse).name}!`);
-}
