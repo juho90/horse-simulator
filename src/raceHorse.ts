@@ -165,14 +165,18 @@ export class RaceHorse {
     return moveDistance;
   }
 
-  /** 코너 추월 파워 계산 */
-  calcCornerOvertakePower(): number {
-    return (
+  /**
+   * 코너 추월 파워 계산 (코너 난이도 수치에 따라 보정)
+   * @param difficulty 코너 난이도 계수(1.0=기본, 1.1=완만, 0.9=가파름 등)
+   */
+  calcCornerOvertakePower(difficulty: number): number {
+    let basePower =
       this.cornering +
       this.positioning +
       this.temperament +
-      (Math.random() - RACE_CONST.RANDOM_BASE)
-    );
+      (Math.random() - RACE_CONST.RANDOM_BASE);
+    basePower *= difficulty;
+    return basePower;
   }
 
   /** 한 턴 실행 */
@@ -189,7 +193,7 @@ export class RaceHorse {
 
   // --- 코너/특수효과 ---
 
-  /** 코너 구간 판정 */
+  /** 코너 구간 판정 (코너 타입 포함) */
   static isInCorner(
     distance: number,
     corner: { start: number; end: number }

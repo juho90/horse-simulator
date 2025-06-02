@@ -18,8 +18,8 @@ const tracksData = JSON.parse(
   fs.readFileSync(tracksJsonPath, "utf-8")
 ) as TrackOptions[];
 
-// 원하는 경기장 선택
-const track = tracksData[0];
+// 트랙을 무작위로 선택
+const track = tracksData[Math.floor(Math.random() * tracksData.length)];
 console.log(`\n🏟️ 경기장: ${track.name}`);
 
 const simulator = new RaceSimulator(horses, track);

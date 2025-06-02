@@ -38,10 +38,10 @@ export class RaceSimulator {
     return result;
   }
 
-  /** 코너에서 추월 시도 로직 */
+  /** 코너에서 추월 시도 로직 (코너 난이도 수치 반드시 전달) */
   private tryOvertake(
     horses: RaceHorse[],
-    corner: { start: number; end: number }
+    corner: { start: number; end: number; difficulty: number }
   ) {
     for (let i = horses.length - 1; i >= 0; i--) {
       const curr = horses[i];
@@ -62,12 +62,12 @@ export class RaceSimulator {
       }
       // 4. 추월 시도마다 스태미나 감소
       curr.staminaLeft -= 0.2;
-      // 5. 내 파워/내측마 파워 계산
-      const myPower = curr.calcCornerOvertakePower();
+      // 5. 내 파워/내측마 파워 계산 (코너 난이도 수치 반드시 전달)
+      const myPower = curr.calcCornerOvertakePower(corner.difficulty);
       const inner = this.findInnerHorse(horses, curr, targetLane);
       let innerPower = 0;
       if (inner) {
-        innerPower = inner.calcCornerOvertakePower();
+        innerPower = inner.calcCornerOvertakePower(corner.difficulty);
       }
       // 6. 추월 성공 판정
       if (!inner || myPower > innerPower) {

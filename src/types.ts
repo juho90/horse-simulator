@@ -4,7 +4,7 @@ export enum RacePhase {
   Final = "final",
 }
 
-export type Corner = { start: number; end: number };
+export type Corner = { start: number; end: number; difficulty: number };
 
 export type TrackOptions = {
   name: string;
