@@ -24,4 +24,4 @@ console.log(`\n🏟️ 경기장: ${track.name}`);
 
 const simulator = new RaceSimulator(horses, track);
 const logs = simulator.run();
-RaceRenderer.renderRace(logs, track.finishLine);
+RaceRenderer.renderVisualizerHtml(logs, track);

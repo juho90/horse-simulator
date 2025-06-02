@@ -236,6 +236,34 @@ export class RaceHorse {
     return { speed: slipstreamBonus, accel: accelBonus };
   }
 
+  public findUnblockedLaneForSpurt(horses: RaceHorse[]): number | null {
+    // 좌/우 인접 레인 중 막힘 없고 앞에 말이 없는 레인 반환 (없으면 null)
+    var candidateLanes: number[] = [];
+    if (this.lane - 1 >= 1) {
+      candidateLanes.push(this.lane - 1);
+    }
+    if (this.lane + 1 >= 1) {
+      candidateLanes.push(this.lane + 1);
+    }
+    for (let i = 0; i < candidateLanes.length; i++) {
+      const lane = candidateLanes[i];
+      if (!this.isLaneBlocked(horses, lane)) {
+        let ahead = null;
+        for (let j = 0; j < horses.length; j++) {
+          const h = horses[j];
+          if (h.lane === lane && h.distance > this.distance) {
+            ahead = h;
+            break;
+          }
+        }
+        if (!ahead) {
+          return lane;
+        }
+      }
+    }
+    return null;
+  }
+
   public updateRaceState(track: RaceTrack, horses: RaceHorse[]): void {
     const { phase, lastSpurtAccel, ignoreStaminaPenalty } =
       track.getPhaseEffectInfo(this);
@@ -244,6 +272,16 @@ export class RaceHorse {
     this.slipstreamAccelBonus = accel;
     this.lastSpurtAccelBonus = lastSpurtAccel;
     this.ignoreStaminaPenalty = ignoreStaminaPenalty;
+    // 라스트스퍼트(최종구간)에서 막힘 없는 라인으로 이동 시도
+    if (phase === RacePhase.Final) {
+      const blocked = this.getClosestHorseAheadInLane(horses);
+      if (blocked) {
+        const newLane = this.findUnblockedLaneForSpurt(horses);
+        if (newLane) {
+          this.lane = newLane;
+        }
+      }
+    }
     this.updateForTurn(phase);
   }
 }

@@ -21,12 +21,12 @@ export const RACE_VALUES = {
   CORNER_BONUS_PER: 0.01, // 코너링 보너스 비율
 
   // 페이즈별 속도/스태미나 소모
-  EARLY_PHASE_SPEED: 0.92, // 초반 구간 속도 배율
+  EARLY_PHASE_SPEED: 0.18, // 초반 구간 속도 배율
   EARLY_PHASE_STAMINA: 0.7, // 초반 구간 스태미나 소모
-  MIDDLE_PHASE_SPEED: 1.0, // 중반 구간 속도 배율
+  MIDDLE_PHASE_SPEED: 0.22, // 중반 구간 속도 배율
   MIDDLE_PHASE_STAMINA: 1.0, // 중반 구간 스태미나 소모
   FINAL_PHASE_STAMINA: 1.2, // 막판 구간 스태미나 소모
-  FINAL_PHASE_SPURT_BONUS: 0.3, // 라스트스퍼트 속도 보너스 배율
+  FINAL_PHASE_SPURT_BONUS: 0.08, // 라스트스퍼트 속도 보너스 배율
   FINAL_PHASE_SPURT_STAMINA: 1.5, // 라스트스퍼트 스태미나 소모
   FINAL_PHASE_SPURT_STAMINA_MULT: 1.5, // 라스트스퍼트 진입 필요 스태미나 배수
 
