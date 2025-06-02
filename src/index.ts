@@ -1,3 +1,6 @@
+import * as fs from "fs";
+import * as path from "path";
+
 type HorseStats = {
   speed: number;
   stamina: number;
@@ -106,86 +109,17 @@ function simulateRace(
   console.log(`🏆 Winner: ${(winner as Horse).name}!`);
   return winner;
 }
+// horses.json 읽기
+const horsesJsonPath = path.join(__dirname, "..", "data", "horses.json");
+const horsesData = JSON.parse(fs.readFileSync(horsesJsonPath, "utf-8"));
+const horses = horsesData.map((h: any) => new Horse(h.name, h.stats));
 
-// 예시 사용
-const horses = [
-  new Horse("Thunder", {
-    speed: 10,
-    stamina: 12,
-    burst: 8,
-    temperament: 5,
-    weight: 5,
-  }),
-  new Horse("Lightning", {
-    speed: 9,
-    stamina: 14,
-    burst: 7,
-    temperament: 6,
-    weight: 4,
-  }),
-  new Horse("Storm", {
-    speed: 11,
-    stamina: 10,
-    burst: 9,
-    temperament: 4,
-    weight: 6,
-  }),
-  new Horse("Blaze", {
-    speed: 10,
-    stamina: 11,
-    burst: 10,
-    temperament: 7,
-    weight: 5,
-  }),
-  new Horse("Shadow", {
-    speed: 8,
-    stamina: 15,
-    burst: 6,
-    temperament: 3,
-    weight: 4,
-  }),
-  new Horse("Comet", {
-    speed: 12,
-    stamina: 9,
-    burst: 11,
-    temperament: 8,
-    weight: 7,
-  }),
-  new Horse("Rocket", {
-    speed: 9,
-    stamina: 13,
-    burst: 8,
-    temperament: 6,
-    weight: 5,
-  }),
-  new Horse("Spirit", {
-    speed: 10,
-    stamina: 12,
-    burst: 9,
-    temperament: 5,
-    weight: 5,
-  }),
-  new Horse("Phantom", {
-    speed: 11,
-    stamina: 10,
-    burst: 10,
-    temperament: 7,
-    weight: 6,
-  }),
-  new Horse("Blizzard", {
-    speed: 8,
-    stamina: 14,
-    burst: 7,
-    temperament: 4,
-    weight: 4,
-  }),
-];
+// tracks.json 읽기
+const tracksJsonPath = path.join(__dirname, "..", "data", "tracks.json");
+const tracksData = JSON.parse(fs.readFileSync(tracksJsonPath, "utf-8"));
 
-simulateRace(horses, {
-  finishLine: 100,
-  corners: [
-    { start: 20, end: 30 },
-    { start: 50, end: 60 },
-    { start: 80, end: 90 },
-  ],
-});
+// 원하는 경기장 선택
+const track = tracksData[0];
+console.log(`\n🏟️ 경기장: ${track.name}`);
+
+simulateRace(horses, track);

@@ -1,0 +1,102 @@
+[
+    {
+        "name": "Thunder",
+        "stats": {
+            "speed": 10,
+            "stamina": 12,
+            "burst": 8,
+            "temperament": 5,
+            "weight": 5
+        }
+    },
+    {
+        "name": "Lightning",
+        "stats": {
+            "speed": 9,
+            "stamina": 14,
+            "burst": 7,
+            "temperament": 6,
+            "weight": 4
+        }
+    },
+    {
+        "name": "Storm",
+        "stats": {
+            "speed": 11,
+            "stamina": 10,
+            "burst": 9,
+            "temperament": 4,
+            "weight": 6
+        }
+    },
+    {
+        "name": "Blaze",
+        "stats": {
+            "speed": 10,
+            "stamina": 11,
+            "burst": 10,
+            "temperament": 7,
+            "weight": 5
+        }
+    },
+    {
+        "name": "Shadow",
+        "stats": {
+            "speed": 8,
+            "stamina": 15,
+            "burst": 6,
+            "temperament": 3,
+            "weight": 4
+        }
+    },
+    {
+        "name": "Comet",
+        "stats": {
+            "speed": 12,
+            "stamina": 9,
+            "burst": 11,
+            "temperament": 8,
+            "weight": 7
+        }
+    },
+    {
+        "name": "Rocket",
+        "stats": {
+            "speed": 9,
+            "stamina": 13,
+            "burst": 8,
+            "temperament": 6,
+            "weight": 5
+        }
+    },
+    {
+        "name": "Spirit",
+        "stats": {
+            "speed": 10,
+            "stamina": 12,
+            "burst": 9,
+            "temperament": 5,
+            "weight": 5
+        }
+    },
+    {
+        "name": "Phantom",
+        "stats": {
+            "speed": 11,
+            "stamina": 10,
+            "burst": 10,
+            "temperament": 7,
+            "weight": 6
+        }
+    },
+    {
+        "name": "Blizzard",
+        "stats": {
+            "speed": 8,
+            "stamina": 14,
+            "burst": 7,
+            "temperament": 4,
+            "weight": 4
+        }
+    }
+]

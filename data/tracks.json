@@ -1,0 +1,44 @@
+[
+    {
+        "name": "Seoul Racecourse",
+        "finishLine": 100,
+        "corners": [
+            {
+                "start": 20,
+                "end": 30
+            },
+            {
+                "start": 50,
+                "end": 60
+            }
+        ]
+    },
+    {
+        "name": "Short Track",
+        "finishLine": 60,
+        "corners": [
+            {
+                "start": 25,
+                "end": 35
+            }
+        ]
+    },
+    {
+        "name": "Long Track",
+        "finishLine": 200,
+        "corners": [
+            {
+                "start": 40,
+                "end": 60
+            },
+            {
+                "start": 100,
+                "end": 120
+            },
+            {
+                "start": 160,
+                "end": 180
+            }
+        ]
+    }
+]
