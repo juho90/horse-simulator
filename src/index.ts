@@ -1,9 +1,9 @@
 import * as fs from "fs";
 import * as path from "path";
 import { Horse } from "./horse";
+import { TrackOptions } from "./interfaces";
 import { RaceRenderer } from "./raceRenderer";
 import { RaceSimulator } from "./raceSimulator";
-import { TrackOptions } from "./types";
 
 // horses.json 읽기
 const horsesJsonPath = path.join(__dirname, "..", "data", "horses.json");

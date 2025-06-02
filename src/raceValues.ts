@@ -1,3 +1,9 @@
+export enum RacePhase {
+  Early = "early",
+  Middle = "middle",
+  Final = "final",
+}
+
 export const RACE_VALUES = {
   // 단위 및 위치 계산
   UNIT: 100, // 1 = 100 (ex: 1m = 100)

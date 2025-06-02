@@ -1,6 +1,7 @@
 import { Horse } from "./horse";
-import { RACE_VALUES } from "./raceValues";
-import { RacePhase } from "./types";
+import { TrackCorner } from "./interfaces";
+import { RaceTrack } from "./raceTrack";
+import { RACE_VALUES, RacePhase } from "./raceValues";
 
 export class RaceHorse {
   // --- 고정 스탯 ---
@@ -43,10 +44,11 @@ export class RaceHorse {
     this.staminaLeft = this.stamina;
   }
 
-  // --- apply: 상태 변화/패널티/보너스 적용 ---
+  private randomVariance(): number {
+    return Math.random() - RACE_VALUES.RANDOM_BASE;
+  }
 
-  /** 구간별 스태미나 소모 */
-  applyStaminaChange(phase: RacePhase): void {
+  consumeStaminaByPhase(phase: RacePhase): void {
     if (phase === RacePhase.Early) {
       this.staminaLeft -= RACE_VALUES.EARLY_PHASE_STAMINA;
     } else if (phase === RacePhase.Middle) {
@@ -60,8 +62,7 @@ export class RaceHorse {
     }
   }
 
-  /** 스태미나 패널티 */
-  private applyStaminaPenalty(speed: number): number {
+  private applyLowStaminaSpeedPenalty(speed: number): number {
     if (this.ignoreStaminaPenalty) {
       return speed;
     }
@@ -73,45 +74,35 @@ export class RaceHorse {
     return speed;
   }
 
-  /** 체중 패널티 */
-  private applyWeightPenalty(speed: number): number {
+  private applyWeightSpeedPenalty(speed: number): number {
     const penalty = this.weight * RACE_VALUES.WEIGHT_PENALTY;
     return speed - penalty;
   }
 
-  /** 기질 랜덤 변동 */
-  private applyRandomVariance(speed: number): number {
-    const randomFactor = Math.random() - RACE_VALUES.RANDOM_BASE;
+  private applyTemperamentVariance(speed: number): number {
     const temperamentVariance =
       this.temperament * RACE_VALUES.TEMPERAMENT_VARIANCE;
-    const variance = randomFactor * temperamentVariance;
+    const variance = this.randomVariance() * temperamentVariance;
     return speed + variance;
   }
 
-  // --- calc: 계산/판정/이동 ---
-
-  /**
-   * 현재 적용 가속력(기본+슬립스트림+라스트스퍼트)을 반환
-   */
-  calcAcceleration(): number {
+  private getCurrentAcceleration(): number {
     return (
       this.acceleration + this.slipstreamAccelBonus + this.lastSpurtAccelBonus
     );
   }
 
-  /** 구간별 목표 속도 계산 */
-  calcTargetSpeed(phase: RacePhase): number {
-    let speed = this.basePhaseSpeed(phase);
+  private getPhaseGoalSpeed(phase: RacePhase): number {
+    let speed = this.getBasePhaseSpeed(phase);
     speed += this.slipstreamSpeedBonus;
     speed += this.lastSpurtAccelBonus;
-    speed = this.applyStaminaPenalty(speed);
-    speed = this.applyWeightPenalty(speed);
-    speed = this.applyRandomVariance(speed);
+    speed = this.applyLowStaminaSpeedPenalty(speed);
+    speed = this.applyWeightSpeedPenalty(speed);
+    speed = this.applyTemperamentVariance(speed);
     return Math.min(speed, this.maxSpeed);
   }
 
-  /** 페이즈별 기본 속도 */
-  private basePhaseSpeed(phase: RacePhase): number {
+  private getBasePhaseSpeed(phase: RacePhase): number {
     if (phase === RacePhase.Early) {
       return this.baseSpeed * RACE_VALUES.EARLY_PHASE_SPEED;
     }
@@ -124,15 +115,10 @@ export class RaceHorse {
     return this.baseSpeed;
   }
 
-  /** 가속/감속 및 이동량 계산 */
-  calcMove(targetSpeed: number): number {
-    // 1. 가속력 계산 (기본 + 슬립스트림 + 라스트스퍼트)
-    const effectiveAcceleration = this.calcAcceleration();
-
-    // 2. 가속/감속 상황별 속도 계산
+  private getMoveDistanceByTargetSpeed(targetSpeed: number): number {
+    const effectiveAcceleration = this.getCurrentAcceleration();
     let nextSpeed: number;
     if (this.currentSpeed < targetSpeed) {
-      // 가속
       nextSpeed = this.currentSpeed + effectiveAcceleration;
       if (nextSpeed > targetSpeed) {
         nextSpeed = targetSpeed;
@@ -142,7 +128,6 @@ export class RaceHorse {
       }
       this.currentSpeed = nextSpeed;
     } else {
-      // 감속
       nextSpeed = this.currentSpeed - effectiveAcceleration;
       if (nextSpeed < targetSpeed) {
         nextSpeed = targetSpeed;
@@ -152,8 +137,6 @@ export class RaceHorse {
       }
       this.currentSpeed = nextSpeed;
     }
-
-    // 3. 이동량 계산 (currentSpeed는 m/s, 단위 변환)
     const minMoveFactor = RACE_VALUES.MOVE_FACTOR_MIN;
     const moveFactorRange = RACE_VALUES.MOVE_FACTOR_RANGE;
     const randomValue = Math.random();
@@ -165,39 +148,102 @@ export class RaceHorse {
     return moveDistance;
   }
 
-  /**
-   * 코너 추월 파워 계산 (코너 난이도 수치에 따라 보정)
-   * @param difficulty 코너 난이도 계수(1.0=기본, 1.1=완만, 0.9=가파름 등)
-   */
-  calcCornerOvertakePower(difficulty: number): number {
+  public getCornerOvertakePower(difficulty: number): number {
     let basePower =
       this.cornering +
       this.positioning +
       this.temperament +
-      (Math.random() - RACE_VALUES.RANDOM_BASE);
+      this.randomVariance();
     basePower *= difficulty;
     return basePower;
   }
 
-  /** 한 턴 실행 */
-  run(phase: RacePhase) {
-    // 1. 목표속도 계산
-    const targetSpeed = this.calcTargetSpeed(phase);
-    // 2. 스태미나 소모
-    this.applyStaminaChange(phase);
-    // 3. 가속/이동
-    const move = this.calcMove(targetSpeed);
-    // 4. 거리 갱신
+  private updateForTurn(phase: RacePhase) {
+    const targetSpeed = this.getPhaseGoalSpeed(phase);
+    this.consumeStaminaByPhase(phase);
+    const move = this.getMoveDistanceByTargetSpeed(targetSpeed);
     this.distance += move;
   }
 
-  // --- 코너/특수효과 ---
-
-  /** 코너 구간 판정 (코너 타입 포함) */
-  static isInCorner(
-    distance: number,
-    corner: { start: number; end: number }
-  ): boolean {
+  static isInCornerSection(distance: number, corner: TrackCorner): boolean {
     return distance >= corner.start && distance < corner.end;
+  }
+
+  public isLaneBlocked(horses: RaceHorse[], targetLane: number): boolean {
+    for (let i = 0; i < horses.length; i++) {
+      const h = horses[i];
+      const sameLane = h.lane === targetLane;
+      const diff = Math.abs(h.distance - this.distance);
+      const blocked = sameLane && diff < RACE_VALUES.CLOSE_POSITION_BLOCK;
+      if (blocked) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public getInnerHorseInLane(
+    horses: RaceHorse[],
+    targetLane: number
+  ): RaceHorse | undefined {
+    for (let i = 0; i < horses.length; i++) {
+      const h = horses[i];
+      const sameLane = h.lane === targetLane;
+      const diff = Math.abs(h.distance - this.distance);
+      const isInner = sameLane && diff < RACE_VALUES.CLOSE_POSITION_INNER;
+      if (isInner) {
+        return h;
+      }
+    }
+    return undefined;
+  }
+
+  public getClosestHorseAheadInLane(
+    horses: RaceHorse[]
+  ): RaceHorse | undefined {
+    let closestAhead: RaceHorse | undefined = undefined;
+    for (let i = 0; i < horses.length; i++) {
+      const other = horses[i];
+      const sameLane = other.lane === this.lane;
+      const ahead = other.distance > this.distance;
+      if (sameLane && ahead) {
+        if (!closestAhead || other.distance < closestAhead.distance) {
+          closestAhead = other;
+        }
+      }
+    }
+    return closestAhead;
+  }
+
+  public getSlipstreamBonus(horses: RaceHorse[]): {
+    speed: number;
+    accel: number;
+  } {
+    const sameLaneAhead = this.getClosestHorseAheadInLane(horses);
+    if (!sameLaneAhead) {
+      return { speed: 0, accel: 0 };
+    }
+    const distanceToAhead = sameLaneAhead.distance - this.distance;
+    const inSlipstreamZone =
+      distanceToAhead >= RACE_VALUES.SLIPSTREAM_MIN_DIST &&
+      distanceToAhead <= RACE_VALUES.SLIPSTREAM_MAX_DIST;
+    let slipstreamBonus = 0;
+    let accelBonus = 0;
+    if (inSlipstreamZone) {
+      slipstreamBonus = RACE_VALUES.SLIPSTREAM_SPEED_BONUS;
+      accelBonus = RACE_VALUES.SLIPSTREAM_ACCEL_BONUS;
+    }
+    return { speed: slipstreamBonus, accel: accelBonus };
+  }
+
+  public updateRaceState(track: RaceTrack, horses: RaceHorse[]): void {
+    const { phase, lastSpurtAccel, ignoreStaminaPenalty } =
+      track.getPhaseEffectInfo(this);
+    const { speed, accel } = this.getSlipstreamBonus(horses);
+    this.slipstreamSpeedBonus = speed;
+    this.slipstreamAccelBonus = accel;
+    this.lastSpurtAccelBonus = lastSpurtAccel;
+    this.ignoreStaminaPenalty = ignoreStaminaPenalty;
+    this.updateForTurn(phase);
   }
 }
