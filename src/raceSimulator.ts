@@ -241,6 +241,8 @@ export class RaceSimulator {
         innerScore =
           inner.positioning + (Math.random() - RACE_VALUES.RANDOM_BASE);
       }
+      // 포지션 싸움 시도마다 스태미나 소모
+      curr.staminaLeft -= RACE_VALUES.POSITION_FIGHT_STAMINA;
       if (!inner || myScore > innerScore) {
         curr.lane = targetLane;
       }

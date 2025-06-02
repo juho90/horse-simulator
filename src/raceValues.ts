@@ -45,4 +45,5 @@ export const RACE_VALUES = {
 
   // 코너 진입 전 포지션 싸움 거리
   POSITION_FIGHT_RANGE: 100, // 코너 진입 전 포지션 싸움 거리(m)
+  POSITION_FIGHT_STAMINA: 0.1, // 포지션 싸움 시도 시 스태미나 소모량
 };
