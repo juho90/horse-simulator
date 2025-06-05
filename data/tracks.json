@@ -1,7 +1,7 @@
 [
   {
     "name": "Seoul Racecourse",
-    "finishLine": 10000,
+    "finishLine": 13000,
     "corners": [
       { "start": 2000, "end": 3000, "difficulty": 1.1 },
       { "start": 5000, "end": 6000, "difficulty": 0.9 }
@@ -17,7 +17,7 @@
   },
   {
     "name": "Long Track",
-    "finishLine": 20000,
+    "finishLine": 23000,
     "corners": [
       { "start": 4000, "end": 6000, "difficulty": 1.1 },
       { "start": 10000, "end": 12000, "difficulty": 1.1 },
@@ -35,7 +35,7 @@
   },
   {
     "name": "River Park",
-    "finishLine": 9000,
+    "finishLine": 12000,
     "corners": [
       { "start": 1800, "end": 2300, "difficulty": 1.1 },
       { "start": 5000, "end": 5500, "difficulty": 0.9 }

@@ -1,0 +1,103 @@
+{
+  "totalTurns": 6,
+  "stats": [
+    {
+      "name": "썬더",
+      "maxSpeed": 171.46441588888288,
+      "avgSpeed": 146.85707568214735,
+      "minStamina": 810.6745964255899,
+      "finishDistance": 1192.8290144104335
+    },
+    {
+      "name": "블리츠",
+      "maxSpeed": 422.72219199624533,
+      "avgSpeed": 192.38645535035775,
+      "minStamina": 857.3224675749659,
+      "finishDistance": 1550.0129538679014
+    },
+    {
+      "name": "윈드",
+      "maxSpeed": 372.98739045033756,
+      "avgSpeed": 174.29666204427477,
+      "minStamina": 700.1104668295743,
+      "finishDistance": 1399.120221464403
+    },
+    {
+      "name": "스톰",
+      "maxSpeed": 399.6657731918218,
+      "avgSpeed": 182.1165244080897,
+      "minStamina": 746.124636895121,
+      "finishDistance": 1465.716621552936
+    },
+    {
+      "name": "플래시",
+      "maxSpeed": 363.7407258709944,
+      "avgSpeed": 159.77407446844654,
+      "minStamina": 849.9564339876033,
+      "finishDistance": 1278.1925957475723
+    },
+    {
+      "name": "스피릿",
+      "maxSpeed": 153.5407106793804,
+      "avgSpeed": 134.31887175540317,
+      "minStamina": 848.5430873858057,
+      "finishDistance": 1078.055821650586
+    },
+    {
+      "name": "에이스",
+      "maxSpeed": 407.2503476892148,
+      "avgSpeed": 176.24584414123774,
+      "minStamina": 793.9472047919626,
+      "finishDistance": 1420.0714662985501
+    },
+    {
+      "name": "로켓",
+      "maxSpeed": 391.1855228351859,
+      "avgSpeed": 176.14898753492017,
+      "minStamina": 698.9350918805785,
+      "finishDistance": 1412.833224746434
+    }
+  ],
+  "rankSummary": [
+    {
+      "name": "썬더",
+      "first": 2,
+      "avgRank": 2.5
+    },
+    {
+      "name": "블리츠",
+      "first": 4,
+      "avgRank": 1.3333333333333333
+    },
+    {
+      "name": "윈드",
+      "first": 0,
+      "avgRank": 4.166666666666667
+    },
+    {
+      "name": "스톰",
+      "first": 0,
+      "avgRank": 2.8333333333333335
+    },
+    {
+      "name": "플래시",
+      "first": 0,
+      "avgRank": 7.666666666666667
+    },
+    {
+      "name": "스피릿",
+      "first": 0,
+      "avgRank": 6.5
+    },
+    {
+      "name": "에이스",
+      "first": 0,
+      "avgRank": 6.166666666666667
+    },
+    {
+      "name": "로켓",
+      "first": 0,
+      "avgRank": 4.833333333333333
+    }
+  ]
+}

@@ -2,121 +2,121 @@
   {
     "name": "썬더",
     "stats": {
-      "speed": 12,
-      "stamina": 14,
-      "paceSense": 7,
-      "cornering": 8,
-      "positioning": 7,
-      "temperament": 6,
-      "weight": 5
+      "speed": 1220,
+      "stamina": 1420,
+      "paceSense": 720,
+      "cornering": 820,
+      "positioning": 720,
+      "temperament": 620,
+      "weight": 500
     }
   },
   {
     "name": "블리츠",
     "stats": {
-      "speed": 11,
-      "stamina": 13,
-      "paceSense": 8,
-      "cornering": 7,
-      "positioning": 8,
-      "temperament": 7,
-      "weight": 6
+      "speed": 1120,
+      "stamina": 1320,
+      "paceSense": 820,
+      "cornering": 720,
+      "positioning": 820,
+      "temperament": 720,
+      "weight": 600
     }
   },
   {
     "name": "루나",
     "stats": {
-      "speed": 10,
-      "stamina": 15,
-      "paceSense": 6,
-      "cornering": 9,
-      "positioning": 6,
-      "temperament": 5,
-      "weight": 5
+      "speed": 1040,
+      "stamina": 1540,
+      "paceSense": 640,
+      "cornering": 940,
+      "positioning": 640,
+      "temperament": 540,
+      "weight": 500
     }
   },
   {
     "name": "에이스",
     "stats": {
-      "speed": 13,
-      "stamina": 12,
-      "paceSense": 7,
-      "cornering": 7,
-      "positioning": 7,
-      "temperament": 8,
-      "weight": 6
+      "speed": 1280,
+      "stamina": 1200,
+      "paceSense": 700,
+      "cornering": 700,
+      "positioning": 700,
+      "temperament": 800,
+      "weight": 600
     }
   },
   {
     "name": "스톰",
     "stats": {
-      "speed": 12,
-      "stamina": 13,
-      "paceSense": 8,
-      "cornering": 8,
-      "positioning": 6,
-      "temperament": 7,
-      "weight": 5
+      "speed": 1200,
+      "stamina": 1320,
+      "paceSense": 820,
+      "cornering": 820,
+      "positioning": 640,
+      "temperament": 720,
+      "weight": 520
     }
   },
   {
     "name": "샤인",
     "stats": {
-      "speed": 11,
-      "stamina": 14,
-      "paceSense": 7,
-      "cornering": 8,
-      "positioning": 7,
-      "temperament": 6,
-      "weight": 6
+      "speed": 1120,
+      "stamina": 1440,
+      "paceSense": 720,
+      "cornering": 820,
+      "positioning": 720,
+      "temperament": 620,
+      "weight": 600
     }
   },
   {
     "name": "플레어",
     "stats": {
-      "speed": 13,
-      "stamina": 13,
-      "paceSense": 6,
-      "cornering": 7,
-      "positioning": 8,
-      "temperament": 7,
-      "weight": 5
+      "speed": 1260,
+      "stamina": 1280,
+      "paceSense": 640,
+      "cornering": 720,
+      "positioning": 820,
+      "temperament": 720,
+      "weight": 520
     }
   },
   {
     "name": "위너",
     "stats": {
-      "speed": 12,
-      "stamina": 12,
-      "paceSense": 7,
-      "cornering": 9,
-      "positioning": 7,
-      "temperament": 8,
-      "weight": 6
+      "speed": 1200,
+      "stamina": 1220,
+      "paceSense": 720,
+      "cornering": 920,
+      "positioning": 720,
+      "temperament": 820,
+      "weight": 600
     }
   },
   {
     "name": "로키",
     "stats": {
-      "speed": 10,
-      "stamina": 15,
-      "paceSense": 8,
-      "cornering": 8,
-      "positioning": 6,
-      "temperament": 5,
-      "weight": 5
+      "speed": 1040,
+      "stamina": 1540,
+      "paceSense": 820,
+      "cornering": 820,
+      "positioning": 640,
+      "temperament": 540,
+      "weight": 520
     }
   },
   {
     "name": "스피어",
     "stats": {
-      "speed": 12,
-      "stamina": 13,
-      "paceSense": 7,
-      "cornering": 7,
-      "positioning": 7,
-      "temperament": 6,
-      "weight": 6
+      "speed": 1220,
+      "stamina": 1320,
+      "paceSense": 720,
+      "cornering": 720,
+      "positioning": 720,
+      "temperament": 620,
+      "weight": 600
     }
   }
 ]

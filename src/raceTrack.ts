@@ -1,13 +1,15 @@
-import { TrackOptions } from "./interfaces";
+import { TrackCorner, TrackOptions } from "./interfaces";
 import { RaceHorse } from "./raceHorse";
 import { RacePhase } from "./raceValues";
 
 export class RaceTrack {
   public name: string;
   public finishLine: number;
+  public corners: TrackCorner[];
   constructor(track: TrackOptions) {
     this.name = track.name;
     this.finishLine = track.finishLine;
+    this.corners = track.corners;
   }
 
   public getRacePhase(progress: number): RacePhase {
