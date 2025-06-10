@@ -1,3 +1,3 @@
-import { RaceManager } from "./RaceManager";
+import { RaceManager } from "./raceManager";
 
 new RaceManager().run();

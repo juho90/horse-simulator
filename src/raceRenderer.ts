@@ -1,4 +1,5 @@
-import { RaceLog, TrackOptions } from "./interfaces";
+import { RaceLog } from "./interfaces";
+import { RaceTrack } from "./raceTrack";
 
 export class RaceRenderer {
   /**
@@ -41,7 +42,7 @@ export class RaceRenderer {
     return result;
   }
 
-  static renderVisualizerHtml(logs: any[], track: TrackOptions) {
+  static renderVisualizerHtml(logs: RaceLog[], track: RaceTrack) {
     const fs = require("fs");
     const path = require("path");
     const lanesCount =

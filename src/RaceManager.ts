@@ -1,5 +1,6 @@
 import { RaceHorse } from "./raceHorse";
 import { RaceLogAnalyzer } from "./raceLogAnalyzer";
+import { RaceRenderer } from "./raceRenderer";
 import { RaceSimulator } from "./raceSimulator";
 import { RaceTrack } from "./raceTrack";
 import { HORSE_VALUES, TRACK_VALUES, randFloat, randInt } from "./raceValues";
@@ -91,5 +92,6 @@ export class RaceManager {
     analyzer.saveRaceLogs(logs, "race_log.json");
     analyzer.saveStatsJson("race_stats.json");
     analyzer.printSummaryToConsoleWithProfiles(horses);
+    RaceRenderer.renderVisualizerHtml(logs, raceTrack);
   }
 }
