@@ -5,7 +5,7 @@
       "type": "node",
       "request": "launch",
       "name": "Debug TypeScript",
-      "program": "${workspaceFolder}/src/index.ts",
+      "program": "${workspaceFolder}/src/main.ts",
       "runtimeArgs": ["-r", "ts-node/register"],
       "cwd": "${workspaceFolder}"
     }
