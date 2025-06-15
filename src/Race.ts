@@ -17,7 +17,6 @@ export class Race {
     this.tracks = horses.length; // 트랙 수 = 말 수
   }
 
-  // 해당 트랙, 위치에 말이 있는지 확인
   isBlocked(track: number, position: number, exceptHorse?: Horse): boolean {
     return this.horses.some(
       (h) =>

@@ -13,7 +13,6 @@ export class Horse {
     this.track = track;
   }
 
-  // move 메서드는 트랙 변경을 Race에서 관리하므로, 위치만 이동
   move(maxPositionAhead: number) {
     const moveDist = this.speed * (0.8 + Math.random() * 0.4);
     let nextPos = this.position + moveDist;

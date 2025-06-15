@@ -1,7 +1,16 @@
-// main.ts
-// 시뮬레이터 실행 및 사용자 인터페이스
+// main.ts (Node.js에서 실행, 경주 로그 생성)
+import * as fs from "fs";
 import { Horse } from "./Horse";
 import { Race } from "./Race";
+import { getRaceViewerHtml } from "./raceViewer";
+
+interface HorseLog {
+  name: string;
+  position: number;
+  track: number;
+}
+
+type RaceLog = HorseLog[];
 
 function main() {
   const horses = [
@@ -10,20 +19,36 @@ function main() {
     new Horse("스톰", 11, 3),
   ];
   const race = new Race(horses, 100);
+  const logs: RaceLog[] = [];
 
-  console.log("경마 시뮬레이터 시작!");
+  // 첫 턴(시작 상태) 저장
+  logs.push(
+    horses.map((h) => ({
+      name: h.name,
+      position: h.position,
+      track: h.track,
+    }))
+  );
+
   while (!race.isFinished()) {
     race.step();
-    horses.forEach((horse) => {
-      console.log(
-        `${horse.name} (트랙 ${horse.track}): ${horse.position.toFixed(1)}m`
-      );
-    });
-    console.log("---");
+    logs.push(
+      horses.map((h) => ({
+        name: h.name,
+        position: h.position,
+        track: h.track,
+      }))
+    );
   }
-  if (race.winner) {
-    console.log(`우승마: ${race.winner.name}!`);
-  }
+
+  // logs를 포함한 단순 HTML 생성 및 저장
+  const html = getRaceViewerHtml(logs);
+  fs.writeFileSync("src/index.html", html, "utf-8");
+  console.log("경주 로그가 포함된 index.html이 생성되었습니다.");
+
+  // Windows에서 기본 브라우저로 index.html 자동 열기
+  const { exec } = require("child_process");
+  exec(`start "" "src/index.html"`);
 }
 
 main();

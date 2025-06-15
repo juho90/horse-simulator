@@ -7,7 +7,8 @@
       "name": "Debug TypeScript",
       "program": "${workspaceFolder}/src/main.ts",
       "runtimeArgs": ["-r", "ts-node/register"],
-      "cwd": "${workspaceFolder}"
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
     }
   ]
 }
