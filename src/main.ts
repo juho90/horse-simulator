@@ -1,54 +1,38 @@
-// main.ts (Node.js에서 실행, 경주 로그 생성)
+import { exec } from "child_process";
 import * as fs from "fs";
-import { Horse } from "./Horse";
-import { Race } from "./Race";
-import { getRaceViewerHtml } from "./raceViewer";
-
-interface HorseLog {
-  name: string;
-  position: number;
-  track: number;
-}
-
-type RaceLog = HorseLog[];
+import { createHorses, HorseRace } from "./horseRace";
+import { createTrack } from "./raceTrack";
+import { generateRaceHtml } from "./raceViewer";
 
 function main() {
-  const horses = [
-    new Horse("썬더", 10, 1),
-    new Horse("블리츠", 9, 2),
-    new Horse("스톰", 11, 3),
-  ];
-  const race = new Race(horses, 100);
-  const logs: RaceLog[] = [];
+  // 트랙 정보(길이, 코너) 설정
+  const track = createTrack();
+  const horses = createHorses();
+  const race = new HorseRace(horses, track);
 
-  // 첫 턴(시작 상태) 저장
-  logs.push(
-    horses.map((h) => ({
-      name: h.name,
-      position: h.position,
-      track: h.track,
-    }))
-  );
-
-  while (!race.isFinished()) {
-    race.step();
-    logs.push(
-      horses.map((h) => ({
-        name: h.name,
-        position: h.position,
-        track: h.track,
-      }))
-    );
+  // 경주 진행
+  while (!race.finished) {
+    race.nextTurn();
   }
 
-  // logs를 포함한 단순 HTML 생성 및 저장
-  const html = getRaceViewerHtml(logs);
-  fs.writeFileSync("src/index.html", html, "utf-8");
-  console.log("경주 로그가 포함된 index.html이 생성되었습니다.");
+  // 결과 출력
+  console.log(`경주 종료! 총 턴: ${race.turn}`);
+  if (race.winner) {
+    console.log(`우승마: ${race.winner.name} (속도: ${race.winner.speed}m/턴)`);
+  }
+  console.log("턴별 경주마 상태:");
+  for (const turnState of race.getHistory()) {
+    const horseStates = turnState.horses
+      .map((h) => `${h.name}: ${h.distance}m`)
+      .join(", ");
+    console.log(`턴 ${turnState.turn}: ${horseStates}`);
+  }
 
-  // Windows에서 기본 브라우저로 index.html 자동 열기
-  const { exec } = require("child_process");
-  exec(`start "" "src/index.html"`);
+  // HTML 생성 및 실행
+  const html = generateRaceHtml(race.getHistory(), track);
+  const outPath = "race-result.html";
+  fs.writeFileSync(outPath, html, "utf-8");
+  exec(`start ${outPath}`);
 }
 
 main();
