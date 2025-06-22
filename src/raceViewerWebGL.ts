@@ -42,38 +42,83 @@ export function generateRaceWebGLHtml(raceLog: any[], track: RaceTrack) {
     camera.position.z = 10;
     const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('webgl'), antialias: true, alpha: true });
     renderer.setClearColor(0xf4f4f4, 1);
-    // 트랙을 원형(타원형) 곡선으로 생성
-    const ellipseA = 320, ellipseB = 180; // 장축, 단축
-    const ellipseCurve = new THREE.EllipseCurve(0, 0, ellipseA, ellipseB, 0, Math.PI * 2, false, 0);
-    // 트랙 Path(Shape)
-    const trackPath = new THREE.Path(ellipseCurve.getPoints(200));
-    const trackGeom = new THREE.BufferGeometry().setFromPoints(trackPath.getPoints());
+    // 트랙을 직선+코너 복합 곡선(2D)으로 생성
+    function buildTrackCurvePath2D(track) {
+      // 캔버스 크기에 맞게 중심/반지름 자동 조정
+      const canvasW = 900, canvasH = 500;
+      const margin = 40;
+      const cx = 0;
+      const cy = 0;
+      const r = Math.min(canvasW, canvasH) / 2 - margin;
+      let angle = 0; // 시작 각도(라디안)
+      const path = new THREE.CurvePath();
+      // 곡률을 더 자연스럽게: 제어점 거리를 r*1.15로 조정 (덜 뾰족하게)
+      const tangentLen = r * 1.15;
+      for (let i = 0; i < track.segments.length; i++) {
+        const seg = track.segments[i];
+        const ratio = (seg.end - seg.start) / track.trackLength;
+        const segAngle = ratio * Math.PI * 2;
+        if (seg.type === 'line') {
+          // 직선 시작/끝점(원 위)
+          const x1 = cx + Math.cos(angle) * r;
+          const y1 = cy + Math.sin(angle) * r;
+          const x2 = cx + Math.cos(angle + segAngle) * r;
+          const y2 = cy + Math.sin(angle + segAngle) * r;
+          // 직선 구간은 LineCurve로!
+          path.add(new THREE.LineCurve(
+            new THREE.Vector2(x1, y1),
+            new THREE.Vector2(x2, y2)
+          ));
+          angle += segAngle;
+        } else if (seg.type === 'corner') {
+          path.add(new THREE.ArcCurve(
+            cx, cy, r,
+            angle, angle + segAngle,
+            false
+          ));
+          angle += segAngle;
+        }
+      }
+      if (Math.abs(angle - Math.PI * 2) > 1e-2) {
+        const x1 = cx + Math.cos(angle) * r;
+        const y1 = cy + Math.sin(angle) * r;
+        const tanAngle = (angle + 0) / 2;
+        const cpx = cx + Math.cos(tanAngle) * tangentLen;
+        const cpy = cy + Math.sin(tanAngle) * tangentLen;
+        const x2 = cx + Math.cos(0) * r;
+        const y2 = cy + Math.sin(0) * r;
+        path.add(new THREE.QuadraticBezierCurve(
+          new THREE.Vector2(x1, y1),
+          new THREE.Vector2(cpx, cpy),
+          new THREE.Vector2(x2, y2)
+        ));
+      }
+      return path;
+    }
+    // 트랙 Path
+    const trackCurvePath = buildTrackCurvePath2D(track);
+    const trackPoints = trackCurvePath.getPoints(300);
+    const trackGeom = new THREE.BufferGeometry().setFromPoints(trackPoints.map(p => new THREE.Vector3(p.x, p.y, 0)));
     const trackLine = new THREE.Line(trackGeom, new THREE.LineBasicMaterial({ color: 0xcccccc, linewidth: 12 }));
     scene.add(trackLine);
-    // 출발점/결승점 표시
+    // 출발점/결승점 표시 (복합 곡선 길이 비율)
     function drawStartFinishMarkers() {
-      // 출발점/결승점의 각도(비율)
-      const startT = track.start / track.length;
-      const finishT = track.finish / track.length;
-      const startAngle = startT * Math.PI * 2;
-      const finishAngle = finishT * Math.PI * 2;
+      const totalLen = trackCurvePath.getLength();
+      const startT = track.start / track.trackLength;
+      const finishT = track.finish / track.trackLength;
+      const startPt = trackCurvePath.getPointAt(startT);
+      const finishPt = trackCurvePath.getPointAt(finishT);
       // 출발점
-      const sx = Math.cos(startAngle) * ellipseA;
-      const sy = Math.sin(startAngle) * ellipseB;
       const startGeom = new THREE.PlaneGeometry(18, 36);
       const startMat = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
       const startMesh = new THREE.Mesh(startGeom, startMat);
-      startMesh.position.set(sx, sy, 1);
-      startMesh.rotation.z = startAngle + Math.PI/2;
+      startMesh.position.set(startPt.x, startPt.y, 1);
       scene.add(startMesh);
       // 결승점
-      const fx = Math.cos(finishAngle) * ellipseA;
-      const fy = Math.sin(finishAngle) * ellipseB;
       const finishGeom = new THREE.PlaneGeometry(18, 36);
       const finishMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
       const finishMesh = new THREE.Mesh(finishGeom, finishMat);
-      finishMesh.position.set(fx, fy, 1);
-      finishMesh.rotation.z = finishAngle + Math.PI/2;
+      finishMesh.position.set(finishPt.x, finishPt.y, 1);
       scene.add(finishMesh);
     }
     drawStartFinishMarkers();
@@ -86,15 +131,11 @@ export function generateRaceWebGLHtml(raceLog: any[], track: RaceTrack) {
       scene.add(mesh);
       horseMeshes.push(mesh);
     }
-    // 말 위치 계산 (원형 곡선 따라)
+    // 말 위치 계산 (복합 곡선 따라)
     function getHorsePos(distance, idx) {
-      // distance: 출발점 기준 누적 이동거리
-      const t = ((track.start + distance) % track.length) / track.length;
-      const angle = t * Math.PI * 2;
-      return {
-        x: Math.cos(angle) * ellipseA,
-        y: Math.sin(angle) * ellipseB
-      };
+      const t = ((track.start + distance) % track.trackLength) / track.trackLength;
+      const pt = trackCurvePath.getPointAt(t);
+      return { x: pt.x, y: pt.y };
     }
     // 애니메이션 루프
     function render() {

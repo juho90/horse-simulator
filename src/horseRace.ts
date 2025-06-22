@@ -41,7 +41,7 @@ export class HorseRace {
     this.turn++;
     for (const horse of this.horses) {
       horse.distance += horse.speed;
-      if (!this.finished && horse.distance >= this.track.length) {
+      if (!this.finished && horse.distance >= this.track.raceLength) {
         this.finished = true;
         this.winner = horse;
       }
