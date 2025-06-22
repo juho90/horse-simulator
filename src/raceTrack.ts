@@ -23,11 +23,18 @@ export type RaceSegment = RaceLine | RaceCorner;
 export interface RaceTrack {
   length: number;
   segments: RaceSegment[];
+  start: number; // 출발점(트랙 거리상 위치, m)
+  finish: number; // 결승점(트랙 거리상 위치, m)
 }
 
 export function createTrack(): RaceTrack {
   // 트랙 길이: 1200~3600m, 100m 단위
   const length = 1200 + Math.floor(Math.random() * 25) * 100; // 1200~3600
+  // 출발점: 0~length-1 중 임의 위치
+  const start = Math.floor(Math.random() * length);
+  // 결승점: 출발점과 다르게, 1바퀴 이내 임의 위치(예: start+600~start+length-100)
+  let finish = start + 600 + Math.floor(Math.random() * (length - 700));
+  if (finish >= length) finish -= length;
   // 코너 개수: 2~4개
   const cornerCount = 2 + Math.floor(Math.random() * 3); // 2~4
   const minCornerLen = 100;
@@ -75,5 +82,5 @@ export function createTrack(): RaceTrack {
   }
   // 시작점 기준 정렬
   segments = segments.sort((a, b) => a.start - b.start);
-  return { length, segments };
+  return { length, segments, start, finish };
 }

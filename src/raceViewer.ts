@@ -122,10 +122,59 @@ export function generateRaceHtml(raceLog: any[], track: RaceTrack) {
   }
   const segments = buildSegments();
 
+  // 트랙 구간을 SVG 좌표계로 변환 (시작점, 방향, arc 중심/반지름/각도 등 계산)
+  function segmentsToSvg(track: RaceTrack) {
+    const svgSegments = [];
+    // 전체 트랙 길이(m) → SVG 총 길이(px)
+    const svgTotalLen = Math.min(width - 2 * margin, height - 2 * margin) * 0.9;
+    // 시작점: 좌상단 기준, dir=0(→)
+    let x = centerX - svgTotalLen / 2;
+    let y = centerY;
+    let dir = 0; // 0:→, 90:↓, 180:←, 270:↑
+    for (const seg of track.segments) {
+      const ratio = (seg.end - seg.start) / track.length;
+      const pxLen = svgTotalLen * ratio;
+      if (seg.type === "line") {
+        const x2 = x + Math.cos((dir * Math.PI) / 180) * pxLen;
+        const y2 = y + Math.sin((dir * Math.PI) / 180) * pxLen;
+        svgSegments.push({ type: "line", x1: x, y1: y, x2, y2, length: pxLen });
+        x = x2;
+        y = y2;
+      } else if (seg.type === "corner") {
+        // 코너: 90도 원호(시계방향), 반지름은 pxLen (길이=πr/2 → r=2*pxLen/π)
+        const r = (2 * pxLen) / Math.PI;
+        const sweep = 1;
+        const startAngle = dir;
+        const endAngle = dir + 90;
+        // arc 중심 계산
+        const cx = x + Math.cos(((dir + 90) * Math.PI) / 180) * r;
+        const cy = y + Math.sin(((dir + 90) * Math.PI) / 180) * r;
+        svgSegments.push({
+          type: "arc",
+          cx,
+          cy,
+          r,
+          startAngle,
+          endAngle,
+          sweep,
+          length: pxLen,
+        });
+        // arc 끝점 계산
+        x = cx + Math.cos(((endAngle - 180) * Math.PI) / 180) * r;
+        y = cy + Math.sin(((endAngle - 180) * Math.PI) / 180) * r;
+        dir = (dir + 90) % 360;
+      }
+    }
+    return svgSegments;
+  }
+
+  const svgSegments = segmentsToSvg(track);
+
   // SVG 경로 생성
   function buildTrackPath() {
-    let path = [`M ${segments[0].x1},${segments[0].y1}`];
-    for (const seg of segments) {
+    if (svgSegments.length === 0) return "";
+    let path = [`M ${svgSegments[0].x1},${svgSegments[0].y1}`];
+    for (const seg of svgSegments) {
       if (seg.type === "line" && seg.x2 !== undefined && seg.y2 !== undefined) {
         path.push(`L ${seg.x2},${seg.y2}`);
       } else if (
@@ -147,10 +196,10 @@ export function generateRaceHtml(raceLog: any[], track: RaceTrack) {
     return path.join(" ");
   }
 
-  // 말 위치 계산: 누적 거리로 구간 판별 후 좌표 계산
+  // 말 위치 계산: 누적 거리로 구간 판별 후 SVG 좌표 변환
   function getHorsePosition(distance: number, offset = 0) {
     let d = distance;
-    for (const seg of segments) {
+    for (const seg of svgSegments) {
       if (d <= seg.length) {
         if (
           seg.type === "line" &&
@@ -183,7 +232,7 @@ export function generateRaceHtml(raceLog: any[], track: RaceTrack) {
       d -= seg.length;
     }
     // 마지막 구간을 넘어가면 트랙 끝점에 위치
-    const last = segments[segments.length - 1];
+    const last = svgSegments[svgSegments.length - 1];
     if (last.type === "line" && last.x2 !== undefined && last.y2 !== undefined)
       return { x: last.x2, y: last.y2 - offset };
     else if (

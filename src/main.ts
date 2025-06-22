@@ -2,7 +2,7 @@ import { exec } from "child_process";
 import * as fs from "fs";
 import { createHorses, HorseRace } from "./horseRace";
 import { createTrack } from "./raceTrack";
-import { generateRaceHtml } from "./raceViewer";
+import { generateRaceWebGLHtml } from "./raceViewerWebGL";
 
 function main() {
   // 트랙 정보(길이, 코너) 설정
@@ -29,7 +29,7 @@ function main() {
   }
 
   // HTML 생성 및 실행
-  const html = generateRaceHtml(race.getHistory(), track);
+  const html = generateRaceWebGLHtml(race.getHistory(), track);
   const outPath = "race-result.html";
   fs.writeFileSync(outPath, html, "utf-8");
   exec(`start ${outPath}`);
