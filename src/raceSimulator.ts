@@ -6,42 +6,42 @@ export function runRaceSimulator(
   track: RaceTrack,
   horses: Horse[]
 ): HorseTurnState[] {
-  const maxTurns = 60;
+  const points = track.getTrackPoints(3000);
   const logs: HorseTurnState[] = [];
-  const positions = horses.map(() => ({
-    x: track.segments[0].start.x,
-    y: track.segments[0].start.y,
+  // positions에 name, speed 등 Horse 정보도 포함
+  const positions = horses.map((h) => ({
+    id: h.id,
+    name: h.name,
+    speed: h.speed,
     dist: 0,
+    x: points[0].x,
+    y: points[0].y,
   }));
-  const pointCount = Math.max(1000, Math.round(track.totalLength));
-  const trackPoints = track.getTrackPoints(pointCount);
-  for (let turn = 0; turn < maxTurns; turn++) {
+  let turn = 0;
+  while (positions.some((pos) => pos.dist < track.totalLength)) {
     for (let i = 0; i < horses.length; i++) {
-      positions[i].dist += horses[i].speed;
-      if (positions[i].dist > track.totalLength) {
-        positions[i].dist = track.totalLength;
+      if (positions[i].dist < track.totalLength) {
+        positions[i].dist += horses[i].speed;
+        if (positions[i].dist > track.totalLength)
+          positions[i].dist = track.totalLength;
+        const t = positions[i].dist / track.totalLength;
+        const idx = Math.floor(t * (points.length - 1));
+        positions[i].x = points[idx].x;
+        positions[i].y = points[idx].y;
       }
-      const t = positions[i].dist / track.totalLength;
-      const idx = Math.min(
-        trackPoints.length - 1,
-        Math.floor(t * (trackPoints.length - 1))
-      );
-      positions[i].x = trackPoints[idx].x;
-      positions[i].y = trackPoints[idx].y;
     }
     logs.push({
       turn,
-      horses: positions.map((pos, idx) => ({
-        id: horses[idx].id,
-        name: horses[idx].name,
-        x: pos.x,
-        y: pos.y,
-        dist: pos.dist,
+      horses: positions.map((p) => ({
+        id: p.id,
+        name: p.name,
+        speed: p.speed,
+        dist: p.dist,
+        x: p.x,
+        y: p.y,
       })),
     });
-    if (positions.every((p) => p.dist >= track.totalLength)) {
-      break;
-    }
+    turn++;
   }
   return logs;
 }
