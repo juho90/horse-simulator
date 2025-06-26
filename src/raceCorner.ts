@@ -1,99 +1,28 @@
-import { Point, RaceSegment } from "./raceSegment";
-
-export type CornerDirection = "left" | "right";
+import { RaceLine } from "./raceLine";
+import { BoundingBox, Point, RaceSegment } from "./raceSegment";
 
 export class RaceCorner extends RaceSegment {
   center: Point;
   radius: number;
-  angle: number; // 라디안
-  direction: CornerDirection;
+  angle: number;
   startAngle: number;
   endAngle: number;
 
-  constructor(
-    start: Point,
-    radius: number,
-    angle: number,
-    direction: CornerDirection,
-    center: Point,
-    startAngle?: number,
-    endAngle?: number
-  ) {
-    const end = RaceCorner.calculateEnd(
-      start,
-      center,
-      radius,
-      angle,
-      direction
-    );
+  constructor(start: Point, center: Point, angle: number) {
+    const radius = Math.hypot(start.x - center.x, start.y - center.y);
+    const startAngle = Math.atan2(start.y - center.y, start.x - center.x);
+    const endAngle = startAngle + angle; // 시계방향(+)
+    const end: Point = {
+      x: center.x + radius * Math.cos(endAngle),
+      y: center.y + radius * Math.sin(endAngle),
+    };
     super(start, end, "corner");
     this.center = center;
     this.radius = radius;
     this.angle = angle;
-    this.direction = direction;
-    this.startAngle =
-      startAngle !== undefined
-        ? startAngle
-        : Math.atan2(start.y - center.y, start.x - center.x);
-    this.endAngle =
-      endAngle !== undefined
-        ? endAngle
-        : this.direction === "left"
-        ? this.startAngle + angle
-        : this.startAngle - angle;
+    this.startAngle = startAngle;
+    this.endAngle = endAngle;
     this.length = this.calculateLength();
-  }
-
-  static fromStartEndCenter(
-    start: Point,
-    end: Point,
-    center: Point
-  ): RaceCorner {
-    const startAngle = Math.atan2(start.y - center.y, start.x - center.x);
-    const endAngle = Math.atan2(end.y - center.y, end.x - center.x);
-    let angle = endAngle - startAngle;
-
-    // 방향 및 보정
-    let direction: CornerDirection = "left";
-    if (angle < 0) {
-      angle += 2 * Math.PI;
-    }
-    if (angle > Math.PI) {
-      direction = "right";
-      angle = 2 * Math.PI - angle;
-    }
-
-    const radius = Math.sqrt(
-      (start.x - center.x) ** 2 + (start.y - center.y) ** 2
-    );
-
-    return new RaceCorner(
-      start,
-      radius,
-      angle,
-      direction,
-      center,
-      startAngle,
-      endAngle
-    );
-  }
-
-  static calculateEnd(
-    start: Point,
-    center: Point,
-    radius: number,
-    angle: number,
-    direction: CornerDirection
-  ): Point {
-    const dx = start.x - center.x;
-    const dy = start.y - center.y;
-    const startAngle = Math.atan2(dy, dx);
-    const delta = direction === "left" ? angle : -angle;
-    const endAngle = startAngle + delta;
-    return {
-      x: center.x + radius * Math.cos(endAngle),
-      y: center.y + radius * Math.sin(endAngle),
-    };
   }
 
   calculateLength(): number {
@@ -102,14 +31,77 @@ export class RaceCorner extends RaceSegment {
 
   getPoints(resolution: number = 100): Point[] {
     const points: Point[] = [];
-    const delta = this.direction === "left" ? -this.angle : this.angle;
     for (let i = 0; i <= resolution; i++) {
-      const theta = this.startAngle + (delta * i) / resolution;
+      const theta = this.startAngle + (this.angle * i) / resolution;
       points.push({
         x: this.center.x + this.radius * Math.cos(theta),
         y: this.center.y + this.radius * Math.sin(theta),
       });
     }
     return points;
+  }
+
+  getBounds(): BoundingBox {
+    return {
+      minX: this.center.x - this.radius,
+      maxX: this.center.x + this.radius,
+      minY: this.center.y - this.radius,
+      maxY: this.center.y + this.radius,
+    };
+  }
+}
+
+export function createHorizontalCorner(
+  arcLength: number,
+  angle: number
+): RaceCorner {
+  const radius = arcLength / Math.abs(angle);
+  const start: Point = { x: 0, y: 0 };
+  const center: Point = { x: 0, y: radius };
+  return new RaceCorner(start, center, angle);
+}
+
+export function createCornerFromLine(
+  line: RaceLine,
+  arcLength: number,
+  angle: number
+): RaceCorner {
+  const lineAngle = Math.atan2(
+    line.end.y - line.start.y,
+    line.end.x - line.start.x
+  );
+  const radius = arcLength / Math.abs(angle);
+  const centerAngle = lineAngle + Math.PI / 2;
+  const centerX = line.end.x + radius * Math.cos(centerAngle);
+  const centerY = line.end.y + radius * Math.sin(centerAngle);
+  const center: Point = { x: centerX, y: centerY };
+  return new RaceCorner(line.end, center, angle);
+}
+
+export function createCornerFromCorner(
+  corner: RaceCorner,
+  arcLength: number,
+  angle: number
+): RaceCorner {
+  const tangentAngle = corner.endAngle + Math.PI / 2;
+  const radius = arcLength / Math.abs(angle);
+  const centerAngle = tangentAngle + Math.PI / 2;
+  const centerX = corner.end.x + radius * Math.cos(centerAngle);
+  const centerY = corner.end.y + radius * Math.sin(centerAngle);
+  const center: Point = { x: centerX, y: centerY };
+  return new RaceCorner(corner.end, center, angle);
+}
+
+export function createCornerFromSegment(
+  segment: RaceSegment,
+  arcLength: number,
+  angle: number
+): RaceCorner {
+  if (segment.type === "line") {
+    return createCornerFromLine(segment as RaceLine, arcLength, angle);
+  } else if (segment.type === "corner") {
+    return createCornerFromCorner(segment as RaceCorner, arcLength, angle);
+  } else {
+    throw new Error("지원되지 않는 세그먼트 타입입니다.");
   }
 }

@@ -2,6 +2,13 @@ export type Point = { x: number; y: number };
 
 export type SegmentType = "line" | "corner";
 
+export type BoundingBox = {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+};
+
 export abstract class RaceSegment {
   start: Point;
   end: Point;
@@ -12,10 +19,11 @@ export abstract class RaceSegment {
     this.start = start;
     this.end = end;
     this.type = type;
-    this.length = this.calculateLength();
+    this.length = 0;
   }
 
-  abstract calculateLength(): number;
+  protected abstract calculateLength(): number;
 
   abstract getPoints(resolution?: number): Point[];
+  abstract getBounds(): BoundingBox;
 }

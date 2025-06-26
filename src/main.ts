@@ -4,6 +4,15 @@ import { createTrack } from "./raceTrack";
 import { generateRaceWebGLHtml as renderRaceWebGLHtml } from "./raceViewerWebGL";
 import { Horse } from "./types/horse";
 
+function getRandomTrackLength(): number {
+  const min = 1200;
+  const max = 3600;
+  const step = 100;
+  const count = (max - min) / step + 1;
+  const idx = Math.floor(Math.random() * count);
+  return min + idx * step;
+}
+
 function createHorses(count: number = 10): Horse[] {
   return Array.from({ length: count }, (_, i) => ({
     id: i + 1,
@@ -13,10 +22,9 @@ function createHorses(count: number = 10): Horse[] {
 }
 
 function main() {
-  const width = 1200,
-    height = 600,
-    N = 7;
-  const track = createTrack(width, height, N);
+  const trackLength = getRandomTrackLength();
+  const segmentCount = Math.floor(Math.random() * 5) + 3;
+  const track = createTrack(trackLength, segmentCount);
   const horses = createHorses(10);
   const logs = runRaceSimulator(track, horses);
   let winner = null,
@@ -32,7 +40,7 @@ function main() {
   }
   const outPath = path.resolve(__dirname, "../race-result.html");
   renderRaceWebGLHtml(outPath, logs, track);
-  console.log(`트랙 크기: ${width}x${height}`);
+  console.log(`트랙 크기: ${track.width}x${track.height}`);
   if (winner) {
     console.log(
       `우승마: ${winner.name} (id=${winner.id}, speed=${winner.speed.toFixed(
