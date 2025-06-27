@@ -1,5 +1,5 @@
 import * as path from "path";
-import { displayRaceResults, displayTrackInfo } from "./raceLog";
+import { displayTrackInfo } from "./raceLog";
 import { runRaceSimulator } from "./raceSimulator";
 import { createTrack } from "./raceTrack";
 import { generateRaceWebGLHtml as renderRaceWebGLHtml } from "./raceViewerWebGL";
@@ -29,7 +29,7 @@ function createHorses(count: number = 10): Horse[] {
 function main() {
   const trackLength = getRandomTrackLength();
   const segmentCount = Math.floor(Math.random() * 12) + 6;
-  const track = createTrack(trackLength, segmentCount, true, true);
+  const track = createTrack(trackLength, segmentCount);
   const targetRaceDistance = track.totalLength * 3;
   const horses = createHorses(10);
   const logs = runRaceSimulator(track, horses, track.totalLength * 3);
@@ -61,7 +61,7 @@ function main() {
   const outPath = path.resolve(__dirname, "../race-result.html");
   renderRaceWebGLHtml(outPath, logs, track);
   displayTrackInfo(track);
-  displayRaceResults(track, horses, logs, targetRaceDistance, winner, minTurn);
+  // displayRaceResults(track, horses, logs, targetRaceDistance, winner, minTurn);
 }
 
 main();
