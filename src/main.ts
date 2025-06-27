@@ -17,21 +17,23 @@ function createHorses(count: number = 10): Horse[] {
   return Array.from({ length: count }, (_, i) => ({
     id: i + 1,
     name: `Horse${i + 1}`,
-    speed: 18 + Math.random() * 4, // 18~22 m/턴
+    speed: 18 + Math.random() * 4,
   }));
 }
 
 function main() {
   const trackLength = getRandomTrackLength();
-  const segmentCount = Math.floor(Math.random() * 5) + 3;
+  const segmentCount = Math.floor(Math.random() * 12) + 6;
+  console.log(`랜덤 세그먼트 수: ${segmentCount}`);
   const track = createTrack(trackLength, segmentCount);
+  const targetRaceDistance = track.totalLength * 3;
   const horses = createHorses(10);
-  const logs = runRaceSimulator(track, horses);
+  const logs = runRaceSimulator(track, horses, track.totalLength * 3);
   let winner = null,
     minTurn = Infinity;
   for (const horse of horses) {
     const finishTurn = logs.find((l) =>
-      l.horses.find((h) => h.id === horse.id && h.dist >= track.totalLength)
+      l.horses.find((h) => h.id === horse.id && h.dist >= targetRaceDistance)
     )?.turn;
     if (finishTurn !== undefined && finishTurn < minTurn) {
       minTurn = finishTurn;

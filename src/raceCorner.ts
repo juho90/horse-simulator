@@ -11,7 +11,7 @@ export class RaceCorner extends RaceSegment {
   constructor(start: Point, center: Point, angle: number) {
     const radius = Math.hypot(start.x - center.x, start.y - center.y);
     const startAngle = Math.atan2(start.y - center.y, start.x - center.x);
-    const endAngle = startAngle + angle; // 시계방향(+)
+    const endAngle = startAngle + angle;
     const end: Point = {
       x: center.x + radius * Math.cos(endAngle),
       y: center.y + radius * Math.sin(endAngle),

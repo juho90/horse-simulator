@@ -1,7 +1,7 @@
 export interface Horse {
   id: number;
   name: string;
-  speed: number; // m/턴
+  speed: number;
   stamina?: number;
   reaction?: number;
   [key: string]: any;

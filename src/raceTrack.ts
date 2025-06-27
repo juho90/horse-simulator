@@ -37,40 +37,42 @@ export class RaceTrack {
   }
 }
 
+export function generateValidTrack(segmentCount: number) {
+  const segmentPattern: ("line" | "corner")[] = [];
+  let needsLine = true;
+  for (let i = 0; i < segmentCount; i++) {
+    if (needsLine) {
+      segmentPattern.push("line");
+      needsLine = false;
+    } else {
+      segmentPattern.push("corner");
+      needsLine = true;
+    }
+  }
+  if (segmentPattern[segmentPattern.length - 1] === segmentPattern[0]) {
+    if (segmentPattern[segmentPattern.length - 1] === "line") {
+      segmentPattern.push("corner");
+    } else {
+      segmentPattern.push("line");
+    }
+  }
+  const cornerCount = segmentPattern.filter((s) => s === "corner").length;
+  const externalAngle = (2 * Math.PI) / cornerCount;
+  const cornerAngles: number[] = [];
+  for (let i = 0; i < cornerCount; i++) {
+    cornerAngles.push(externalAngle);
+  }
+  return { segmentPattern, cornerAngles };
+}
+
 export function createTrack(
   totalLength: number,
   segmentCount: number
 ): RaceTrack {
   if (segmentCount < 3) {
-    throw new Error("segmentCount는 3 이상이어야 합니다 (닫힌 도형을 위해).");
+    throw new Error("segmentCount는 3 이상이어야 합니다.");
   }
-  function generateValidTrack(segmentCount: number) {
-    const segments: ("line" | "corner")[] = [];
-    const cornerAngles: number[] = [];
-    let needsLine = true;
-    for (let i = 0; i < segmentCount; i++) {
-      if (needsLine) {
-        segments.push("line");
-        needsLine = false;
-      } else {
-        segments.push("corner");
-        const angle = Math.PI / 6 + Math.random() * ((5 * Math.PI) / 6);
-        cornerAngles.push(angle);
-        needsLine = true;
-      }
-    }
-    if (segments[segments.length - 1] === segments[0]) {
-      if (segments[segments.length - 1] === "line") {
-        segments.push("corner");
-        cornerAngles.push(Math.PI / 2); // 90도
-      } else {
-        segments.push("line");
-      }
-    }
-    return { segments, cornerAngles };
-  }
-  const { segments: segmentPattern, cornerAngles } =
-    generateValidTrack(segmentCount);
+  const { segmentPattern, cornerAngles } = generateValidTrack(segmentCount);
   console.log(`생성된 패턴: ${segmentPattern.length}개 세그먼트`);
   console.log(`패턴: ${segmentPattern.join(" -> ")}`);
   console.log(
