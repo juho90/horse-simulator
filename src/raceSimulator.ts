@@ -1,6 +1,6 @@
+import { HorseTurnState } from "./raceLog";
 import { RaceTrack } from "./raceTrack";
 import { Horse } from "./types/horse";
-import { HorseTurnState } from "./types/raceLog";
 
 export function runRaceSimulator(
   track: RaceTrack,

@@ -1,4 +1,5 @@
 import * as path from "path";
+import { displayRaceResults, displayTrackInfo } from "./raceLog";
 import { runRaceSimulator } from "./raceSimulator";
 import { createTrack } from "./raceTrack";
 import { generateRaceWebGLHtml as renderRaceWebGLHtml } from "./raceViewerWebGL";
@@ -14,27 +15,44 @@ function getRandomTrackLength(): number {
 }
 
 function createHorses(count: number = 10): Horse[] {
-  return Array.from({ length: count }, (_, i) => ({
-    id: i + 1,
-    name: `Horse${i + 1}`,
-    speed: 18 + Math.random() * 4,
-  }));
+  const horses: Horse[] = [];
+  for (let i = 0; i < count; i++) {
+    horses.push({
+      id: i + 1,
+      name: `Horse${i + 1}`,
+      speed: 18 + Math.random() * 4,
+    });
+  }
+  return horses;
 }
 
 function main() {
   const trackLength = getRandomTrackLength();
   const segmentCount = Math.floor(Math.random() * 12) + 6;
-  console.log(`랜덤 세그먼트 수: ${segmentCount}`);
-  const track = createTrack(trackLength, segmentCount);
+  const track = createTrack(trackLength, segmentCount, true, true);
   const targetRaceDistance = track.totalLength * 3;
   const horses = createHorses(10);
   const logs = runRaceSimulator(track, horses, track.totalLength * 3);
   let winner = null,
     minTurn = Infinity;
+
+  function findFinishTurn(
+    logs: any[],
+    horseId: number,
+    targetDistance: number
+  ): number | undefined {
+    for (const log of logs) {
+      for (const horse of log.horses) {
+        if (horse.id === horseId && horse.dist >= targetDistance) {
+          return log.turn;
+        }
+      }
+    }
+    return undefined;
+  }
+
   for (const horse of horses) {
-    const finishTurn = logs.find((l) =>
-      l.horses.find((h) => h.id === horse.id && h.dist >= targetRaceDistance)
-    )?.turn;
+    const finishTurn = findFinishTurn(logs, horse.id, targetRaceDistance);
     if (finishTurn !== undefined && finishTurn < minTurn) {
       minTurn = finishTurn;
       winner = horse;
@@ -42,17 +60,8 @@ function main() {
   }
   const outPath = path.resolve(__dirname, "../race-result.html");
   renderRaceWebGLHtml(outPath, logs, track);
-  console.log(`트랙 크기: ${track.width}x${track.height}`);
-  if (winner) {
-    console.log(
-      `우승마: ${winner.name} (id=${winner.id}, speed=${winner.speed.toFixed(
-        2
-      )} m/턴)`
-    );
-    console.log(`우승 턴: ${minTurn + 1}`);
-  } else {
-    console.log("우승마 없음 (모두 결승선 미도달)");
-  }
+  displayTrackInfo(track);
+  displayRaceResults(track, horses, logs, targetRaceDistance, winner, minTurn);
 }
 
 main();

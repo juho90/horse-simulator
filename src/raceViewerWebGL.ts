@@ -1,7 +1,7 @@
 import * as child_process from "child_process";
 import * as fs from "fs";
+import { HorseTurnState } from "./raceLog";
 import { RaceTrack } from "./raceTrack";
-import { HorseTurnState } from "./types/raceLog";
 
 export function generateRaceWebGLHtml(
   outPath: string,
