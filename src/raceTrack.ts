@@ -1,4 +1,4 @@
-import { createCornerFromSegment, RaceCorner } from "./raceCorner";
+import { createCornerFromSegment } from "./raceCorner";
 import { createHorizontalLine, createLineFromSegment } from "./raceLine";
 import { Point, RaceSegment } from "./raceSegment";
 
@@ -41,77 +41,85 @@ export function createTrack(
   totalLength: number,
   segmentCount: number
 ): RaceTrack {
-  if (segmentCount < 2) {
-    throw new Error("segmentCount는 2 이상이어야 합니다.");
+  if (segmentCount < 3) {
+    throw new Error("segmentCount는 3 이상이어야 합니다 (닫힌 도형을 위해).");
   }
-  const segments: RaceSegment[] = [];
-  const straightRatio = 0.6;
-  const cornerRatio = 0.4;
-  const estimatedStraights = Math.ceil(segmentCount * 0.5);
-  const estimatedCorners = segmentCount - estimatedStraights;
-  const straightLength = (totalLength * straightRatio) / estimatedStraights;
-  const arcLength = (totalLength * cornerRatio) / estimatedCorners;
-  const totalRequiredAngle = 2 * Math.PI;
-  const cornerAngles: number[] = [];
-  for (let i = 0; i < estimatedCorners; i++) {
-    cornerAngles.push(Math.PI * (0.3 + Math.random() * 1.4));
-  }
-  const currentAngleSum = cornerAngles.reduce((sum, angle) => sum + angle, 0);
-  const angleScale = totalRequiredAngle / currentAngleSum;
-  cornerAngles.forEach((angle, index) => {
-    cornerAngles[index] = angle * angleScale;
-  });
-  const firstLine = createHorizontalLine(straightLength);
-  segments.push(firstLine);
-  let currentSegment: RaceSegment = firstLine;
-  let cornerIndex = 0;
-  for (let i = 1; i < segmentCount; i++) {
-    const useDoubleCorner = Math.random() < 0.3;
-
-    if (currentSegment.type === "line") {
-      if (cornerIndex < cornerAngles.length) {
-        const corner = createCornerFromSegment(
-          currentSegment,
-          arcLength,
-          cornerAngles[cornerIndex]
-        );
-        segments.push(corner);
-        currentSegment = corner;
-        cornerIndex++;
-        if (
-          useDoubleCorner &&
-          i + 1 < segmentCount &&
-          cornerIndex < cornerAngles.length
-        ) {
-          i++;
-          const secondCorner = createCornerFromSegment(
-            currentSegment,
-            arcLength,
-            cornerAngles[cornerIndex]
-          );
-          segments.push(secondCorner);
-          currentSegment = secondCorner;
-          cornerIndex++;
-        }
-      }
-    } else if (currentSegment.type === "corner") {
-      if (Math.random() < 0.7) {
-        const line = createLineFromSegment(currentSegment, straightLength);
-        segments.push(line);
-        currentSegment = line;
+  function generateValidTrack(segmentCount: number) {
+    const segments: ("line" | "corner")[] = [];
+    const cornerAngles: number[] = [];
+    let needsLine = true;
+    for (let i = 0; i < segmentCount; i++) {
+      if (needsLine) {
+        segments.push("line");
+        needsLine = false;
       } else {
-        if (cornerIndex < cornerAngles.length) {
-          const corner = createCornerFromSegment(
-            currentSegment,
-            arcLength,
-            cornerAngles[cornerIndex]
-          );
-          segments.push(corner);
-          currentSegment = corner;
-          cornerIndex++;
-        }
+        segments.push("corner");
+        const angle = Math.PI / 6 + Math.random() * ((5 * Math.PI) / 6);
+        cornerAngles.push(angle);
+        needsLine = true;
       }
     }
+    if (segments[segments.length - 1] === segments[0]) {
+      if (segments[segments.length - 1] === "line") {
+        segments.push("corner");
+        cornerAngles.push(Math.PI / 2); // 90도
+      } else {
+        segments.push("line");
+      }
+    }
+    return { segments, cornerAngles };
+  }
+  const { segments: segmentPattern, cornerAngles } =
+    generateValidTrack(segmentCount);
+  console.log(`생성된 패턴: ${segmentPattern.length}개 세그먼트`);
+  console.log(`패턴: ${segmentPattern.join(" -> ")}`);
+  console.log(
+    `코너 각도들: ${cornerAngles
+      .map((a) => ((a * 180) / Math.PI).toFixed(1) + "°")
+      .join(", ")}`
+  );
+  const lineCount = segmentPattern.filter((s) => s === "line").length;
+  const cornerCount = segmentPattern.filter((s) => s === "corner").length;
+  if (lineCount === 0 || cornerCount === 0) {
+    throw new Error("직선과 곡선이 모두 있어야 합니다.");
+  }
+  const straightLength = (totalLength * 0.6) / lineCount;
+  const arcLength = (totalLength * 0.4) / cornerCount;
+  const segments: RaceSegment[] = [];
+  let currentSegment: RaceSegment | null = null;
+  let cornerIndex = 0;
+  for (let i = 0; i < segmentPattern.length; i++) {
+    const segmentType = segmentPattern[i];
+    if (segmentType === "line") {
+      if (i === 0) {
+        currentSegment = createHorizontalLine(straightLength);
+      } else {
+        currentSegment = createLineFromSegment(currentSegment!, straightLength);
+      }
+      segments.push(currentSegment);
+    } else if (segmentType === "corner") {
+      const angle = cornerAngles[cornerIndex];
+      currentSegment = createCornerFromSegment(
+        currentSegment!,
+        arcLength,
+        angle
+      );
+      segments.push(currentSegment);
+      cornerIndex++;
+    }
+  }
+  const totalAngle = cornerAngles.reduce((sum, angle) => sum + angle, 0);
+  console.log(`총 곡선 각도: ${((totalAngle * 180) / Math.PI).toFixed(2)}도`);
+  if (segments.length > 0) {
+    const firstSegment = segments[0];
+    const lastSegment = segments[segments.length - 1];
+    const firstPoints = firstSegment.getPoints(2);
+    const lastPoints = lastSegment.getPoints(2);
+    const distance = Math.sqrt(
+      Math.pow(lastPoints[lastPoints.length - 1].x - firstPoints[0].x, 2) +
+        Math.pow(lastPoints[lastPoints.length - 1].y - firstPoints[0].y, 2)
+    );
+    console.log(`트랙 닫힘 검증: 시작점-끝점 거리 = ${distance.toFixed(6)}`);
   }
   const allX: number[] = [];
   const allY: number[] = [];
@@ -122,14 +130,5 @@ export function createTrack(
   });
   const width = Math.max(...allX) - Math.min(...allX);
   const height = Math.max(...allY) - Math.min(...allY);
-  let totalAngle = 0;
-  for (const segment of segments) {
-    if (segment.type !== "corner") {
-      continue;
-    }
-    const corner = segment as RaceCorner;
-    totalAngle += Math.abs(corner.angle);
-  }
-  console.log(`총 곡선 각도: ${(totalAngle * 180) / Math.PI}도 (목표: 360도)`);
   return new RaceTrack(width, height, segments);
 }
