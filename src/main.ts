@@ -26,6 +26,21 @@ function createHorses(count: number = 10): Horse[] {
   return horses;
 }
 
+function findFinishTurn(
+  logs: any[],
+  horseId: number,
+  targetDistance: number
+): number | undefined {
+  for (const log of logs) {
+    for (const horse of log.horses) {
+      if (horse.id === horseId && horse.dist >= targetDistance) {
+        return log.turn;
+      }
+    }
+  }
+  return undefined;
+}
+
 function main() {
   const trackLength = getRandomTrackLength();
   const segmentCount = Math.floor(Math.random() * 12) + 6;
@@ -33,24 +48,8 @@ function main() {
   const targetRaceDistance = track.totalLength * 3;
   const horses = createHorses(10);
   const logs = runRaceSimulator(track, horses, track.totalLength * 3);
-  let winner = null,
-    minTurn = Infinity;
-
-  function findFinishTurn(
-    logs: any[],
-    horseId: number,
-    targetDistance: number
-  ): number | undefined {
-    for (const log of logs) {
-      for (const horse of log.horses) {
-        if (horse.id === horseId && horse.dist >= targetDistance) {
-          return log.turn;
-        }
-      }
-    }
-    return undefined;
-  }
-
+  let winner = null;
+  let minTurn = Infinity;
   for (const horse of horses) {
     const finishTurn = findFinishTurn(logs, horse.id, targetRaceDistance);
     if (finishTurn !== undefined && finishTurn < minTurn) {
