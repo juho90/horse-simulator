@@ -78,36 +78,34 @@ export function createTrack(
     throw new Error("직선과 곡선이 모두 있어야 합니다.");
   }
   const totalLength = Math.round(trackLength / 100) * 100;
-  let remainingAngle = Math.PI * 2;
-  let remainingLength = totalLength;
+  let remainAngle = Math.PI * 2;
+  let remainLength = totalLength;
   const trackStartPoint: Point = { x: 0, y: 0 };
 
   const segmentBuilder = new NextSegmentBuilder()
     .setSegmentType("line")
     .setTrackStartPoint(trackStartPoint)
-    .setRemainingSegmentPattern(segmentPattern)
-    .setRemainingSegments(segmentPattern.length)
-    .setRemainingTrackLength(remainingLength)
-    .setRemainingAngle(remainingAngle);
+    .setSegmentPattern(segmentPattern)
+    .setSegmentIndex(0)
+    .setRemainTrackLength(remainLength)
+    .setRemainAngle(remainAngle);
 
   let currentSegment = segmentBuilder.build();
   const segments: RaceSegment[] = [];
   segments.push(currentSegment);
-  remainingLength -= currentSegment.length;
-  for (let i = 1; i < segmentPattern.length; i++) {
-    const remainingPattern = segmentPattern.slice(i); // i번째부터 끝까지
+  remainLength -= currentSegment.length;
+  for (let index = 1; index < segmentPattern.length; index++) {
     currentSegment = segmentBuilder
-      .setSegmentType(segmentPattern[i])
-      .setRemainingSegmentPattern(remainingPattern)
-      .setRemainingSegments(segmentPattern.length - i)
-      .setRemainingTrackLength(remainingLength)
-      .setRemainingAngle(remainingAngle)
+      .setSegmentType(segmentPattern[index])
+      .setSegmentIndex(index)
+      .setRemainTrackLength(remainLength)
+      .setRemainAngle(remainAngle)
       .setPreviousSegment(currentSegment)
       .build();
     segments.push(currentSegment);
-    remainingLength -= currentSegment.length;
+    remainLength -= currentSegment.length;
     if (currentSegment.type === "corner") {
-      remainingAngle -= (currentSegment as RaceCorner).angle;
+      remainAngle -= (currentSegment as RaceCorner).angle;
     }
   }
   const firstSegment = segments[0];

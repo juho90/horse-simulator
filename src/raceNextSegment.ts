@@ -6,10 +6,10 @@ import { SegmentLengthBuilder } from "./raceSegmentLength";
 export class NextSegmentBuilder {
   private segmentType: "line" | "corner" = "line";
   private trackStartPoint: Point = { x: 0, y: 0 };
-  private remainingSegmentPattern: ("line" | "corner")[] = [];
-  private remainingSegments: number = 0;
-  private remainingTrackLength: number = 0;
-  private remainingAngle: number = 0;
+  private segmentPattern: ("line" | "corner")[] = [];
+  private segmentIndex: number = 0;
+  private remainTrackLength: number = 0;
+  private remainAngle: number = 0;
   private previousSegment: RaceSegment | null = null;
   private segmentLengthBuilder: SegmentLengthBuilder;
 
@@ -29,29 +29,27 @@ export class NextSegmentBuilder {
     return this;
   }
 
-  setRemainingSegmentPattern(
-    pattern: ("line" | "corner")[]
-  ): NextSegmentBuilder {
-    this.remainingSegmentPattern = pattern;
-    this.segmentLengthBuilder.setRemainingSegmentPattern(pattern);
+  setSegmentPattern(pattern: ("line" | "corner")[]): NextSegmentBuilder {
+    this.segmentPattern = pattern;
+    this.segmentLengthBuilder.setRemainSegmentPattern(pattern);
     return this;
   }
 
-  setRemainingSegments(count: number): NextSegmentBuilder {
-    this.remainingSegments = count;
-    this.segmentLengthBuilder.setRemainingSegments(count);
+  setSegmentIndex(index: number): NextSegmentBuilder {
+    this.segmentIndex = index;
+    this.segmentLengthBuilder.setRemainSegments(this.getRemainSegments());
     return this;
   }
 
-  setRemainingTrackLength(length: number): NextSegmentBuilder {
-    this.remainingTrackLength = length;
-    this.segmentLengthBuilder.setRemainingTrackLength(length);
+  setRemainTrackLength(length: number): NextSegmentBuilder {
+    this.remainTrackLength = length;
+    this.segmentLengthBuilder.setRemainTrackLength(length);
     return this;
   }
 
-  setRemainingAngle(angle: number): NextSegmentBuilder {
-    this.remainingAngle = angle;
-    this.segmentLengthBuilder.setRemainingAngle(angle);
+  setRemainAngle(angle: number): NextSegmentBuilder {
+    this.remainAngle = angle;
+    this.segmentLengthBuilder.setRemainAngle(angle);
     return this;
   }
 
@@ -61,17 +59,19 @@ export class NextSegmentBuilder {
     return this;
   }
 
+  private getRemainSegments(): number {
+    return this.segmentPattern.length - (this.segmentIndex + 1);
+  }
+
   private calculateCornerAngle(): number {
-    const isLastSegment = this.remainingSegments === 1;
+    const remainSegments = this.getRemainSegments();
+    const isLastSegment = remainSegments === 1;
     if (isLastSegment) {
-      return this.remainingAngle;
+      return this.remainAngle;
     }
-    const remainingCorners =
-      Math.floor(this.remainingSegments / 2) + (this.remainingSegments % 2);
+    const remainCorners = Math.floor(remainSegments / 2) + (remainSegments % 2);
     const cornerAngle =
-      remainingCorners > 0
-        ? this.remainingAngle / remainingCorners
-        : this.remainingAngle;
+      remainCorners > 0 ? this.remainAngle / remainCorners : this.remainAngle;
     return Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cornerAngle));
   }
 
@@ -99,22 +99,4 @@ export class NextSegmentBuilder {
       return createLineFromSegment(this.previousSegment, segmentLength);
     }
   }
-}
-
-export function createNextSegment(
-  segmentType: "line" | "corner",
-  trackStartPoint: Point,
-  remainingSegments: number,
-  remainingTrackLength: number,
-  remainingAngle: number,
-  previousSegment: RaceSegment | null
-): RaceSegment {
-  return new NextSegmentBuilder()
-    .setSegmentType(segmentType)
-    .setTrackStartPoint(trackStartPoint)
-    .setRemainingSegments(remainingSegments)
-    .setRemainingTrackLength(remainingTrackLength)
-    .setRemainingAngle(remainingAngle)
-    .setPreviousSegment(previousSegment)
-    .build();
 }

@@ -4,11 +4,11 @@ export class SegmentLengthBuilder {
   private currentSegmentType: "line" | "corner" = "line";
   private cornerAngle: number | null = null;
   private trackStartPoint: Point = { x: 0, y: 0 };
-  private remainingSegmentPattern: ("line" | "corner")[] = [];
-  private remainingSegments: number = 0;
-  private remainingTrackLength: number = 0;
+  private remainSegmentPattern: ("line" | "corner")[] = [];
+  private remainSegments: number = 0;
+  private remainTrackLength: number = 0;
+  private remainAngle: number = 0;
   private previousSegment: RaceSegment | null = null;
-  private remainingAngle: number = 0;
 
   setSegmentType(type: "line" | "corner"): SegmentLengthBuilder {
     this.currentSegmentType = type;
@@ -25,25 +25,25 @@ export class SegmentLengthBuilder {
     return this;
   }
 
-  setRemainingSegmentPattern(
+  setRemainSegmentPattern(
     pattern: ("line" | "corner")[]
   ): SegmentLengthBuilder {
-    this.remainingSegmentPattern = pattern;
+    this.remainSegmentPattern = pattern;
     return this;
   }
 
-  setRemainingSegments(count: number): SegmentLengthBuilder {
-    this.remainingSegments = count;
+  setRemainSegments(count: number): SegmentLengthBuilder {
+    this.remainSegments = count;
     return this;
   }
 
-  setRemainingTrackLength(length: number): SegmentLengthBuilder {
-    this.remainingTrackLength = length;
+  setRemainTrackLength(length: number): SegmentLengthBuilder {
+    this.remainTrackLength = length;
     return this;
   }
 
-  setRemainingAngle(angle: number): SegmentLengthBuilder {
-    this.remainingAngle = angle;
+  setRemainAngle(angle: number): SegmentLengthBuilder {
+    this.remainAngle = angle;
     return this;
   }
 
@@ -69,7 +69,7 @@ export class SegmentLengthBuilder {
     );
 
     let geometricMinLength = 50;
-    let geometricMaxLength = this.remainingTrackLength;
+    let geometricMaxLength = this.remainTrackLength;
 
     if (this.currentSegmentType === "corner") {
       if (this.cornerAngle === null) {
@@ -77,7 +77,7 @@ export class SegmentLengthBuilder {
       }
 
       // 코너의 물리적 제약
-      const maxRadius = Math.min(500, this.remainingTrackLength / 4);
+      const maxRadius = Math.min(500, this.remainTrackLength / 4);
       const minRadius = 50;
       const radiusBasedMaxLength = Math.abs(maxRadius * this.cornerAngle);
       const radiusBasedMinLength = Math.abs(minRadius * this.cornerAngle);
@@ -107,7 +107,7 @@ export class SegmentLengthBuilder {
 
       geometricMinLength = Math.max(50, closureConstraints.minLength);
       geometricMaxLength = Math.min(
-        this.remainingTrackLength,
+        this.remainTrackLength,
         closureConstraints.maxLength
       );
     }
@@ -124,18 +124,18 @@ export class SegmentLengthBuilder {
     const dy = this.trackStartPoint.y - currentPosition.y;
     const directDistance = Math.sqrt(dx * dx + dy * dy);
 
-    const remainingSegmentsAfterThis = this.remainingSegments - 1;
-    const remainingPattern = this.remainingSegmentPattern.slice(1); // 현재 세그먼트 이후의 패턴
+    const remainSegmentsAfterThis = this.remainSegments - 1;
+    const remainPattern = this.remainSegmentPattern.slice(1); // 현재 세그먼트 이후의 패턴
 
-    if (remainingSegmentsAfterThis === 0) {
+    if (remainSegmentsAfterThis === 0) {
       // 마지막 세그먼트: 정확한 클로저 계산
       if (isCorner) {
         const radius =
           directDistance / (2 * Math.sin(Math.abs(segmentAngle) / 2));
         if (radius < 50 || radius > 500 || Math.abs(segmentAngle) < 0.01) {
           return {
-            minLength: this.remainingTrackLength,
-            maxLength: this.remainingTrackLength,
+            minLength: this.remainTrackLength,
+            maxLength: this.remainTrackLength,
           };
         }
         const exactLength = Math.abs(radius * segmentAngle);
@@ -146,35 +146,33 @@ export class SegmentLengthBuilder {
     }
 
     // 남은 세그먼트 패턴 분석
-    const remainingCorners = remainingPattern.filter(
+    const remainCorners = remainPattern.filter(
       (type) => type === "corner"
     ).length;
-    const remainingLines = remainingPattern.filter(
-      (type) => type === "line"
-    ).length;
+    const remainLines = remainPattern.filter((type) => type === "line").length;
 
     // 남은 코너들의 각도 분배 계산
-    const remainingAngleAfterThis =
-      this.remainingAngle - (isCorner ? segmentAngle : 0);
+    const remainAngleAfterThis =
+      this.remainAngle - (isCorner ? segmentAngle : 0);
     const avgAnglePerCorner =
-      remainingCorners > 0 ? remainingAngleAfterThis / remainingCorners : 0;
+      remainCorners > 0 ? remainAngleAfterThis / remainCorners : 0;
 
     // 남은 세그먼트들의 길이 제약 계산
-    const minRemainingLength = remainingSegmentsAfterThis * 50;
-    const maxRemainingLength = this.remainingTrackLength - 50;
+    const minRemainLength = remainSegmentsAfterThis * 50;
+    const maxRemainLength = this.remainTrackLength - 50;
 
     // 남은 패턴으로 실제 도달 가능한 범위 계산
     const reachabilityConstraints = this.calculateReachabilityWithPattern(
       currentPosition,
-      remainingPattern,
-      remainingAngleAfterThis,
-      minRemainingLength,
-      maxRemainingLength
+      remainPattern,
+      remainAngleAfterThis,
+      minRemainLength,
+      maxRemainLength
     );
 
     const minLength = Math.max(50, reachabilityConstraints.minThisSegment);
     const maxLength = Math.min(
-      this.remainingTrackLength - minRemainingLength,
+      this.remainTrackLength - minRemainLength,
       reachabilityConstraints.maxThisSegment
     );
 
@@ -186,17 +184,17 @@ export class SegmentLengthBuilder {
 
   private calculateReachabilityWithPattern(
     currentPosition: Point,
-    remainingPattern: ("line" | "corner")[],
-    remainingAngle: number,
-    minRemainingLength: number,
-    maxRemainingLength: number
+    remainPattern: ("line" | "corner")[],
+    remainAngle: number,
+    minRemainLength: number,
+    maxRemainLength: number
   ): { minThisSegment: number; maxThisSegment: number } {
     const dx = this.trackStartPoint.x - currentPosition.x;
     const dy = this.trackStartPoint.y - currentPosition.y;
     const directDistance = Math.sqrt(dx * dx + dy * dy);
 
-    if (remainingPattern.length === 0) {
-      return { minThisSegment: 50, maxThisSegment: this.remainingTrackLength };
+    if (remainPattern.length === 0) {
+      return { minThisSegment: 50, maxThisSegment: this.remainTrackLength };
     }
 
     // 현재 세그먼트의 시작 방향 계산
@@ -204,11 +202,11 @@ export class SegmentLengthBuilder {
 
     // 여러 길이 후보를 테스트해서 클로저 가능성 확인
     const testLengths = this.generateTestLengths();
-    let validMinLength = this.remainingTrackLength;
+    let validMinLength = this.remainTrackLength;
     let validMaxLength = 50;
 
     for (const testLength of testLengths) {
-      if (testLength > this.remainingTrackLength - minRemainingLength) continue;
+      if (testLength > this.remainTrackLength - minRemainLength) continue;
       if (testLength < 50) continue;
 
       // 이 길이로 현재 세그먼트를 만들었을 때의 최종 위치와 방향 계산
@@ -216,13 +214,13 @@ export class SegmentLengthBuilder {
         this.simulateThisSegment(currentPosition, currentDirection, testLength);
 
       // 남은 패턴으로 시작점에 도달 가능한지 확인
-      const remainingLengthAfterThis = this.remainingTrackLength - testLength;
+      const remainLengthAfterThis = this.remainTrackLength - testLength;
       const canReachStart = this.canReachStartWithPattern(
         nextPosition,
         nextDirection,
-        remainingPattern,
-        remainingAngle,
-        remainingLengthAfterThis
+        remainPattern,
+        remainAngle,
+        remainLengthAfterThis
       );
 
       if (canReachStart) {
@@ -235,10 +233,7 @@ export class SegmentLengthBuilder {
     if (validMinLength > validMaxLength) {
       return {
         minThisSegment: 50,
-        maxThisSegment: Math.max(
-          50,
-          this.remainingTrackLength - minRemainingLength
-        ),
+        maxThisSegment: Math.max(50, this.remainTrackLength - minRemainLength),
       };
     }
 
@@ -267,8 +262,7 @@ export class SegmentLengthBuilder {
 
   private generateTestLengths(): number[] {
     const minLength = 50;
-    const maxLength =
-      this.remainingTrackLength - (this.remainingSegments - 1) * 50;
+    const maxLength = this.remainTrackLength - (this.remainSegments - 1) * 50;
     const step = 50; // 50m 단위로 테스트
 
     const lengths: number[] = [];
@@ -324,8 +318,8 @@ export class SegmentLengthBuilder {
     position: Point,
     direction: number,
     pattern: ("line" | "corner")[],
-    remainingAngle: number,
-    remainingLength: number
+    remainAngle: number,
+    remainLength: number
   ): boolean {
     if (pattern.length === 0) {
       // 더 이상 세그먼트가 없으면 현재 위치가 시작점이어야 함
@@ -355,7 +349,7 @@ export class SegmentLengthBuilder {
         return (
           angleDiff < 0.1 && // 방향 오차 허용
           requiredDistance >= 50 &&
-          requiredDistance <= remainingLength
+          requiredDistance <= remainLength
         );
       } else {
         // 코너로 시작점까지 도달
@@ -366,14 +360,14 @@ export class SegmentLengthBuilder {
         // 코너의 가능한 반지름 범위
         const minRadius = 50;
         const maxRadius = 500;
-        const minLength = Math.abs(minRadius * remainingAngle);
-        const maxLength = Math.abs(maxRadius * remainingAngle);
+        const minLength = Math.abs(minRadius * remainAngle);
+        const maxLength = Math.abs(maxRadius * remainAngle);
 
         // 거리가 코너로 도달 가능한 범위 내인지 확인
         return (
           distance <= distance * 1.5 && // 코너는 더 유연함
-          remainingLength >= minLength &&
-          remainingLength <= maxLength
+          remainLength >= minLength &&
+          remainLength <= maxLength
         );
       }
     }
@@ -385,30 +379,30 @@ export class SegmentLengthBuilder {
     const distanceToStart = Math.sqrt(dx * dx + dy * dy);
 
     // 남은 세그먼트들로 최대한 갈 수 있는 거리
-    const maxReachableDistance = remainingLength * 1.2; // 코너를 고려한 여유
+    const maxReachableDistance = remainLength * 1.2; // 코너를 고려한 여유
 
     return distanceToStart <= maxReachableDistance;
   }
 
   build(): number {
-    const averageLength = this.remainingTrackLength / this.remainingSegments;
+    const averageLength = this.remainTrackLength / this.remainSegments;
     const { minLength: geometricMinLength, maxLength: geometricMaxLength } =
       this.calculateGeometricConstraints();
 
-    const isLastSegment = this.remainingSegments === 1;
+    const isLastSegment = this.remainSegments === 1;
     if (isLastSegment) {
       // 마지막 세그먼트: 남은 트랙 길이를 모두 사용 (최소 50m 제약만 적용)
-      const finalLength = Math.max(50, this.remainingTrackLength);
+      const finalLength = Math.max(50, this.remainTrackLength);
       return this.quantizeSegmentLength(finalLength);
     }
 
     // 초기 세그먼트들: 기하학적 제약과 남은 길이 분배를 고려한 랜덤 선택
     const minLength = Math.max(50, geometricMinLength);
     // 남은 세그먼트들이 최소 50m씩 가져갈 수 있도록 여유 공간 계산
-    const reserveForRemaining = (this.remainingSegments - 1) * 50;
+    const reserveForRemain = (this.remainSegments - 1) * 50;
     const maxLength = Math.min(
       geometricMaxLength,
-      this.remainingTrackLength - reserveForRemaining
+      this.remainTrackLength - reserveForRemain
     );
 
     if (maxLength <= minLength) {
@@ -418,26 +412,4 @@ export class SegmentLengthBuilder {
     const randomLength = minLength + Math.random() * (maxLength - minLength);
     return this.quantizeSegmentLength(randomLength);
   }
-}
-
-export function createSegmentLength(
-  currentSegmentType: "line" | "corner",
-  cornerAngle: number | null,
-  trackStartPoint: Point,
-  remainingSegments: number,
-  remainingTrackLength: number,
-  previousSegment: RaceSegment | null,
-  remainingSegmentPattern: ("line" | "corner")[],
-  remainingAngle: number
-): number {
-  return new SegmentLengthBuilder()
-    .setSegmentType(currentSegmentType)
-    .setCornerAngle(cornerAngle)
-    .setTrackStartPoint(trackStartPoint)
-    .setRemainingSegments(remainingSegments)
-    .setRemainingTrackLength(remainingTrackLength)
-    .setPreviousSegment(previousSegment)
-    .setRemainingSegmentPattern(remainingSegmentPattern)
-    .setRemainingAngle(remainingAngle)
-    .build();
 }
