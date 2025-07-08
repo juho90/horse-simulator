@@ -5,15 +5,6 @@ import { createTrack } from "./raceTrack";
 import { generateRaceWebGLHtml as renderRaceWebGLHtml } from "./raceViewerWebGL";
 import { Horse } from "./types/horse";
 
-function getRandomTrackLength(): number {
-  const min = 1200;
-  const max = 3600;
-  const step = 100;
-  const count = (max - min) / step + 1;
-  const idx = Math.floor(Math.random() * count);
-  return min + idx * step;
-}
-
 function createHorses(count: number = 10): Horse[] {
   const horses: Horse[] = [];
   for (let i = 0; i < count; i++) {
@@ -42,9 +33,8 @@ function findFinishTurn(
 }
 
 function main() {
-  const trackLength = getRandomTrackLength();
   const segmentCount = Math.floor(Math.random() * 12) + 6;
-  const track = createTrack(trackLength, segmentCount);
+  const track = createTrack(segmentCount);
   const targetRaceDistance = track.totalLength * 3;
   const horses = createHorses(10);
   const logs = runRaceSimulator(track, horses, track.totalLength * 3);

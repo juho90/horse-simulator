@@ -8,8 +8,7 @@ export class RaceCorner extends RaceSegment {
   startAngle: number;
   endAngle: number;
 
-  constructor(start: Point, center: Point, angle: number) {
-    const radius = Math.hypot(start.x - center.x, start.y - center.y);
+  constructor(start: Point, center: Point, radius: number, angle: number) {
     const startAngle = Math.atan2(start.y - center.y, start.x - center.x);
     const endAngle = startAngle + angle;
     const end: Point = {
@@ -41,6 +40,10 @@ export class RaceCorner extends RaceSegment {
     return points;
   }
 
+  getDirection(): number {
+    return this.endAngle + (this.angle > 0 ? Math.PI / 2 : -Math.PI / 2);
+  }
+
   getBounds(): BoundingBox {
     return {
       minX: this.center.x - this.radius,
@@ -52,44 +55,41 @@ export class RaceCorner extends RaceSegment {
 }
 
 export function createHorizontalCorner(
-  arcLength: number,
+  radius: number,
   angle: number
 ): RaceCorner {
-  const radius = arcLength / Math.abs(angle);
   const start: Point = { x: 0, y: 0 };
   const center: Point = { x: 0, y: radius };
-  return new RaceCorner(start, center, angle);
+  return new RaceCorner(start, center, radius, angle);
 }
 
 export function createCornerFromLine(
   line: RaceLine,
-  arcLength: number,
+  radius: number,
   angle: number
 ): RaceCorner {
   const lineAngle = Math.atan2(
     line.end.y - line.start.y,
     line.end.x - line.start.x
   );
-  const radius = arcLength / Math.abs(angle);
   const centerAngle = lineAngle + Math.PI / 2;
   const centerX = line.end.x + radius * Math.cos(centerAngle);
   const centerY = line.end.y + radius * Math.sin(centerAngle);
   const center: Point = { x: centerX, y: centerY };
-  return new RaceCorner(line.end, center, angle);
+  return new RaceCorner(line.end, center, radius, angle);
 }
 
 export function createCornerFromCorner(
   corner: RaceCorner,
-  arcLength: number,
+  radius: number,
   angle: number
 ): RaceCorner {
   const tangentAngle = corner.endAngle + Math.PI / 2;
-  const radius = arcLength / Math.abs(angle);
   const centerAngle = tangentAngle + Math.PI / 2;
   const centerX = corner.end.x + radius * Math.cos(centerAngle);
   const centerY = corner.end.y + radius * Math.sin(centerAngle);
   const center: Point = { x: centerX, y: centerY };
-  return new RaceCorner(corner.end, center, angle);
+  return new RaceCorner(corner.end, center, radius, angle);
 }
 
 export function createCornerFromSegment(

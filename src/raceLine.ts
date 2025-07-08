@@ -23,6 +23,10 @@ export class RaceLine extends RaceSegment {
     return points;
   }
 
+  getDirection(): number {
+    return Math.atan2(this.end.y - this.start.y, this.end.x - this.start.x);
+  }
+
   getBounds(): BoundingBox {
     return {
       minX: Math.min(this.start.x, this.end.x),
@@ -43,9 +47,9 @@ export function createLineFromCorner(
   corner: RaceCorner,
   length: number
 ): RaceLine {
-  const tangentAngle = corner.endAngle + Math.PI / 2;
-  const endX = corner.end.x + length * Math.cos(tangentAngle);
-  const endY = corner.end.y + length * Math.sin(tangentAngle);
+  const dir = corner.getDirection();
+  const endX = corner.end.x + length * Math.cos(dir);
+  const endY = corner.end.y + length * Math.sin(dir);
   const end: Point = { x: endX, y: endY };
   return new RaceLine(corner.end, end);
 }

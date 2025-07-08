@@ -25,5 +25,6 @@ export abstract class RaceSegment {
   protected abstract calculateLength(): number;
 
   abstract getPoints(resolution?: number): Point[];
+  abstract getDirection(): number;
   abstract getBounds(): BoundingBox;
 }

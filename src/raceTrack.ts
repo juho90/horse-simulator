@@ -1,6 +1,25 @@
-import { RaceCorner } from "./raceCorner";
-import { NextSegmentBuilder } from "./raceNextSegment";
+import {
+  createCornerFromSegment,
+  createHorizontalCorner,
+  RaceCorner,
+} from "./raceCorner";
+import {
+  createHorizontalLine,
+  createLineFromSegment,
+  RaceLine,
+} from "./raceLine";
 import { Point, RaceSegment } from "./raceSegment";
+
+export const LINE_LENGTHS = [300, 350, 400, 450];
+export const CORNER_ANGLES = [Math.PI / 6, Math.PI / 4, Math.PI / 2];
+export const CORNER_RADIUS = [50, 100, 150, 200];
+
+export interface RaceTrackHint {
+  type: "line" | "corner";
+  length?: number;
+  radius?: number;
+  angle?: number;
+}
 
 export class RaceTrack {
   width: number;
@@ -37,79 +56,166 @@ export class RaceTrack {
   }
 }
 
-export function generateTrackPattern(segmentCount: number) {
-  const segmentPattern: ("line" | "corner")[] = [];
-  let lineCount = 0;
-  let cornerCount = 0;
+export function generateTrackPattern(segmentCount: number): RaceTrackHint[] {
+  const segmentPattern: RaceTrackHint[] = [];
+  let remainAngle = 2 * Math.PI;
   let needsLine = true;
   for (let i = 0; i < segmentCount; i++) {
     if (needsLine) {
-      segmentPattern.push("line");
-      lineCount++;
+      const length =
+        LINE_LENGTHS[Math.floor(Math.random() * LINE_LENGTHS.length)];
+      segmentPattern.push({ type: "line", length: length });
       needsLine = false;
     } else {
-      segmentPattern.push("corner");
-      cornerCount++;
+      const radius =
+        CORNER_RADIUS[Math.floor(Math.random() * CORNER_RADIUS.length)];
+      segmentPattern.push({ type: "corner", radius: radius });
       needsLine = true;
     }
   }
   if (segmentPattern[segmentPattern.length - 1] === segmentPattern[0]) {
-    if (segmentPattern[segmentPattern.length - 1] === "line") {
-      segmentPattern.push("corner");
-      cornerCount++;
+    if (segmentPattern[segmentPattern.length - 1].type === "line") {
+      const radius =
+        CORNER_RADIUS[Math.floor(Math.random() * CORNER_RADIUS.length)];
+      segmentPattern.push({ type: "corner", radius: radius });
     } else {
-      segmentPattern.push("line");
-      lineCount++;
+      segmentPattern.push({ type: "line" });
     }
   }
-  return { segmentPattern, lineCount, cornerCount };
+  const cornerHitnts = segmentPattern.filter((hint) => hint.type === "corner");
+  const cornerCount = cornerHitnts.length;
+  let cornerIndex = 0;
+  for (const cornerHitnt of cornerHitnts) {
+    if (cornerIndex === cornerCount - 1) {
+      cornerHitnt.angle = remainAngle;
+    } else {
+      // 남은 각도에서 최소 각도만큼은 남겨둬야 함
+      const minRemain =
+        (cornerCount - cornerIndex - 1) * Math.min(...CORNER_ANGLES);
+      const candidates = CORNER_ANGLES.filter(
+        (a) => a <= remainAngle - minRemain
+      );
+      const angle =
+        candidates.length > 0
+          ? candidates[Math.floor(Math.random() * candidates.length)]
+          : Math.min(...CORNER_ANGLES);
+      cornerHitnt.angle = angle;
+      remainAngle -= angle;
+    }
+    cornerIndex++;
+  }
+  return segmentPattern;
 }
 
-export function createTrack(
-  trackLength: number,
-  segmentCount: number
-): RaceTrack {
+export function adjustRaceSegments(segments: RaceSegment[]): RaceSegment[] {
+  if (segments.length < 2) {
+    return segments;
+  }
+  const N = segments.length;
+  const first = segments[0];
+  const last = segments[segments.length - 1];
+  const dx = first.start.x - last.end.x;
+  const dy = first.start.y - last.end.y;
+  const adjustX = dx / N;
+  const adjustY = dy / N;
+  const minLength = 150;
+  let currDir = 0;
+  let remainingAdjust = 0;
+  let prevSegment: RaceSegment | null = null;
+  const adjusted: RaceSegment[] = [];
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    const adjust = Math.cos(currDir) * adjustX + Math.sin(currDir) * adjustY;
+    if (seg.type === "line") {
+      const lineSeg = seg as RaceLine;
+      if (lineSeg.length + adjust < minLength) {
+        remainingAdjust += adjust;
+        const newSeg: RaceSegment = prevSegment
+          ? createLineFromSegment(prevSegment, lineSeg.length)
+          : createHorizontalLine(lineSeg.length);
+        adjusted.push(newSeg);
+        prevSegment = newSeg;
+        currDir = newSeg.getDirection();
+        continue;
+      } else {
+        let newLength = lineSeg.length + adjust + remainingAdjust;
+        if (newLength < minLength) {
+          const remainAdjust = minLength - newLength;
+          newLength = minLength;
+          remainingAdjust = remainAdjust;
+        } else {
+          remainingAdjust = 0;
+        }
+        const newSeg: RaceSegment = prevSegment
+          ? createLineFromSegment(prevSegment, newLength)
+          : createHorizontalLine(newLength);
+        adjusted.push(newSeg);
+        prevSegment = newSeg;
+        currDir = newSeg.getDirection();
+      }
+    } else {
+      const cornerSeg = seg as RaceCorner;
+      if (cornerSeg.length + adjust < minLength) {
+        remainingAdjust += adjust;
+        const angle = cornerSeg.angle;
+        const radius = cornerSeg.radius;
+        const newSeg: RaceSegment = prevSegment
+          ? createCornerFromSegment(prevSegment, radius, angle)
+          : createHorizontalCorner(radius, angle);
+        adjusted.push(newSeg);
+        prevSegment = newSeg;
+        currDir = newSeg.getDirection();
+      } else {
+        let newLength = cornerSeg.length + adjust + remainingAdjust;
+        if (newLength < minLength) {
+          const remainAdjust = minLength - newLength;
+          newLength = minLength;
+          remainingAdjust = remainAdjust;
+        } else {
+          remainingAdjust = 0;
+        }
+        const angle = cornerSeg.angle;
+        const radius = newLength / Math.abs(angle);
+        const newSeg: RaceSegment = prevSegment
+          ? createCornerFromSegment(prevSegment, radius, angle)
+          : createHorizontalCorner(radius, angle);
+        adjusted.push(newSeg);
+        prevSegment = newSeg;
+        currDir = newSeg.getDirection();
+      }
+    }
+  }
+  return adjusted;
+}
+
+export function createTrack(segmentCount: number): RaceTrack {
   if (segmentCount < 3) {
     throw new Error("segmentCount는 3 이상이어야 합니다.");
   }
-  const { segmentPattern, lineCount, cornerCount } =
-    generateTrackPattern(segmentCount);
-  if (lineCount === 0 || cornerCount === 0) {
-    throw new Error("직선과 곡선이 모두 있어야 합니다.");
-  }
-  const totalLength = Math.round(trackLength / 100) * 100;
-  let remainAngle = Math.PI * 2;
-  let remainLength = totalLength;
-  const trackStartPoint: Point = { x: 0, y: 0 };
-
-  const segmentBuilder = new NextSegmentBuilder()
-    .setSegmentType("line")
-    .setTrackStartPoint(trackStartPoint)
-    .setSegmentPattern(segmentPattern)
-    .setSegmentIndex(0)
-    .setRemainTrackLength(remainLength)
-    .setRemainAngle(remainAngle);
-
-  let currentSegment = segmentBuilder.build();
+  const segmentPattern = generateTrackPattern(segmentCount);
   const segments: RaceSegment[] = [];
-  segments.push(currentSegment);
-  remainLength -= currentSegment.length;
-  for (let index = 1; index < segmentPattern.length; index++) {
-    currentSegment = segmentBuilder
-      .setSegmentType(segmentPattern[index])
-      .setSegmentIndex(index)
-      .setRemainTrackLength(remainLength)
-      .setRemainAngle(remainAngle)
-      .setPreviousSegment(currentSegment)
-      .build();
-    segments.push(currentSegment);
-    remainLength -= currentSegment.length;
-    if (currentSegment.type === "corner") {
-      remainAngle -= (currentSegment as RaceCorner).angle;
+  let prevSegment: RaceSegment | null = null;
+  for (const segmentHint of segmentPattern) {
+    if (segmentHint.type === "line") {
+      const length = segmentHint.length!;
+      const segment: RaceSegment = prevSegment
+        ? createLineFromSegment(prevSegment, length)
+        : createHorizontalLine(length);
+      segments.push(segment);
+      prevSegment = segment;
+    } else {
+      const angle = segmentHint.angle!;
+      const radius = segmentHint.radius!;
+      const segment: RaceSegment = prevSegment
+        ? createCornerFromSegment(prevSegment, radius, angle)
+        : createHorizontalCorner(radius, angle);
+      segments.push(segment);
+      prevSegment = segment;
     }
   }
-  const firstSegment = segments[0];
-  const lastSegment = segments[segments.length - 1];
+  const adjustSegments = adjustRaceSegments(segments);
+  const firstSegment = adjustSegments[0];
+  const lastSegment = adjustSegments[adjustSegments.length - 1];
   const startPoint = firstSegment.start;
   const endPoint = lastSegment.end;
   const closureDistance = Math.sqrt(
@@ -125,12 +231,12 @@ export function createTrack(
   }
   const allX: number[] = [];
   const allY: number[] = [];
-  segments.forEach((segment) => {
+  adjustSegments.forEach((segment) => {
     const bounds = segment.getBounds();
     allX.push(bounds.minX, bounds.maxX);
     allY.push(bounds.minY, bounds.maxY);
   });
   const width = Math.max(...allX) - Math.min(...allX);
   const height = Math.max(...allY) - Math.min(...allY);
-  return new RaceTrack(width, height, segments);
+  return new RaceTrack(width, height, adjustSegments);
 }
