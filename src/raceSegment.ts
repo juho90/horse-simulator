@@ -27,4 +27,5 @@ export abstract class RaceSegment {
   abstract getPoints(resolution?: number): Point[];
   abstract getDirection(): number;
   abstract getBounds(): BoundingBox;
+  abstract cloneWithOffset(dx: number, dy: number): RaceSegment;
 }

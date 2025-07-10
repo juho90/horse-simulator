@@ -52,6 +52,12 @@ export class RaceCorner extends RaceSegment {
       maxY: this.center.y + this.radius,
     };
   }
+
+  cloneWithOffset(dx: number, dy: number): RaceSegment {
+    const newStart: Point = { x: this.start.x + dx, y: this.start.y + dy };
+    const newCenter: Point = { x: this.center.x + dx, y: this.center.y + dy };
+    return new RaceCorner(newStart, newCenter, this.radius, this.angle);
+  }
 }
 
 export function createHorizontalCorner(

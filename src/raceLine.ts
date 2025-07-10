@@ -35,6 +35,12 @@ export class RaceLine extends RaceSegment {
       maxY: Math.max(this.start.y, this.end.y),
     };
   }
+
+  cloneWithOffset(dx: number, dy: number): RaceSegment {
+    const newStart: Point = { x: this.start.x + dx, y: this.start.y + dy };
+    const newEnd: Point = { x: this.end.x + dx, y: this.end.y + dy };
+    return new RaceLine(newStart, newEnd);
+  }
 }
 
 export function createHorizontalLine(length: number): RaceLine {
