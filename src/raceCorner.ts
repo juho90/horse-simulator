@@ -40,8 +40,13 @@ export class RaceCorner extends RaceSegment {
     return points;
   }
 
+  getDirectionAt(x: number, y: number): number {
+    const angle = Math.atan2(y - this.center.y, x - this.center.x);
+    return angle + Math.PI / 2;
+  }
+
   getDirection(): number {
-    return this.endAngle + (this.angle > 0 ? Math.PI / 2 : -Math.PI / 2);
+    return this.endAngle + Math.PI / 2;
   }
 
   getBounds(): BoundingBox {
@@ -53,10 +58,28 @@ export class RaceCorner extends RaceSegment {
     };
   }
 
-  cloneWithOffset(dx: number, dy: number): RaceSegment {
-    const newStart: Point = { x: this.start.x + dx, y: this.start.y + dy };
-    const newCenter: Point = { x: this.center.x + dx, y: this.center.y + dy };
-    return new RaceCorner(newStart, newCenter, this.radius, this.angle);
+  isInside(x: number, y: number, tolerance: number): boolean {
+    const dx = x - this.center.x;
+    const dy = y - this.center.y;
+    const dist = Math.hypot(dx, dy);
+    if (Math.abs(dist - this.radius) > tolerance) {
+      return false;
+    }
+    const angle = Math.atan2(dy, dx);
+    const norm = (a: number) => (a + 2 * Math.PI) % (2 * Math.PI);
+    const start = norm(this.startAngle);
+    const end = norm(this.endAngle);
+    let theta = norm(angle);
+    if (start < end) {
+      if (theta < start || end < theta) {
+        return false;
+      }
+    } else {
+      if (theta < start && end < theta) {
+        return false;
+      }
+    }
+    return true;
   }
 }
 

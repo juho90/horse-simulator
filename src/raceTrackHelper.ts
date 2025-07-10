@@ -21,410 +21,6 @@ export interface RaceTrackHint {
   angle?: number;
 }
 
-export function generateTrackPattern(segmentCount: number): RaceTrackHint[] {
-  const segmentPattern: RaceTrackHint[] = [];
-  let remainAngle = 2 * Math.PI;
-  let needsLine = true;
-  for (let i = 0; i < segmentCount; i++) {
-    if (needsLine) {
-      const length =
-        LINE_LENGTHS[Math.floor(Math.random() * LINE_LENGTHS.length)];
-      segmentPattern.push({ type: "line", length: length });
-      needsLine = false;
-    } else {
-      const radius =
-        CORNER_RADIUS[Math.floor(Math.random() * CORNER_RADIUS.length)];
-      segmentPattern.push({ type: "corner", radius: radius });
-      needsLine = true;
-    }
-  }
-  if (segmentPattern[segmentPattern.length - 1] === segmentPattern[0]) {
-    if (segmentPattern[segmentPattern.length - 1].type === "line") {
-      const radius =
-        CORNER_RADIUS[Math.floor(Math.random() * CORNER_RADIUS.length)];
-      segmentPattern.push({ type: "corner", radius: radius });
-    } else {
-      segmentPattern.push({ type: "line" });
-    }
-  }
-  const cornerHitnts = segmentPattern.filter((hint) => hint.type === "corner");
-  const cornerCount = cornerHitnts.length;
-  let cornerIndex = 0;
-  for (const cornerHitnt of cornerHitnts) {
-    if (cornerIndex === cornerCount - 1) {
-      cornerHitnt.angle = remainAngle;
-    } else {
-      const minRemain =
-        (cornerCount - cornerIndex - 1) * Math.min(...CORNER_ANGLES);
-      const candidates = CORNER_ANGLES.filter(
-        (a) => a <= remainAngle - minRemain
-      );
-      const angle =
-        candidates.length > 0
-          ? candidates[Math.floor(Math.random() * candidates.length)]
-          : Math.min(...CORNER_ANGLES);
-      cornerHitnt.angle = angle;
-      remainAngle -= angle;
-    }
-    cornerIndex++;
-  }
-  return segmentPattern;
-}
-
-export function adjustRaceSegments(segments: RaceSegment[]): RaceSegment[] {
-  if (segments.length < 2) {
-    return segments;
-  }
-  const N = segments.length;
-  const first = segments[0];
-  const last = segments[segments.length - 1];
-  const dx = first.start.x - last.end.x;
-  const dy = first.start.y - last.end.y;
-  const adjustX = dx / N;
-  const adjustY = dy / N;
-  const minLength = 150;
-  let currDir = 0;
-  let remainingAdjust = 0;
-  let prevSegment: RaceSegment | null = null;
-  const adjusted: RaceSegment[] = [];
-  for (let i = 0; i < segments.length; i++) {
-    const seg = segments[i];
-    const adjust = Math.cos(currDir) * adjustX + Math.sin(currDir) * adjustY;
-    if (seg.type === "line") {
-      const lineSeg = seg as RaceLine;
-      if (lineSeg.length + adjust < minLength) {
-        remainingAdjust += adjust;
-        const newSeg: RaceSegment = prevSegment
-          ? createLineFromSegment(prevSegment, lineSeg.length)
-          : createHorizontalLine(lineSeg.length);
-        adjusted.push(newSeg);
-        prevSegment = newSeg;
-        currDir = newSeg.getDirection();
-        continue;
-      } else {
-        let newLength = lineSeg.length + adjust + remainingAdjust;
-        if (newLength < minLength) {
-          const remainAdjust = minLength - newLength;
-          newLength = minLength;
-          remainingAdjust = remainAdjust;
-        } else {
-          remainingAdjust = 0;
-        }
-        const newSeg: RaceSegment = prevSegment
-          ? createLineFromSegment(prevSegment, newLength)
-          : createHorizontalLine(newLength);
-        adjusted.push(newSeg);
-        prevSegment = newSeg;
-        currDir = newSeg.getDirection();
-      }
-    } else {
-      const cornerSeg = seg as RaceCorner;
-      if (cornerSeg.length + adjust < minLength) {
-        remainingAdjust += adjust;
-        const angle = cornerSeg.angle;
-        const radius = cornerSeg.radius;
-        const newSeg: RaceSegment = prevSegment
-          ? createCornerFromSegment(prevSegment, radius, angle)
-          : createHorizontalCorner(radius, angle);
-        adjusted.push(newSeg);
-        prevSegment = newSeg;
-        currDir = newSeg.getDirection();
-      } else {
-        let newLength = cornerSeg.length + adjust + remainingAdjust;
-        if (newLength < minLength) {
-          const remainAdjust = minLength - newLength;
-          newLength = minLength;
-          remainingAdjust = remainAdjust;
-        } else {
-          remainingAdjust = 0;
-        }
-        const angle = cornerSeg.angle;
-        const radius = newLength / Math.abs(angle);
-        const newSeg: RaceSegment = prevSegment
-          ? createCornerFromSegment(prevSegment, radius, angle)
-          : createHorizontalCorner(radius, angle);
-        adjusted.push(newSeg);
-        prevSegment = newSeg;
-        currDir = newSeg.getDirection();
-      }
-    }
-  }
-  return adjusted;
-}
-
-export function translateTrackToClose(segments: RaceSegment[]): RaceSegment[] {
-  if (segments.length < 2) {
-    return segments;
-  }
-  const first = segments[0];
-  const last = segments[segments.length - 1];
-  const dx = first.start.x - last.end.x;
-  const dy = first.start.y - last.end.y;
-  return segments.map((segment) => segment.cloneWithOffset(dx, dy));
-}
-
-export function autoAdjustLastSegmentsToClose(
-  segments: RaceSegment[],
-  options?: { adjustCount?: number; minLength?: number; minRadius?: number }
-): RaceSegment[] {
-  if (segments.length < 2) {
-    return segments;
-  }
-  const N = segments.length;
-  const adjustCount = options?.adjustCount ?? 1;
-  const minLength = options?.minLength ?? 150;
-  const minRadius = options?.minRadius ?? 30;
-  const start = segments[0].start;
-  const end = segments[N - 1].end;
-  const dx = start.x - end.x;
-  const dy = start.y - end.y;
-  const newSegments = segments.slice();
-  for (let i = N - adjustCount; i < N; i++) {
-    const segment = newSegments[i];
-    if (segment.type === "line") {
-      const dir = segment.getDirection();
-      const proj = Math.cos(dir) * dx + Math.sin(dir) * dy;
-      let newLength = (segment as any).length + proj;
-      if (newLength < minLength) newLength = minLength;
-      newSegments[i] =
-        i > 0
-          ? createLineFromSegment(newSegments[i - 1], newLength)
-          : createHorizontalLine(newLength);
-    } else {
-      const angle = (segment as any).angle;
-      let radius = (segment as any).radius;
-      let newRadius = Math.max(
-        minRadius,
-        radius + (dx + dy) / 2 / Math.abs(angle)
-      );
-      newSegments[i] =
-        i > 0
-          ? createCornerFromSegment(newSegments[i - 1], newRadius, angle)
-          : createHorizontalCorner(newRadius, angle);
-    }
-  }
-  return newSegments;
-}
-
-export function robustCloseTrack(segments: RaceSegment[]): RaceSegment[] {
-  if (segments.length < 2) return segments;
-  const N = segments.length;
-  const first = segments[0];
-  const last = segments[N - 1];
-  const dx = first.start.x - last.end.x;
-  const dy = first.start.y - last.end.y;
-  const dist = Math.hypot(dx, dy);
-  if (dist < 1e-6) {
-    return segments;
-  }
-  let adjusted = adjustRaceSegments(segments);
-  const adjLast = adjusted[adjusted.length - 1];
-  const adjDx = first.start.x - adjLast.end.x;
-  const adjDy = first.start.y - adjLast.end.y;
-  if (Math.hypot(adjDx, adjDy) < 1e-3) {
-    return adjusted;
-  }
-  let bestSegs = adjusted.slice();
-  let minErr = Infinity;
-  const prev = adjusted[N - 2];
-  const lastSeg = adjusted[N - 1];
-  for (let d1 = -40; d1 <= 40; d1 += 4) {
-    for (let d2 = -40; d2 <= 40; d2 += 4) {
-      let newPrev = prev;
-      let newLast = lastSeg;
-      if (prev.type === "line") {
-        const len = (prev as RaceLine).length + d1;
-        if (len < 100) {
-          continue;
-        }
-        newPrev = createLineFromSegment(adjusted[N - 3], len);
-      } else if (prev.type === "corner") {
-        const angle = (prev as RaceCorner).angle + d1 * 0.01;
-        const radius = (prev as RaceCorner).radius;
-        if (Math.abs(angle) < 0.1) {
-          continue;
-        }
-        newPrev = createCornerFromSegment(adjusted[N - 3], radius, angle);
-      }
-      if (lastSeg.type === "line") {
-        const len = (lastSeg as RaceLine).length + d2;
-        if (len < 100) {
-          continue;
-        }
-        newLast = createLineFromSegment(newPrev, len);
-      } else if (lastSeg.type === "corner") {
-        const angle = (lastSeg as RaceCorner).angle + d2 * 0.01;
-        const radius = (lastSeg as RaceCorner).radius;
-        if (Math.abs(angle) < 0.1) {
-          continue;
-        }
-        newLast = createCornerFromSegment(newPrev, radius, angle);
-      }
-      // 마지막 세그먼트는 무조건 시작점에 닫히도록 강제 생성
-      if (lastSeg.type === "line") {
-        // newPrev의 end에서 first.start까지 직선 생성
-        newLast = new RaceLine(newPrev.end, {
-          x: first.start.x,
-          y: first.start.y,
-        });
-      } else if (lastSeg.type === "corner") {
-        // newPrev의 end에서 first.start까지 반지름 유지하며 각도 자동 계산
-        const radius = (lastSeg as RaceCorner).radius;
-        const start = newPrev.end;
-        const dx = first.start.x - start.x;
-        const dy = first.start.y - start.y;
-        const dist = Math.hypot(dx, dy);
-        // 반지름보다 거리가 작으면, 각도는 부호 유지하며 arcLength = dist
-        let angle = (lastSeg as RaceCorner).angle;
-        let newAngle = angle;
-        if (radius > 0.1) {
-          // 호의 길이 = r * |angle|, chord = 2r * sin(|angle|/2)
-          // 역산: angle = 2 * arcsin(chord / (2r))
-          const chord = dist;
-          newAngle = 2 * Math.asin(Math.min(1, chord / (2 * Math.abs(radius))));
-          if (angle < 0) newAngle = -newAngle;
-        }
-        // center 계산: start에서 반지름만큼 수직 방향으로 이동
-        const dir = Math.atan2(dy, dx);
-        const centerAngle = dir + (newAngle > 0 ? -Math.PI / 2 : Math.PI / 2);
-        const center = {
-          x: start.x + radius * Math.cos(centerAngle),
-          y: start.y + radius * Math.sin(centerAngle),
-        };
-        newLast = new RaceCorner(start, center, radius, newAngle);
-      }
-      const testSegs = adjusted.slice(0, N - 2).concat([newPrev, newLast]);
-      const dx = first.start.x - newLast.end.x;
-      const dy = first.start.y - newLast.end.y;
-      const err = Math.hypot(dx, dy);
-      if (err < minErr) {
-        minErr = err;
-        bestSegs = testSegs;
-        if (err < 1e-3) {
-          break;
-        }
-      }
-    }
-    if (minErr < 1e-3) {
-      break;
-    }
-  }
-  if (minErr < 1e-2) {
-    return bestSegs;
-  }
-  // 마지막 2개 세그먼트로 시작점의 위치와 방향을 모두 맞추는 역산 보정
-  // [코너, 직선] 또는 [직선, 코너] 조합만 우선 지원
-  const preLast = adjusted[N - 2];
-  const lastS = adjusted[N - 1];
-  let closed = false;
-  let fixedSegs = adjusted.slice(0, N - 2);
-  // [코너, 직선] 조합
-  if (preLast.type === "corner" && lastS.type === "line") {
-    const corner = preLast as RaceCorner;
-    const dir0 = corner.getDirection();
-    const start = corner.end;
-    const end = { x: first.start.x, y: first.start.y };
-    // 직선 길이와 방향: start에서 end까지
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-    const len = Math.hypot(dx, dy);
-    const newLine = new RaceLine(start, end);
-    // 코너 각도는 방향 연속성 보장
-    const prevDir = (adjusted[N - 3] as RaceSegment).getDirection();
-    const cornerDir = Math.atan2(
-      start.y - corner.center.y,
-      start.x - corner.center.x
-    );
-    const targetDir = Math.atan2(dy, dx);
-    let newAngle = targetDir - prevDir;
-    // 부호 보정
-    if (corner.angle < 0 && newAngle > 0) newAngle -= 2 * Math.PI;
-    if (corner.angle > 0 && newAngle < 0) newAngle += 2 * Math.PI;
-    const newCorner = new RaceCorner(
-      corner.start,
-      corner.center,
-      corner.radius,
-      newAngle
-    );
-    fixedSegs = fixedSegs.concat([newCorner, newLine]);
-    closed = true;
-  }
-  // [직선, 코너] 조합
-  else if (preLast.type === "line" && lastS.type === "corner") {
-    const line = preLast as RaceLine;
-    const corner = lastS as RaceCorner;
-    // 직선: line.start ~ line.end
-    // 코너: line.end ~ ? (끝점이 first.start에 오도록)
-    const start = line.end;
-    const end = { x: first.start.x, y: first.start.y };
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-    // 각도 역산
-    const radius = corner.radius;
-    let angle = corner.angle;
-    if (radius > 0.1) {
-      const chord = Math.hypot(dx, dy);
-      angle = 2 * Math.asin(Math.min(1, chord / (2 * Math.abs(radius))));
-      if (corner.angle < 0) angle = -angle;
-    }
-    const dir = Math.atan2(dy, dx);
-    const centerAngle = dir + (angle > 0 ? -Math.PI / 2 : Math.PI / 2);
-    const center = {
-      x: start.x + radius * Math.cos(centerAngle),
-      y: start.y + radius * Math.sin(centerAngle),
-    };
-    const newCorner = new RaceCorner(start, center, radius, angle);
-    fixedSegs = fixedSegs.concat([line, newCorner]);
-    closed = true;
-  }
-  if (closed) {
-    return fixedSegs;
-  }
-  let numericallyClosed = tryNumericalLastSegmentClosure(adjusted);
-  const numLast = numericallyClosed[numericallyClosed.length - 1];
-  const numDx = first.start.x - numLast.end.x;
-  const numDy = first.start.y - numLast.end.y;
-  if (Math.hypot(numDx, numDy) < 1e-3) {
-    return numericallyClosed;
-  }
-  let translated = translateTrackToClose(numericallyClosed);
-  return translated;
-}
-
-function tryNumericalLastSegmentClosure(
-  segments: RaceSegment[]
-): RaceSegment[] {
-  const N = segments.length;
-  if (N < 2) {
-    return segments;
-  }
-  const first = segments[0];
-  const last = segments[N - 1];
-  const dx = first.start.x - last.end.x;
-  const dy = first.start.y - last.end.y;
-  const dist = Math.hypot(dx, dy);
-  if (dist < 1e-6) {
-    return segments;
-  }
-  const newSegments = segments.slice();
-  const adjustCount = Math.min(3, N - 1);
-  for (let i = N - adjustCount; i < N; i++) {
-    const segment = newSegments[i];
-    if (segment.type === "line") {
-      const dir = segment.getDirection();
-      const proj = Math.cos(dir) * dx + Math.sin(dir) * dy;
-      (segment as any).length += proj;
-    } else {
-      const angle = (segment as any).angle;
-      let radius = (segment as any).radius;
-      let newRadius = radius + (dx + dy) / 2 / Math.abs(angle);
-      if (newRadius < 0) newRadius = 0;
-      (segment as any).radius = newRadius;
-    }
-  }
-  return newSegments;
-}
-
 export function generateTrackPatternClosed(
   segmentCount: number
 ): RaceTrackHint[] {
@@ -589,4 +185,121 @@ export function generateClosedTrackSegments(
     segments.push(line);
   }
   return segments;
+}
+
+export class RaceTrackHelper {
+  innerPoints: { x: number; y: number }[];
+  outerPoints: { x: number; y: number }[];
+  constructor(innerPoints: { x: number; y: number }[], outerOffset: number) {
+    this.innerPoints = innerPoints;
+    this.outerPoints = RaceTrackHelper.getOuterGuardrail(
+      innerPoints,
+      outerOffset
+    );
+  }
+
+  static getOuterGuardrail(
+    innerPoints: { x: number; y: number }[],
+    offset: number
+  ): { x: number; y: number }[] {
+    return innerPoints.map((pt: { x: number; y: number }, i: number) => {
+      const prev = innerPoints[i === 0 ? innerPoints.length - 1 : i - 1];
+      const next = innerPoints[(i + 1) % innerPoints.length];
+      const n = RaceTrackHelper._normalVector(prev, next);
+      return { x: pt.x + n.x * offset, y: pt.y + n.y * offset };
+    });
+  }
+
+  static _normalVector(
+    a: { x: number; y: number },
+    b: { x: number; y: number }
+  ): { x: number; y: number } {
+    const dx = b.x - a.x,
+      dy = b.y - a.y,
+      len = Math.hypot(dx, dy);
+    return { x: dy / len, y: -dx / len };
+  }
+
+  getLateralPosition(idx: number, laneRatio: number): { x: number; y: number } {
+    return RaceTrackHelper._lerp(
+      this.innerPoints[idx],
+      this.outerPoints[idx],
+      laneRatio
+    );
+  }
+
+  static _lerp(
+    a: { x: number; y: number },
+    b: { x: number; y: number },
+    t: number
+  ): { x: number; y: number } {
+    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+  }
+
+  getDirection(idx: number): number {
+    return RaceTrackHelper._direction(this.innerPoints, idx);
+  }
+
+  getLateralDirection(idx: number): number {
+    return RaceTrackHelper._direction(
+      [this.innerPoints[idx], this.outerPoints[idx]],
+      0
+    );
+  }
+
+  static _direction(arr: { x: number; y: number }[], idx: number): number {
+    const a = arr[idx],
+      b = arr[(idx + 1) % arr.length];
+    return Math.atan2(b.y - a.y, b.x - a.x);
+  }
+
+  clampToBoundary(x: number, y: number): { x: number; y: number } {
+    return RaceTrackHelper.clampToTrackBoundary(
+      x,
+      y,
+      this.innerPoints,
+      this.outerPoints
+    );
+  }
+
+  static clampToTrackBoundary(
+    x: number,
+    y: number,
+    innerPoints: { x: number; y: number }[],
+    outerPoints: { x: number; y: number }[]
+  ): { x: number; y: number } {
+    let minDist = Infinity,
+      closestIdx = 0;
+    for (let i = 0; i < innerPoints.length; i++) {
+      const d = (x - innerPoints[i].x) ** 2 + (y - innerPoints[i].y) ** 2;
+      if (d < minDist) {
+        minDist = d;
+        closestIdx = i;
+      }
+    }
+    const i1 = closestIdx,
+      i2 = (closestIdx + 1) % innerPoints.length;
+    const in1 = innerPoints[i1],
+      in2 = innerPoints[i2];
+    const out1 = outerPoints[i1],
+      out2 = outerPoints[i2];
+    const t = RaceTrackHelper._projectOnSegment(x, y, in1, in2);
+    const innerProj = RaceTrackHelper._lerp(in1, in2, t);
+    const outerProj = RaceTrackHelper._lerp(out1, out2, t);
+    const proj = RaceTrackHelper._projectOnSegment(x, y, innerProj, outerProj);
+    return RaceTrackHelper._lerp(innerProj, outerProj, proj);
+  }
+  static _projectOnSegment(
+    x: number,
+    y: number,
+    a: { x: number; y: number },
+    b: { x: number; y: number }
+  ): number {
+    const dx = b.x - a.x,
+      dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) return 0;
+    let t = ((x - a.x) * dx + (y - a.y) * dy) / len2;
+    return Math.max(0, Math.min(1, t));
+  }
 }

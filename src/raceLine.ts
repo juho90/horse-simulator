@@ -11,16 +11,8 @@ export class RaceLine extends RaceSegment {
     return Math.hypot(this.end.x - this.start.x, this.end.y - this.start.y);
   }
 
-  getPoints(resolution: number = 100): Point[] {
-    const points: Point[] = [];
-    for (let i = 0; i <= resolution; i++) {
-      const t = i / resolution;
-      points.push({
-        x: this.start.x + (this.end.x - this.start.x) * t,
-        y: this.start.y + (this.end.y - this.start.y) * t,
-      });
-    }
-    return points;
+  getDirectionAt(x: number, y: number): number {
+    return Math.atan2(this.end.y - this.start.y, this.end.x - this.start.x);
   }
 
   getDirection(): number {
@@ -36,10 +28,21 @@ export class RaceLine extends RaceSegment {
     };
   }
 
-  cloneWithOffset(dx: number, dy: number): RaceSegment {
-    const newStart: Point = { x: this.start.x + dx, y: this.start.y + dy };
-    const newEnd: Point = { x: this.end.x + dx, y: this.end.y + dy };
-    return new RaceLine(newStart, newEnd);
+  isInside(x: number, y: number, tolerance: number): boolean {
+    const dx = this.end.x - this.start.x;
+    const dy = this.end.y - this.start.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) {
+      return false;
+    }
+    const t = ((x - this.start.x) * dx + (y - this.start.y) * dy) / len2;
+    if (t < 0 || 1 < t) {
+      return false;
+    }
+    const projX = this.start.x + dx * t;
+    const projY = this.start.y + dy * t;
+    const dist = Math.hypot(x - projX, y - projY);
+    return dist < tolerance;
   }
 }
 

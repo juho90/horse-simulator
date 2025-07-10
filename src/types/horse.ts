@@ -4,5 +4,4 @@ export interface Horse {
   speed: number;
   stamina?: number;
   reaction?: number;
-  [key: string]: any;
 }

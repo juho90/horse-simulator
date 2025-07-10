@@ -1,4 +1,4 @@
-import { Point, RaceSegment } from "./raceSegment";
+import { RaceSegment } from "./raceSegment";
 import { generateClosedTrackSegments } from "./raceTrackHelper";
 
 export class RaceTrack {
@@ -14,25 +14,18 @@ export class RaceTrack {
     this.totalLength = this.segments.reduce((sum, seg) => sum + seg.length, 0);
   }
 
-  getTrackPoints(resolution: number = 2000): Point[] {
-    if (this.segments.length === 0 || this.totalLength === 0) {
-      return [];
+  getFirstSegment(): RaceSegment {
+    if (this.segments.length === 0) {
+      throw new Error("트랙에 세그먼트가 없습니다.");
     }
-    const points: Point[] = [];
-    for (let i = 0; i < this.segments.length; i++) {
-      const seg = this.segments[i];
-      const segRes = Math.max(
-        2,
-        Math.round(resolution * (seg.length / this.totalLength))
-      );
-      const segPoints = seg.getPoints(segRes);
-      if (i === 0) {
-        points.push(...segPoints);
-      } else {
-        points.push(...segPoints.slice(1));
-      }
+    return this.segments[0];
+  }
+
+  getLastSegment(): RaceSegment {
+    if (this.segments.length === 0) {
+      throw new Error("트랙에 세그먼트가 없습니다.");
     }
-    return points;
+    return this.segments[this.segments.length - 1];
   }
 }
 
@@ -48,7 +41,7 @@ export function createTrack(segmentCount: number): RaceTrack {
     allX.push(bounds.minX, bounds.maxX);
     allY.push(bounds.minY, bounds.maxY);
   });
-  const width = Math.max(...allX) - Math.min(...allX);
-  const height = Math.max(...allY) - Math.min(...allY);
+  const width = Math.max(...allX) - Math.min(...allX) + 200;
+  const height = Math.max(...allY) - Math.min(...allY) + 200;
   return new RaceTrack(width, height, segmentPattern);
 }

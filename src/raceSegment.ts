@@ -24,8 +24,8 @@ export abstract class RaceSegment {
 
   protected abstract calculateLength(): number;
 
-  abstract getPoints(resolution?: number): Point[];
+  abstract getDirectionAt(x: number, y: number): number;
   abstract getDirection(): number;
   abstract getBounds(): BoundingBox;
-  abstract cloneWithOffset(dx: number, dy: number): RaceSegment;
+  abstract isInside(x: number, y: number, tolerance: number): boolean;
 }

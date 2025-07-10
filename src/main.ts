@@ -1,5 +1,5 @@
 import * as path from "path";
-import { displayTrackInfo } from "./raceLog";
+import { displayTrackInfo, RaceLog } from "./raceLog";
 import { runRaceSimulator } from "./raceSimulator";
 import { createTrack } from "./raceTrack";
 import { generateRaceWebGLHtml as renderRaceWebGLHtml } from "./raceViewerWebGL";
@@ -18,12 +18,12 @@ function createHorses(count: number = 10): Horse[] {
 }
 
 function findFinishTurn(
-  logs: any[],
+  logs: RaceLog[],
   horseId: number,
   targetDistance: number
 ): number | undefined {
   for (const log of logs) {
-    for (const horse of log.horses) {
+    for (const horse of log.horseStates) {
       if (horse.id === horseId && horse.dist >= targetDistance) {
         return log.turn;
       }

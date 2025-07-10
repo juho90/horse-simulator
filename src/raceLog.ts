@@ -3,14 +3,16 @@ import { RaceTrack } from "./raceTrack";
 import { Horse } from "./types/horse";
 
 export interface HorseTurnState {
+  id: number;
+  name: string;
+  x: number;
+  y: number;
+  dist: number;
+}
+
+export interface RaceLog {
   turn: number;
-  horses: Array<{
-    id: number;
-    name: string;
-    x: number;
-    y: number;
-    [key: string]: any;
-  }>;
+  horseStates: HorseTurnState[];
 }
 
 export function displayTrackInfo(track: RaceTrack) {
@@ -71,7 +73,7 @@ export function displayTrackInfo(track: RaceTrack) {
 export function displayRaceResults(
   track: RaceTrack,
   horses: Horse[],
-  logs: HorseTurnState[],
+  logs: RaceLog[],
   targetRaceDistance: number,
   winner: Horse | null,
   minTurn: number
@@ -99,12 +101,12 @@ export function displayRaceResults(
   console.log("\n=== 전체 말 순위 ===");
 
   function findFinishTurn(
-    logs: HorseTurnState[],
+    logs: RaceLog[],
     horseId: number,
     targetDistance: number
   ): number | null {
     for (const log of logs) {
-      for (const horse of log.horses) {
+      for (const horse of log.horseStates) {
         if (horse.id === horseId && horse.dist >= targetDistance) {
           return log.turn;
         }
@@ -125,7 +127,7 @@ export function displayRaceResults(
   function mapHorseToResult(horse: Horse): any {
     const finishTurn = findFinishTurn(logs, horse.id, targetRaceDistance);
     const finalLog = logs[logs.length - 1];
-    const finalPosition = findFinalPosition(finalLog.horses, horse.id);
+    const finalPosition = findFinalPosition(finalLog.horseStates, horse.id);
 
     return {
       ...horse,
