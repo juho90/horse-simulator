@@ -24,8 +24,10 @@ export abstract class RaceSegment {
 
   protected abstract calculateLength(): number;
 
+  abstract getBounds(): BoundingBox;
   abstract getDirectionAt(x: number, y: number): number;
   abstract getDirection(): number;
-  abstract getBounds(): BoundingBox;
-  abstract isInside(x: number, y: number, tolerance: number): boolean;
+  abstract isInner(x: number, y: number): boolean;
+  abstract isEndAt(x: number, y: number, tolerance: number): boolean;
+  abstract clampToTrackBoundary(x: number, y: number): { x: number; y: number };
 }

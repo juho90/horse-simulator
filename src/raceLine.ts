@@ -11,14 +11,6 @@ export class RaceLine extends RaceSegment {
     return Math.hypot(this.end.x - this.start.x, this.end.y - this.start.y);
   }
 
-  getDirectionAt(x: number, y: number): number {
-    return Math.atan2(this.end.y - this.start.y, this.end.x - this.start.x);
-  }
-
-  getDirection(): number {
-    return Math.atan2(this.end.y - this.start.y, this.end.x - this.start.x);
-  }
-
   getBounds(): BoundingBox {
     return {
       minX: Math.min(this.start.x, this.end.x),
@@ -28,7 +20,15 @@ export class RaceLine extends RaceSegment {
     };
   }
 
-  isInside(x: number, y: number, tolerance: number): boolean {
+  getDirectionAt(x: number, y: number): number {
+    return Math.atan2(this.end.y - this.start.y, this.end.x - this.start.x);
+  }
+
+  getDirection(): number {
+    return Math.atan2(this.end.y - this.start.y, this.end.x - this.start.x);
+  }
+
+  isInner(x: number, y: number): boolean {
     const dx = this.end.x - this.start.x;
     const dy = this.end.y - this.start.y;
     const len2 = dx * dx + dy * dy;
@@ -36,13 +36,45 @@ export class RaceLine extends RaceSegment {
       return false;
     }
     const t = ((x - this.start.x) * dx + (y - this.start.y) * dy) / len2;
-    if (t < 0 || 1 < t) {
+    const tClamped = Math.max(0, Math.min(1, t));
+    const projX = this.start.x + dx * tClamped;
+    const projY = this.start.y + dy * tClamped;
+    const dir = Math.atan2(dy, dx);
+    // 게이트(트랙 내측) 기준으로 수직 방향 부호를 맞춤 (dir - Math.PI / 2)
+    const rel =
+      (x - projX) * Math.cos(dir - Math.PI / 2) +
+      (y - projY) * Math.sin(dir - Math.PI / 2);
+    return rel > 0;
+  }
+
+  isEndAt(x: number, y: number, tolerance: number): boolean {
+    const dx = this.end.x - this.start.x;
+    const dy = this.end.y - this.start.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) {
       return false;
     }
-    const projX = this.start.x + dx * t;
-    const projY = this.start.y + dy * t;
-    const dist = Math.hypot(x - projX, y - projY);
-    return dist < tolerance;
+    const t = ((x - this.start.x) * dx + (y - this.start.y) * dy) / len2;
+    return t >= 1 - tolerance / Math.sqrt(len2);
+  }
+
+  clampToTrackBoundary(x: number, y: number): { x: number; y: number } {
+    const dx = this.end.x - this.start.x;
+    const dy = this.end.y - this.start.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) {
+      return { x: this.start.x, y: this.start.y };
+    } else {
+      const t = ((x - this.start.x) * dx + (y - this.start.y) * dy) / len2;
+      const tClamped = Math.max(0, Math.min(1, t));
+      const projX = this.start.x + dx * tClamped;
+      const projY = this.start.y + dy * tClamped;
+      const dir = Math.atan2(dy, dx);
+      return {
+        x: projX + Math.sin(dir - Math.PI / 2) * 0.5,
+        y: projY + Math.cos(dir - Math.PI / 2) * 0.5,
+      };
+    }
   }
 }
 

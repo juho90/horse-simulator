@@ -28,16 +28,13 @@ export class RaceCorner extends RaceSegment {
     return Math.abs(this.radius * this.angle);
   }
 
-  getPoints(resolution: number = 100): Point[] {
-    const points: Point[] = [];
-    for (let i = 0; i <= resolution; i++) {
-      const theta = this.startAngle + (this.angle * i) / resolution;
-      points.push({
-        x: this.center.x + this.radius * Math.cos(theta),
-        y: this.center.y + this.radius * Math.sin(theta),
-      });
-    }
-    return points;
+  getBounds(): BoundingBox {
+    return {
+      minX: this.center.x - this.radius,
+      maxX: this.center.x + this.radius,
+      minY: this.center.y - this.radius,
+      maxY: this.center.y + this.radius,
+    };
   }
 
   getDirectionAt(x: number, y: number): number {
@@ -47,15 +44,6 @@ export class RaceCorner extends RaceSegment {
 
   getDirection(): number {
     return this.endAngle + Math.PI / 2;
-  }
-
-  getBounds(): BoundingBox {
-    return {
-      minX: this.center.x - this.radius,
-      maxX: this.center.x + this.radius,
-      minY: this.center.y - this.radius,
-      maxY: this.center.y + this.radius,
-    };
   }
 
   isInside(x: number, y: number, tolerance: number): boolean {
@@ -80,6 +68,31 @@ export class RaceCorner extends RaceSegment {
       }
     }
     return true;
+  }
+
+  isInner(x: number, y: number): boolean {
+    const dx = x - this.center.x;
+    const dy = y - this.center.y;
+    const dist = Math.hypot(dx, dy);
+    return dist > this.radius;
+  }
+
+  isEndAt(x: number, y: number, tolerance: number): boolean {
+    const angle = Math.atan2(y - this.center.y, x - this.center.x);
+    const norm = (angle - this.startAngle + 2 * Math.PI) % (2 * Math.PI);
+    const span =
+      (this.endAngle - this.startAngle + 2 * Math.PI) % (2 * Math.PI);
+    return norm >= span - 0.05;
+  }
+
+  clampToTrackBoundary(x: number, y: number): { x: number; y: number } {
+    const dx = x - this.center.x;
+    const dy = y - this.center.y;
+    const angle = Math.atan2(dy, dx);
+    return {
+      x: this.center.x + (this.radius + 0.5) * Math.cos(angle),
+      y: this.center.y + (this.radius + 0.5) * Math.sin(angle),
+    };
   }
 }
 
