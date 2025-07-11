@@ -39,11 +39,8 @@ export class RaceLine extends RaceSegment {
     const tClamped = Math.max(0, Math.min(1, t));
     const projX = this.start.x + dx * tClamped;
     const projY = this.start.y + dy * tClamped;
-    const dir = Math.atan2(dy, dx);
-    // 게이트(트랙 내측) 기준으로 수직 방향 부호를 맞춤 (dir - Math.PI / 2)
-    const rel =
-      (x - projX) * Math.cos(dir - Math.PI / 2) +
-      (y - projY) * Math.sin(dir - Math.PI / 2);
+    const ortho = this.orthoVectorAt(x, y);
+    const rel = (x - projX) * ortho.x + (y - projY) * ortho.y;
     return rel > 0;
   }
 
@@ -58,6 +55,14 @@ export class RaceLine extends RaceSegment {
     return t >= 1 - tolerance / Math.sqrt(len2);
   }
 
+  orthoVectorAt(x: number, y: number): { x: number; y: number } {
+    const dir = this.getDirectionAt(x, y);
+    return {
+      x: Math.cos(dir - Math.PI / 2),
+      y: Math.sin(dir - Math.PI / 2),
+    };
+  }
+
   clampToTrackBoundary(x: number, y: number): { x: number; y: number } {
     const dx = this.end.x - this.start.x;
     const dy = this.end.y - this.start.y;
@@ -69,12 +74,55 @@ export class RaceLine extends RaceSegment {
       const tClamped = Math.max(0, Math.min(1, t));
       const projX = this.start.x + dx * tClamped;
       const projY = this.start.y + dy * tClamped;
-      const dir = Math.atan2(dy, dx);
+      const ortho = this.orthoVectorAt(x, y);
       return {
-        x: projX + Math.sin(dir - Math.PI / 2) * 0.5,
-        y: projY + Math.cos(dir - Math.PI / 2) * 0.5,
+        x: projX + ortho.x * 0.5,
+        y: projY + ortho.y * 0.5,
       };
     }
+  }
+
+  raycastBoundary(
+    x0: number,
+    y0: number,
+    dirX: number,
+    dirY: number,
+    boundary: "inner" | "outer",
+    trackWidth: number = 40
+  ): Point | null {
+    const x1 = this.start.x;
+    const y1 = this.start.y;
+    const x2 = this.end.x;
+    const y2 = this.end.y;
+    let offsetX = 0,
+      offsetY = 0;
+    if (boundary === "outer") {
+      const dir = this.getDirectionAt(x0, y0);
+      const ortho = {
+        x: Math.cos(dir - Math.PI / 2),
+        y: Math.sin(dir - Math.PI / 2),
+      };
+      offsetX = ortho.x * trackWidth;
+      offsetY = ortho.y * trackWidth;
+    }
+    const x1b = x1 + offsetX;
+    const y1b = y1 + offsetY;
+    const x2b = x2 + offsetX;
+    const y2b = y2 + offsetY;
+    const dx = x2b - x1b;
+    const dy = y2b - y1b;
+    const det = dirX * dy - dirY * dx;
+    if (Math.abs(det) < 1e-8) {
+      return null;
+    }
+    const t = ((x1b - x0) * dy - (y1b - y0) * dx) / det;
+    const s = ((x1b - x0) * dirY - (y1b - y0) * dirX) / det;
+    if (t < 0 || s < 0 || s > 1) {
+      return null;
+    }
+    const ix = x0 + dirX * t;
+    const iy = y0 + dirY * t;
+    return { x: ix, y: iy };
   }
 }
 

@@ -29,5 +29,14 @@ export abstract class RaceSegment {
   abstract getDirection(): number;
   abstract isInner(x: number, y: number): boolean;
   abstract isEndAt(x: number, y: number, tolerance: number): boolean;
+  abstract orthoVectorAt(x: number, y: number): { x: number; y: number };
   abstract clampToTrackBoundary(x: number, y: number): { x: number; y: number };
+  abstract raycastBoundary(
+    x0: number,
+    y0: number,
+    dirX: number,
+    dirY: number,
+    boundary: "inner" | "outer",
+    trackWidth?: number
+  ): Point | null;
 }

@@ -54,10 +54,9 @@ export class RaceCorner extends RaceSegment {
       return false;
     }
     const angle = Math.atan2(dy, dx);
-    const norm = (a: number) => (a + 2 * Math.PI) % (2 * Math.PI);
-    const start = norm(this.startAngle);
-    const end = norm(this.endAngle);
-    let theta = norm(angle);
+    const start = RaceCorner.normalize(this.startAngle);
+    const end = RaceCorner.normalize(this.endAngle);
+    let theta = RaceCorner.normalize(angle);
     if (start < end) {
       if (theta < start || end < theta) {
         return false;
@@ -85,14 +84,65 @@ export class RaceCorner extends RaceSegment {
     return norm >= span - 0.05;
   }
 
-  clampToTrackBoundary(x: number, y: number): { x: number; y: number } {
-    const dx = x - this.center.x;
-    const dy = y - this.center.y;
-    const angle = Math.atan2(dy, dx);
+  orthoVectorAt(x: number, y: number): { x: number; y: number } {
+    const dir = this.getDirectionAt(x, y);
     return {
-      x: this.center.x + (this.radius + 0.5) * Math.cos(angle),
-      y: this.center.y + (this.radius + 0.5) * Math.sin(angle),
+      x: Math.cos(dir - Math.PI / 2),
+      y: Math.sin(dir - Math.PI / 2),
     };
+  }
+
+  clampToTrackBoundary(x: number, y: number): { x: number; y: number } {
+    const ortho = this.orthoVectorAt(x, y);
+    return {
+      x: this.center.x + (this.radius + 0.5) * ortho.x,
+      y: this.center.y + (this.radius + 0.5) * ortho.y,
+    };
+  }
+
+  raycastBoundary(
+    x0: number,
+    y0: number,
+    dirX: number,
+    dirY: number,
+    boundary: "inner" | "outer",
+    trackWidth: number = 40
+  ): Point | null {
+    const radius =
+      boundary === "outer" ? this.radius + trackWidth : this.radius;
+    const dx = x0 - this.center.x;
+    const dy = y0 - this.center.y;
+    const a = dirX * dirX + dirY * dirY;
+    const b = 2 * (dx * dirX + dy * dirY);
+    const c = dx * dx + dy * dy - radius * radius;
+    const D = b * b - 4 * a * c;
+    if (D < 0) {
+      return null;
+    }
+    const sqrtD = Math.sqrt(D);
+    const t1 = (-b - sqrtD) / (2 * a);
+    const t2 = (-b + sqrtD) / (2 * a);
+    const t = t1 >= 0 ? t1 : t2 >= 0 ? t2 : null;
+    if (t === null) {
+      return null;
+    }
+    const ix = x0 + dirX * t;
+    const iy = y0 + dirY * t;
+    const angle = Math.atan2(iy - this.center.y, ix - this.center.x);
+    const start = RaceCorner.normalize(this.startAngle);
+    const end = RaceCorner.normalize(this.endAngle);
+    const theta = RaceCorner.normalize(angle);
+    let inArc = false;
+    if (start < end) {
+      inArc = theta >= start && theta <= end;
+    } else {
+      inArc = theta >= start || theta <= end;
+    }
+    return inArc ? { x: ix, y: iy } : null;
+  }
+
+  static normalize(a: number) {
+    return (a + 2 * Math.PI) % (2 * Math.PI);
   }
 }
 

@@ -7,6 +7,7 @@ export interface HorseTurnState {
   name: string;
   x: number;
   y: number;
+  speed: number;
   dist: number;
 }
 
