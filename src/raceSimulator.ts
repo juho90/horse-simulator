@@ -36,6 +36,8 @@ export function runRaceSimulator(
         y: horse.y,
         speed: horse.speed,
         dist: horse.distance,
+        closestHitPoint: horse.closestRaycast?.hitPoint,
+        farthestHitPoint: horse.farthestRaycast?.hitPoint,
       };
     }
     logs.push({ turn, horseStates } as RaceLog);

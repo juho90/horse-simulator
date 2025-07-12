@@ -1,8 +1,9 @@
 import { RaceCorner } from "./raceCorner";
-import { BoundingBox, Point, RaceSegment } from "./raceSegment";
+import { Vector2D } from "./raceMath";
+import { BoundingBox, RaceSegment } from "./raceSegment";
 
 export class RaceLine extends RaceSegment {
-  constructor(start: Point, end: Point) {
+  constructor(start: Vector2D, end: Vector2D) {
     super(start, end, "line");
     this.length = this.calculateLength();
   }
@@ -20,11 +21,11 @@ export class RaceLine extends RaceSegment {
     };
   }
 
-  getDirectionAt(x: number, y: number): number {
+  getTangentDirectionAt(x: number, y: number): number {
     return Math.atan2(this.end.y - this.start.y, this.end.x - this.start.x);
   }
 
-  getDirection(): number {
+  getEndTangentDirection(): number {
     return Math.atan2(this.end.y - this.start.y, this.end.x - this.start.x);
   }
 
@@ -55,31 +56,12 @@ export class RaceLine extends RaceSegment {
     return t >= 1 - tolerance / Math.sqrt(len2);
   }
 
-  orthoVectorAt(x: number, y: number): { x: number; y: number } {
-    const dir = this.getDirectionAt(x, y);
+  orthoVectorAt(x: number, y: number): Vector2D {
+    const dir = this.getTangentDirectionAt(x, y);
     return {
       x: Math.cos(dir - Math.PI / 2),
       y: Math.sin(dir - Math.PI / 2),
     };
-  }
-
-  clampToTrackBoundary(x: number, y: number): { x: number; y: number } {
-    const dx = this.end.x - this.start.x;
-    const dy = this.end.y - this.start.y;
-    const len2 = dx * dx + dy * dy;
-    if (len2 === 0) {
-      return { x: this.start.x, y: this.start.y };
-    } else {
-      const t = ((x - this.start.x) * dx + (y - this.start.y) * dy) / len2;
-      const tClamped = Math.max(0, Math.min(1, t));
-      const projX = this.start.x + dx * tClamped;
-      const projY = this.start.y + dy * tClamped;
-      const ortho = this.orthoVectorAt(x, y);
-      return {
-        x: projX + ortho.x * 0.5,
-        y: projY + ortho.y * 0.5,
-      };
-    }
   }
 
   raycastBoundary(
@@ -87,21 +69,16 @@ export class RaceLine extends RaceSegment {
     y0: number,
     dirX: number,
     dirY: number,
-    boundary: "inner" | "outer",
-    trackWidth: number = 40
-  ): Point | null {
+    trackWidth: number
+  ): Vector2D | null {
     const x1 = this.start.x;
     const y1 = this.start.y;
     const x2 = this.end.x;
     const y2 = this.end.y;
-    let offsetX = 0,
-      offsetY = 0;
-    if (boundary === "outer") {
-      const dir = this.getDirectionAt(x0, y0);
-      const ortho = {
-        x: Math.cos(dir - Math.PI / 2),
-        y: Math.sin(dir - Math.PI / 2),
-      };
+    let offsetX = 0;
+    let offsetY = 0;
+    if (0 < trackWidth) {
+      const ortho = this.orthoVectorAt(x0, y0);
       offsetX = ortho.x * trackWidth;
       offsetY = ortho.y * trackWidth;
     }
@@ -124,11 +101,15 @@ export class RaceLine extends RaceSegment {
     const iy = y0 + dirY * t;
     return { x: ix, y: iy };
   }
+
+  courseEffect(x: number, y: number, speed: number): Vector2D {
+    return { x: 0, y: 0 };
+  }
 }
 
 export function createHorizontalLine(length: number): RaceLine {
-  const start: Point = { x: -length / 2, y: 0 };
-  const end: Point = { x: length / 2, y: 0 };
+  const start: Vector2D = { x: -length / 2, y: 0 };
+  const end: Vector2D = { x: length / 2, y: 0 };
   return new RaceLine(start, end);
 }
 
@@ -136,10 +117,10 @@ export function createLineFromCorner(
   corner: RaceCorner,
   length: number
 ): RaceLine {
-  const dir = corner.getDirection();
+  const dir = corner.getEndTangentDirection();
   const endX = corner.end.x + length * Math.cos(dir);
   const endY = corner.end.y + length * Math.sin(dir);
-  const end: Point = { x: endX, y: endY };
+  const end: Vector2D = { x: endX, y: endY };
   return new RaceLine(corner.end, end);
 }
 

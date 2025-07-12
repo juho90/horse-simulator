@@ -8,6 +8,12 @@ import {
   createLineFromSegment,
   RaceLine,
 } from "./raceLine";
+import {
+  Lerp,
+  getOuterGuardrail as OuterGuardrail,
+  ProjectOnSegment,
+  Vector2D,
+} from "./raceMath";
 import { RaceSegment } from "./raceSegment";
 
 export const LINE_LENGTHS = [300, 350, 400, 450];
@@ -126,13 +132,11 @@ export function generateClosedTrackSegments(
   }
   const preLast = segments[segments.length - 1];
   const startPt = segments[0].start;
-  const startDir = segments[0].getDirection();
+  const startDir = segments[0].getEndTangentDirection();
   let bestErr = Infinity;
   let bestCorner: RaceCorner | null = null;
   let bestLine: RaceLine | null = null;
   const lastHint = pattern[pattern.length - 2];
-  const lastLineHint = pattern[pattern.length - 1];
-  // 첫 세그먼트가 직선일 때만 방향 오차를 강하게 반영
   const firstIsLine = pattern[0].type === "line";
   for (let dAngle = -0.5; dAngle <= 0.5; dAngle += 0.01) {
     for (let dRadius = -50; dRadius <= 50; dRadius += 5) {
@@ -144,10 +148,10 @@ export function generateClosedTrackSegments(
       const corner = createCornerFromSegment(preLast, radius, angle);
       const line = new RaceLine(corner.end, startPt);
       const tangentErr = Math.abs(
-        ((line.getDirection() - startDir + Math.PI) % (2 * Math.PI)) - Math.PI
+        ((line.getEndTangentDirection() - startDir + Math.PI) % (2 * Math.PI)) -
+          Math.PI
       );
       const posErr = Math.hypot(line.end.x - startPt.x, line.end.y - startPt.y);
-      // 첫 세그먼트가 직선이면 방향 오차에 매우 큰 가중치, 아니면 위치만
       const totalErr = firstIsLine ? posErr + tangentErr * 10000 : posErr;
       if (totalErr < bestErr) {
         bestErr = totalErr;
@@ -165,7 +169,8 @@ export function generateClosedTrackSegments(
       bestLine &&
       ((firstIsLine &&
         Math.abs(
-          ((bestLine.getDirection() - startDir + Math.PI) % (2 * Math.PI)) -
+          ((bestLine.getEndTangentDirection() - startDir + Math.PI) %
+            (2 * Math.PI)) -
             Math.PI
         ) < 1e-4) ||
         (!firstIsLine && bestErr < 1e-2))
@@ -188,72 +193,35 @@ export function generateClosedTrackSegments(
 }
 
 export class RaceTrackHelper {
-  innerPoints: { x: number; y: number }[];
-  outerPoints: { x: number; y: number }[];
-  constructor(innerPoints: { x: number; y: number }[], outerOffset: number) {
+  innerPoints: Vector2D[];
+  outerPoints: Vector2D[];
+  constructor(innerPoints: Vector2D[], outerOffset: number) {
     this.innerPoints = innerPoints;
-    this.outerPoints = RaceTrackHelper.getOuterGuardrail(
-      innerPoints,
-      outerOffset
-    );
+    this.outerPoints = OuterGuardrail(innerPoints, outerOffset);
   }
 
-  static getOuterGuardrail(
-    innerPoints: { x: number; y: number }[],
-    offset: number
-  ): { x: number; y: number }[] {
-    return innerPoints.map((pt: { x: number; y: number }, i: number) => {
-      const prev = innerPoints[i === 0 ? innerPoints.length - 1 : i - 1];
-      const next = innerPoints[(i + 1) % innerPoints.length];
-      const n = RaceTrackHelper._normalVector(prev, next);
-      return { x: pt.x + n.x * offset, y: pt.y + n.y * offset };
-    });
-  }
-
-  static _normalVector(
-    a: { x: number; y: number },
-    b: { x: number; y: number }
-  ): { x: number; y: number } {
-    const dx = b.x - a.x,
-      dy = b.y - a.y,
-      len = Math.hypot(dx, dy);
-    return { x: dy / len, y: -dx / len };
-  }
-
-  getLateralPosition(idx: number, laneRatio: number): { x: number; y: number } {
-    return RaceTrackHelper._lerp(
-      this.innerPoints[idx],
-      this.outerPoints[idx],
-      laneRatio
-    );
-  }
-
-  static _lerp(
-    a: { x: number; y: number },
-    b: { x: number; y: number },
-    t: number
-  ): { x: number; y: number } {
-    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+  getLateralPosition(idx: number, laneRatio: number): Vector2D {
+    return Lerp(this.innerPoints[idx], this.outerPoints[idx], laneRatio);
   }
 
   getDirection(idx: number): number {
-    return RaceTrackHelper._direction(this.innerPoints, idx);
+    return RaceTrackHelper.Direction(this.innerPoints, idx);
   }
 
   getLateralDirection(idx: number): number {
-    return RaceTrackHelper._direction(
+    return RaceTrackHelper.Direction(
       [this.innerPoints[idx], this.outerPoints[idx]],
       0
     );
   }
 
-  static _direction(arr: { x: number; y: number }[], idx: number): number {
+  static Direction(arr: Vector2D[], idx: number): number {
     const a = arr[idx],
       b = arr[(idx + 1) % arr.length];
     return Math.atan2(b.y - a.y, b.x - a.x);
   }
 
-  clampToBoundary(x: number, y: number): { x: number; y: number } {
+  clampToBoundary(x: number, y: number): Vector2D {
     return RaceTrackHelper.clampToTrackBoundary(
       x,
       y,
@@ -265,9 +233,9 @@ export class RaceTrackHelper {
   static clampToTrackBoundary(
     x: number,
     y: number,
-    innerPoints: { x: number; y: number }[],
-    outerPoints: { x: number; y: number }[]
-  ): { x: number; y: number } {
+    innerPoints: Vector2D[],
+    outerPoints: Vector2D[]
+  ): Vector2D {
     let minDist = Infinity,
       closestIdx = 0;
     for (let i = 0; i < innerPoints.length; i++) {
@@ -283,23 +251,10 @@ export class RaceTrackHelper {
       in2 = innerPoints[i2];
     const out1 = outerPoints[i1],
       out2 = outerPoints[i2];
-    const t = RaceTrackHelper._projectOnSegment(x, y, in1, in2);
-    const innerProj = RaceTrackHelper._lerp(in1, in2, t);
-    const outerProj = RaceTrackHelper._lerp(out1, out2, t);
-    const proj = RaceTrackHelper._projectOnSegment(x, y, innerProj, outerProj);
-    return RaceTrackHelper._lerp(innerProj, outerProj, proj);
-  }
-  static _projectOnSegment(
-    x: number,
-    y: number,
-    a: { x: number; y: number },
-    b: { x: number; y: number }
-  ): number {
-    const dx = b.x - a.x,
-      dy = b.y - a.y;
-    const len2 = dx * dx + dy * dy;
-    if (len2 === 0) return 0;
-    let t = ((x - a.x) * dx + (y - a.y) * dy) / len2;
-    return Math.max(0, Math.min(1, t));
+    const t = ProjectOnSegment(x, y, in1, in2);
+    const innerProj = Lerp(in1, in2, t);
+    const outerProj = Lerp(out1, out2, t);
+    const proj = ProjectOnSegment(x, y, innerProj, outerProj);
+    return Lerp(innerProj, outerProj, proj);
   }
 }

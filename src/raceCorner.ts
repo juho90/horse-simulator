@@ -1,17 +1,23 @@
 import { RaceLine } from "./raceLine";
-import { BoundingBox, Point, RaceSegment } from "./raceSegment";
+import { Vector2D } from "./raceMath";
+import { BoundingBox, RaceSegment } from "./raceSegment";
 
 export class RaceCorner extends RaceSegment {
-  center: Point;
+  center: Vector2D;
   radius: number;
   angle: number;
   startAngle: number;
   endAngle: number;
 
-  constructor(start: Point, center: Point, radius: number, angle: number) {
+  constructor(
+    start: Vector2D,
+    center: Vector2D,
+    radius: number,
+    angle: number
+  ) {
     const startAngle = Math.atan2(start.y - center.y, start.x - center.x);
     const endAngle = startAngle + angle;
-    const end: Point = {
+    const end: Vector2D = {
       x: center.x + radius * Math.cos(endAngle),
       y: center.y + radius * Math.sin(endAngle),
     };
@@ -37,12 +43,12 @@ export class RaceCorner extends RaceSegment {
     };
   }
 
-  getDirectionAt(x: number, y: number): number {
+  getTangentDirectionAt(x: number, y: number): number {
     const angle = Math.atan2(y - this.center.y, x - this.center.x);
     return angle + Math.PI / 2;
   }
 
-  getDirection(): number {
+  getEndTangentDirection(): number {
     return this.endAngle + Math.PI / 2;
   }
 
@@ -84,19 +90,11 @@ export class RaceCorner extends RaceSegment {
     return norm >= span - 0.05;
   }
 
-  orthoVectorAt(x: number, y: number): { x: number; y: number } {
-    const dir = this.getDirectionAt(x, y);
+  orthoVectorAt(x: number, y: number): Vector2D {
+    const dir = this.getTangentDirectionAt(x, y);
     return {
       x: Math.cos(dir - Math.PI / 2),
       y: Math.sin(dir - Math.PI / 2),
-    };
-  }
-
-  clampToTrackBoundary(x: number, y: number): { x: number; y: number } {
-    const ortho = this.orthoVectorAt(x, y);
-    return {
-      x: this.center.x + (this.radius + 0.5) * ortho.x,
-      y: this.center.y + (this.radius + 0.5) * ortho.y,
     };
   }
 
@@ -105,44 +103,66 @@ export class RaceCorner extends RaceSegment {
     y0: number,
     dirX: number,
     dirY: number,
-    boundary: "inner" | "outer",
-    trackWidth: number = 40
-  ): Point | null {
-    const radius =
-      boundary === "outer" ? this.radius + trackWidth : this.radius;
-    const dx = x0 - this.center.x;
-    const dy = y0 - this.center.y;
-    const a = dirX * dirX + dirY * dirY;
-    const b = 2 * (dx * dirX + dy * dirY);
-    const c = dx * dx + dy * dy - radius * radius;
-    const D = b * b - 4 * a * c;
-    if (D < 0) {
-      return null;
+    trackWidth: number
+  ): Vector2D | null {
+    const radius = this.radius + trackWidth;
+    const point = RaceCorner.intersectCircleLine(
+      this.center,
+      radius,
+      x0,
+      y0,
+      dirX,
+      dirY
+    );
+    return point;
+  }
+
+  courseEffect(x: number, y: number, speed: number): Vector2D {
+    const dx = x - this.center.x;
+    const dy = y - this.center.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 0) {
+      const centrifugalCoeff = 0.18;
+      const force = (centrifugalCoeff * (speed * speed)) / this.radius;
+      return {
+        x: (dx / dist) * force,
+        y: (dy / dist) * force,
+      };
     }
-    const sqrtD = Math.sqrt(D);
-    const t1 = (-b - sqrtD) / (2 * a);
-    const t2 = (-b + sqrtD) / (2 * a);
-    const t = t1 >= 0 ? t1 : t2 >= 0 ? t2 : null;
-    if (t === null) {
-      return null;
-    }
-    const ix = x0 + dirX * t;
-    const iy = y0 + dirY * t;
-    const angle = Math.atan2(iy - this.center.y, ix - this.center.x);
-    const start = RaceCorner.normalize(this.startAngle);
-    const end = RaceCorner.normalize(this.endAngle);
-    const theta = RaceCorner.normalize(angle);
-    let inArc = false;
-    if (start < end) {
-      inArc = theta >= start && theta <= end;
-    } else {
-      inArc = theta >= start || theta <= end;
-    }
-    return inArc ? { x: ix, y: iy } : null;
+    return { x: 0, y: 0 };
   }
 
   static normalize(a: number) {
     return (a + 2 * Math.PI) % (2 * Math.PI);
+  }
+
+  static intersectCircleLine(
+    center: Vector2D,
+    radius: number,
+    x0: number,
+    y0: number,
+    dirX: number,
+    dirY: number
+  ): Vector2D | null {
+    const dx = x0 - center.x;
+    const dy = y0 - center.y;
+    const a = dirX * dirX + dirY * dirY;
+    const b = 2 * (dx * dirX + dy * dirY);
+    const c = dx * dx + dy * dy - radius * radius;
+    const d = b * b - 4 * a * c;
+    if (d < 0) {
+      return null;
+    }
+    const sqrtD = Math.sqrt(d);
+    const t1 = (-b - sqrtD) / (2 * a);
+    if (t1 >= 0) {
+      return { x: x0 + dirX * t1, y: y0 + dirY * t1 };
+    }
+    const t2 = (-b + sqrtD) / (2 * a);
+    if (t2 >= 0) {
+      return { x: x0 + dirX * t2, y: y0 + dirY * t2 };
+    }
+    return null;
   }
 }
 
@@ -150,8 +170,8 @@ export function createHorizontalCorner(
   radius: number,
   angle: number
 ): RaceCorner {
-  const start: Point = { x: 0, y: 0 };
-  const center: Point = { x: 0, y: radius };
+  const start: Vector2D = { x: 0, y: 0 };
+  const center: Vector2D = { x: 0, y: radius };
   return new RaceCorner(start, center, radius, angle);
 }
 
@@ -167,7 +187,7 @@ export function createCornerFromLine(
   const centerAngle = lineAngle + Math.PI / 2;
   const centerX = line.end.x + radius * Math.cos(centerAngle);
   const centerY = line.end.y + radius * Math.sin(centerAngle);
-  const center: Point = { x: centerX, y: centerY };
+  const center: Vector2D = { x: centerX, y: centerY };
   return new RaceCorner(line.end, center, radius, angle);
 }
 
@@ -180,7 +200,7 @@ export function createCornerFromCorner(
   const centerAngle = tangentAngle + Math.PI / 2;
   const centerX = corner.end.x + radius * Math.cos(centerAngle);
   const centerY = corner.end.y + radius * Math.sin(centerAngle);
-  const center: Point = { x: centerX, y: centerY };
+  const center: Vector2D = { x: centerX, y: centerY };
   return new RaceCorner(corner.end, center, radius, angle);
 }
 

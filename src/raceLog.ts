@@ -1,3 +1,4 @@
+import { Vector2D } from "./raceMath";
 import { RaceSegment } from "./raceSegment";
 import { RaceTrack } from "./raceTrack";
 import { Horse } from "./types/horse";
@@ -9,6 +10,8 @@ export interface HorseTurnState {
   y: number;
   speed: number;
   dist: number;
+  closestHitPoint?: Vector2D;
+  farthestHitPoint?: Vector2D;
 }
 
 export interface RaceLog {

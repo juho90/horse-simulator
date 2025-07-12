@@ -1,6 +1,8 @@
 import * as child_process from "child_process";
 import * as fs from "fs";
+import { RaceCorner } from "./raceCorner";
 import { RaceLog } from "./raceLog";
+import { Vector2D } from "./raceMath";
 import { RaceTrack } from "./raceTrack";
 
 export function generateRaceWebGLHtml(
@@ -10,20 +12,26 @@ export function generateRaceWebGLHtml(
   intervalMs: number = 200
 ) {
   const segments = track.segments;
-  // margin 값을 늘려 트랙이 더 작게 보이도록
-  // margin을 X축(좌우) 160, Y축(상하) 60으로 다르게 적용
   const marginX = 160;
   const marginY = 60;
-  let minX = Infinity,
-    maxX = -Infinity,
-    minY = Infinity,
-    maxY = -Infinity;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
   segments.forEach((seg) => {
     const b = seg.getBounds();
-    if (b.minX < minX) minX = b.minX;
-    if (b.maxX > maxX) maxX = b.maxX;
-    if (b.minY < minY) minY = b.minY;
-    if (b.maxY > maxY) maxY = b.maxY;
+    if (b.minX < minX) {
+      minX = b.minX;
+    }
+    if (b.maxX > maxX) {
+      maxX = b.maxX;
+    }
+    if (b.minY < minY) {
+      minY = b.minY;
+    }
+    if (b.maxY > maxY) {
+      maxY = b.maxY;
+    }
   });
   const trackWidth = 40;
   minX -= trackWidth + marginX;
@@ -44,31 +52,30 @@ export function generateRaceWebGLHtml(
     "#8e44ad",
     "#2c3e50",
   ];
-  function toCanvas(p: { x: number; y: number }) {
+  function toCanvas(p: Vector2D) {
     return {
       x: p.x - minX,
       y: p.y - minY,
     };
   }
-  // 트랙 외곽선(세그먼트별 중심선) 샘플링
-  const centerLinePoints: { x: number; y: number }[] = [];
-  segments.forEach((seg) => {
-    if (seg.type === "line") {
-      centerLinePoints.push(seg.start);
-    } else if (seg.type === "corner") {
+  const centerLinePoints: Vector2D[] = [];
+  for (const segment of segments) {
+    if (segment.type === "line") {
+      centerLinePoints.push(segment.start);
+    } else if (segment.type === "corner") {
+      const corner = segment as RaceCorner;
       const res = 32;
       for (let i = 0; i <= res; i++) {
         const t = i / res;
         const theta =
-          (seg as any).startAngle +
-          ((seg as any).endAngle - (seg as any).startAngle) * t;
+          corner.startAngle + (corner.endAngle - corner.startAngle) * t;
         centerLinePoints.push({
-          x: (seg as any).center.x + (seg as any).radius * Math.cos(theta),
-          y: (seg as any).center.y + (seg as any).radius * Math.sin(theta),
+          x: corner.center.x + corner.radius * Math.cos(theta),
+          y: corner.center.y + corner.radius * Math.sin(theta),
         });
       }
     }
-  });
+  }
   centerLinePoints.push(segments[segments.length - 1].end);
   const js = `
     const logs = ${JSON.stringify(logs)};
@@ -114,6 +121,36 @@ export function generateRaceWebGLHtml(
       ctx.fillText('GOAL', trackPoints[trackPoints.length-1].x, trackPoints[trackPoints.length-1].y - 18);
       ctx.restore();
     }
+    // 모든 턴의 경계점 누적 시각화
+    function drawBoundaryPoints() {
+      for (let t = 0; t < logs.length; t++) {
+        const horses = logs[t].horseStates;
+        if (!horses) continue;
+        horses.forEach((horse) => {
+          // 가장 가까운 경계점 (파란색)
+          if (horse.closestHitPoint) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(horse.closestHitPoint.x - ${minX}, horse.closestHitPoint.y - ${minY}, 5, 0, 2 * Math.PI);
+            ctx.fillStyle = '#2980ff';
+            ctx.globalAlpha = 0.7;
+            ctx.fill();
+            ctx.restore();
+          }
+          // 가장 먼 경계점 (빨간색)
+          if (horse.farthestHitPoint) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(horse.farthestHitPoint.x - ${minX}, horse.farthestHitPoint.y - ${minY}, 5, 0, 2 * Math.PI);
+            ctx.fillStyle = '#ff2d2d';
+            ctx.globalAlpha = 0.7;
+            ctx.fill();
+            ctx.restore();
+          }
+        });
+      }
+    }
+
     function drawHorses(turnIdx) {
       const log = logs[turnIdx];
       const horses = log.horseStates;
@@ -133,6 +170,28 @@ export function generateRaceWebGLHtml(
         ctx.textBaseline = 'middle';
         ctx.fillText((idx+1).toString(), horse.x - ${minX}, horse.y - ${minY});
         ctx.restore();
+        if (horse.closestHitPoint) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(horse.closestHitPoint.x - ${minX}, horse.closestHitPoint.y - ${minY}, 6, 0, 2 * Math.PI);
+          ctx.fillStyle = '#4fc3ff';
+          ctx.globalAlpha = 1.0;
+          ctx.shadowColor = '#4fc3ff';
+          ctx.shadowBlur = 10;
+          ctx.fill();
+          ctx.restore();
+        }
+        if (horse.farthestHitPoint) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(horse.farthestHitPoint.x - ${minX}, horse.farthestHitPoint.y - ${minY}, 6, 0, 2 * Math.PI);
+          ctx.fillStyle = '#ff6b6b';
+          ctx.globalAlpha = 1.0;
+          ctx.shadowColor = '#ff6b6b';
+          ctx.shadowBlur = 10;
+          ctx.fill();
+          ctx.restore();
+        }
       });
     }
     function drawTurnInfo(turnIdx) {
@@ -158,6 +217,7 @@ export function generateRaceWebGLHtml(
     }
     function render() {
       drawTrack();
+      drawBoundaryPoints();
       drawHorses(turn);
       drawTurnInfo(turn);
       drawStatusPanel(turn);
