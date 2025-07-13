@@ -135,21 +135,21 @@ export function generateRaceWebGLHtml(
         const horses = logs[t].horseStates;
         if (!horses) continue;
         horses.forEach((horse) => {
-          // 가장 가까운 경계점 (파란색)
-          if (horse.closestHitPoint) {
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(horse.closestHitPoint.x - ${minX}, horse.closestHitPoint.y - ${minY}, 5, 0, 2 * Math.PI);
-            ctx.fillStyle = '#2980ff';
-            ctx.globalAlpha = 0.7;
-            ctx.fill();
-            ctx.restore();
+          if (horse.closestHitPoints) {
+            horse.closestHitPoints.forEach((point) => {
+              ctx.save();
+              ctx.beginPath();
+              ctx.arc(point.x - ${minX}, point.y - ${minY}, 2, 0, 2 * Math.PI);
+              ctx.fillStyle = '#2980ff';
+              ctx.globalAlpha = 0.7;
+              ctx.fill();
+              ctx.restore();
+            });
           }
-          // 가장 먼 경계점 (빨간색)
           if (horse.farthestHitPoint) {
             ctx.save();
             ctx.beginPath();
-            ctx.arc(horse.farthestHitPoint.x - ${minX}, horse.farthestHitPoint.y - ${minY}, 5, 0, 2 * Math.PI);
+            ctx.arc(horse.farthestHitPoint.x - ${minX}, horse.farthestHitPoint.y - ${minY}, 2, 0, 2 * Math.PI);
             ctx.fillStyle = '#ff2d2d';
             ctx.globalAlpha = 0.7;
             ctx.fill();
@@ -177,21 +177,23 @@ export function generateRaceWebGLHtml(
         ctx.textBaseline = 'middle';
         ctx.fillText((idx+1).toString(), horse.x - ${minX}, horse.y - ${minY});
         ctx.restore();
-        if (horse.closestHitPoint) {
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(horse.closestHitPoint.x - ${minX}, horse.closestHitPoint.y - ${minY}, 6, 0, 2 * Math.PI);
-          ctx.fillStyle = '#4fc3ff';
-          ctx.globalAlpha = 1.0;
-          ctx.shadowColor = '#4fc3ff';
-          ctx.shadowBlur = 10;
-          ctx.fill();
-          ctx.restore();
+        if (horse.closestHitPoints) {
+          horse.closestHitPoints.forEach((point) => {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(point.x - ${minX}, point.y - ${minY}, 2, 0, 2 * Math.PI);
+            ctx.fillStyle = '#4fc3ff';
+            ctx.globalAlpha = 1.0;
+            ctx.shadowColor = '#4fc3ff';
+            ctx.shadowBlur = 10;
+            ctx.fill();
+            ctx.restore();
+          });
         }
         if (horse.farthestHitPoint) {
           ctx.save();
           ctx.beginPath();
-          ctx.arc(horse.farthestHitPoint.x - ${minX}, horse.farthestHitPoint.y - ${minY}, 6, 0, 2 * Math.PI);
+          ctx.arc(horse.farthestHitPoint.x - ${minX}, horse.farthestHitPoint.y - ${minY}, 2, 0, 2 * Math.PI);
           ctx.fillStyle = '#ff6b6b';
           ctx.globalAlpha = 1.0;
           ctx.shadowColor = '#ff6b6b';
@@ -224,7 +226,6 @@ export function generateRaceWebGLHtml(
     }
     function render() {
       drawTrack();
-      drawBoundaryPoints();
       drawHorses(turn);
       drawTurnInfo(turn);
       drawStatusPanel(turn);

@@ -11,50 +11,51 @@ export interface RaycastResult {
   hitDistance: number;
   rayDir: Vector2D;
   rayAngle: number;
+  angle: number;
 }
 
-export function raycastNearBoundary(
+export function raycastBoundarys(
   x: number,
   y: number,
   heading: number,
   segment: RaceSegment,
   trackWidth: number,
   directions: number[]
-): RaycastResult | null {
-  let closestRaycast: RaycastResult | null = null;
+): RaycastResult[] {
+  const closestRaycasts: RaycastResult[] = [];
   for (const offset of directions) {
     const angle = heading + offset;
     const rayDir = { x: Math.cos(angle), y: Math.sin(angle) };
     const innerPoint = segment.raycastBoundary({ x, y }, rayDir, 0);
     if (innerPoint) {
-      const dist = Math.hypot(innerPoint.x - x, innerPoint.y - y);
-      if (closestRaycast === null || dist < closestRaycast.hitDistance) {
-        closestRaycast = {
-          segment,
-          hitPoint: innerPoint,
-          hitDistance: dist,
-          rayDir: rayDir,
-          rayAngle: angle,
-        };
-      }
+      const distance = Math.hypot(innerPoint.x - x, innerPoint.y - y);
+      const closestRaycast = {
+        segment,
+        hitPoint: innerPoint,
+        hitDistance: distance,
+        rayDir: rayDir,
+        rayAngle: angle,
+        angle: angle,
+      } as RaycastResult;
+      closestRaycasts.push(closestRaycast);
     }
     if (0 < trackWidth) {
       const outerPoint = segment.raycastBoundary({ x, y }, rayDir, trackWidth);
       if (outerPoint) {
         const dist = Math.hypot(outerPoint.x - x, outerPoint.y - y);
-        if (closestRaycast === null || dist < closestRaycast.hitDistance) {
-          closestRaycast = {
-            segment,
-            hitPoint: outerPoint,
-            hitDistance: dist,
-            rayDir: rayDir,
-            rayAngle: angle,
-          };
-        }
+        const closestRaycast = {
+          segment,
+          hitPoint: outerPoint,
+          hitDistance: dist,
+          rayDir: rayDir,
+          rayAngle: angle,
+          angle: angle,
+        } as RaycastResult;
+        closestRaycasts.push(closestRaycast);
       }
     }
   }
-  return closestRaycast;
+  return closestRaycasts;
 }
 
 export function raycastFarBoundary(
@@ -79,6 +80,7 @@ export function raycastFarBoundary(
           hitDistance: dist,
           rayDir: rayDir,
           rayAngle: angle,
+          angle: angle,
         };
       }
     }
@@ -93,6 +95,7 @@ export function raycastFarBoundary(
             hitDistance: dist,
             rayDir: rayDir,
             rayAngle: angle,
+            angle: angle,
           };
         }
       }
@@ -119,10 +122,10 @@ export function raycastBoundary(
   nextSegment: RaceSegment,
   trackWidth: number
 ): {
-  closestRaycast: RaycastResult | null;
+  closestRaycasts: RaycastResult[];
   farthestRaycast: RaycastResult | null;
 } {
-  let closestRaycast = raycastNearBoundary(
+  let closestRaycasts = raycastBoundarys(
     x,
     y,
     heading,
@@ -130,21 +133,15 @@ export function raycastBoundary(
     trackWidth,
     DIRECTIONS
   );
-  if (!closestRaycast) {
-    const nextClosestRaycast = raycastNearBoundary(
-      x,
-      y,
-      heading,
-      nextSegment,
-      trackWidth,
-      DIRECTIONS
-    );
-    if (nextClosestRaycast) {
-      closestRaycast = nextClosestRaycast;
-    } else {
-      throw new Error("No closest raycast found");
-    }
-  }
+  const nextClosestRaycasts = raycastBoundarys(
+    x,
+    y,
+    heading,
+    nextSegment,
+    trackWidth,
+    DIRECTIONS
+  );
+  closestRaycasts.push(...nextClosestRaycasts);
   let farthestRaycast = raycastFarBoundary(x, y, heading, segment, trackWidth, [
     0,
   ]);
@@ -161,7 +158,7 @@ export function raycastBoundary(
       farthestRaycast = nextFarthestRaycast;
     }
   }
-  return { closestRaycast, farthestRaycast };
+  return { closestRaycasts, farthestRaycast };
 }
 
 export function runRaceSimulator(
@@ -198,7 +195,7 @@ export function runRaceSimulator(
           y: horse.y,
           speed: horse.speed,
           dist: horse.distance,
-          closestHitPoint: horse.closestRaycast?.hitPoint,
+          closestHitPoints: horse.closestRaycasts?.map((r) => r.hitPoint),
           farthestHitPoint: horse.farthestRaycast?.hitPoint,
         };
       }

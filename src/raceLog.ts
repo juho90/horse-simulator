@@ -13,7 +13,7 @@ export interface HorseTurnState {
   y: number;
   speed: number;
   dist: number;
-  closestHitPoint?: Vector2D;
+  closestHitPoints?: Vector2D[];
   farthestHitPoint?: Vector2D;
 }
 
