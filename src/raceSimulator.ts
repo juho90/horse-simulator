@@ -104,6 +104,8 @@ export function raycastFarBoundary(
   return farthestRaycast;
 }
 
+const TRACK_WIDTH = 80;
+
 const DIRECTIONS = [
   -Math.PI / 2,
   -Math.PI / 3,
@@ -119,8 +121,7 @@ export function raycastBoundary(
   y: number,
   heading: number,
   segment: RaceSegment,
-  nextSegment: RaceSegment,
-  trackWidth: number
+  nextSegment: RaceSegment
 ): {
   closestRaycasts: RaycastResult[];
   farthestRaycast: RaycastResult | null;
@@ -130,7 +131,7 @@ export function raycastBoundary(
     y,
     heading,
     segment,
-    trackWidth,
+    TRACK_WIDTH,
     DIRECTIONS
   );
   const nextClosestRaycasts = raycastBoundarys(
@@ -138,20 +139,25 @@ export function raycastBoundary(
     y,
     heading,
     nextSegment,
-    trackWidth,
+    TRACK_WIDTH,
     DIRECTIONS
   );
   closestRaycasts.push(...nextClosestRaycasts);
-  let farthestRaycast = raycastFarBoundary(x, y, heading, segment, trackWidth, [
-    0,
-  ]);
+  let farthestRaycast = raycastFarBoundary(
+    x,
+    y,
+    heading,
+    segment,
+    TRACK_WIDTH,
+    [0]
+  );
   if (!farthestRaycast) {
     const nextFarthestRaycast = raycastFarBoundary(
       x,
       y,
       heading,
       nextSegment,
-      trackWidth,
+      TRACK_WIDTH,
       [0]
     );
     if (nextFarthestRaycast) {

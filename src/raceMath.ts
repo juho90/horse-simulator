@@ -88,3 +88,8 @@ export function IsAngleBetween(
     return start <= theta || theta <= end;
   }
 }
+
+export function lerpAngle(a: number, b: number, t: number): number {
+  const diff = Math.atan2(Math.sin(b - a), Math.cos(b - a));
+  return a + diff * t;
+}
