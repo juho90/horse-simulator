@@ -121,9 +121,6 @@ export class RaceHorse implements Horse {
   }
 
   moveOnTrack(): void {
-    if (this.segment.isEndAt(this.x, this.y)) {
-      this.moveNextSegment();
-    }
     const { moveDir, riskWeight } = this.findDirOnTrack();
     this.riskLevel = riskWeight;
     if (this.riskLevel > 0.7) {
@@ -145,5 +142,8 @@ export class RaceHorse implements Horse {
     this.segment.courseEffect(this.x, this.y, this.speed);
     this.heading = moveDir;
     this.distance += this.speed;
+    if (this.segment.isEndAt(this.x, this.y)) {
+      this.moveNextSegment();
+    }
   }
 }
