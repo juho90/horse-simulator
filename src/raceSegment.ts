@@ -31,11 +31,9 @@ export abstract class RaceSegment {
   abstract isEndAt(x: number, y: number, tolerance: number): boolean;
   abstract orthoVectorAt(x: number, y: number): Vector2D;
   abstract raycastBoundary(
-    x0: number,
-    y0: number,
-    dirX: number,
-    dirY: number,
-    trackWidth?: number
+    rayPoint: Vector2D,
+    rayDir: Vector2D,
+    trackWidth: number
   ): Vector2D | null;
   abstract courseEffect(x: number, y: number, speed: number): Vector2D;
 }

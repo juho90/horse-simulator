@@ -1,3 +1,6 @@
+import * as fs from "fs";
+import { RaceCorner } from "./raceCorner";
+import { RaceLine } from "./raceLine";
 import { Vector2D } from "./raceMath";
 import { RaceSegment } from "./raceSegment";
 import { RaceTrack } from "./raceTrack";
@@ -170,5 +173,49 @@ export function displayRaceResults(
 
   for (let i = 0; i < horseResults.length; i++) {
     displayHorseRank(horseResults[i], i);
+  }
+}
+
+export interface RaceLineLog {
+  x: number;
+  y: number;
+  heading: number;
+  segment: RaceLine;
+  trackWidth: number;
+  directions: number[];
+}
+
+export function saveRaceLineLogToFile(raceLine: RaceLineLog) {
+  try {
+    fs.writeFileSync(
+      "raceline-log.json",
+      JSON.stringify(raceLine, null, 2),
+      "utf-8"
+    );
+    console.log(`Race log saved to ${"raceline-log.json"}`);
+  } catch (err) {
+    console.error("Failed to save race log:", err);
+  }
+}
+
+export interface RaceCornerLog {
+  x: number;
+  y: number;
+  heading: number;
+  segment: RaceCorner;
+  trackWidth: number;
+  directions: number[];
+}
+
+export function saveRaceCornerLogToFile(raceCorner: RaceCornerLog) {
+  try {
+    fs.writeFileSync(
+      "racecorner-log.json",
+      JSON.stringify(raceCorner, null, 2),
+      { encoding: "utf-8" }
+    );
+    console.log(`Race log saved to ${"racecorner-log.json"}`);
+  } catch (err) {
+    console.error("Failed to save race log:", err);
   }
 }

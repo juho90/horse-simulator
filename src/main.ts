@@ -53,4 +53,17 @@ function main() {
   // displayRaceResults(track, horses, logs, targetRaceDistance, winner, minTurn);
 }
 
+/*
+const log = fs.readFileSync("raceline-log.json", { encoding: "utf-8" });
+const raceCornerLog = JSON.parse(log) as RaceLineLog;
+raycastNearBoundary(
+  raceCornerLog.x,
+  raceCornerLog.y,
+  raceCornerLog.heading,
+  new RaceLine(raceCornerLog.segment.start, raceCornerLog.segment.end),
+  raceCornerLog.trackWidth,
+  raceCornerLog.directions
+);
+*/
+
 main();

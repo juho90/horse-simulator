@@ -19,6 +19,10 @@ export function NormalVector(a: Vector2D, b: Vector2D): Vector2D {
   return { x: dy / len, y: -dx / len };
 }
 
+export function NormalizeAngle(a: number) {
+  return (a + 2 * Math.PI) % (2 * Math.PI);
+}
+
 export function Lerp(a: Vector2D, b: Vector2D, t: number): Vector2D {
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }
@@ -37,4 +41,48 @@ export function ProjectOnSegment(
   }
   let t = ((x - a.x) * dx + (y - a.y) * dy) / len2;
   return Math.max(0, Math.min(1, t));
+}
+
+export function IntersectCircleLineNear(
+  center: Vector2D,
+  radius: number,
+  rayPoint: Vector2D,
+  rayDir: Vector2D
+): Vector2D | null {
+  const dx = rayPoint.x - center.x;
+  const dy = rayPoint.y - center.y;
+  const a = rayDir.x * rayDir.x + rayDir.y * rayDir.y;
+  const b = 2 * (dx * rayDir.x + dy * rayDir.y);
+  const c = dx * dx + dy * dy - radius * radius;
+  const d = b * b - 4 * a * c;
+  if (d < 0) {
+    return null;
+  }
+  const sqrtD = Math.sqrt(d);
+  const t1 = (-b - sqrtD) / (2 * a);
+  const t2 = (-b + sqrtD) / (2 * a);
+  if (Math.abs(t1) < Math.abs(t2)) {
+    return { x: rayPoint.x + rayDir.x * t1, y: rayPoint.y + rayDir.y * t1 };
+  } else {
+    return { x: rayPoint.x + rayDir.x * t2, y: rayPoint.y + rayDir.y * t2 };
+  }
+}
+
+export function IsAngleBetween(
+  point: Vector2D,
+  center: Vector2D,
+  startAngle: number,
+  endAngle: number
+): boolean {
+  const dx = point.x - center.x;
+  const dy = point.y - center.y;
+  const angle = Math.atan2(dy, dx);
+  const start = NormalizeAngle(startAngle);
+  const end = NormalizeAngle(endAngle);
+  let theta = NormalizeAngle(angle);
+  if (start <= end) {
+    return start <= theta && theta <= end;
+  } else {
+    return start <= theta || theta <= end;
+  }
 }

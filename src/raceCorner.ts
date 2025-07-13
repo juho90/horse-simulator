@@ -1,5 +1,10 @@
 import { RaceLine } from "./raceLine";
-import { Vector2D } from "./raceMath";
+import {
+  IntersectCircleLineNear,
+  IsAngleBetween,
+  NormalizeAngle,
+  Vector2D,
+} from "./raceMath";
 import { BoundingBox, RaceSegment } from "./raceSegment";
 
 export class RaceCorner extends RaceSegment {
@@ -60,9 +65,9 @@ export class RaceCorner extends RaceSegment {
       return false;
     }
     const angle = Math.atan2(dy, dx);
-    const start = RaceCorner.normalize(this.startAngle);
-    const end = RaceCorner.normalize(this.endAngle);
-    let theta = RaceCorner.normalize(angle);
+    const start = NormalizeAngle(this.startAngle);
+    const end = NormalizeAngle(this.endAngle);
+    let theta = NormalizeAngle(angle);
     if (start < end) {
       if (theta < start || end < theta) {
         return false;
@@ -99,22 +104,24 @@ export class RaceCorner extends RaceSegment {
   }
 
   raycastBoundary(
-    x0: number,
-    y0: number,
-    dirX: number,
-    dirY: number,
+    rayPoint: Vector2D,
+    rayDir: Vector2D,
     trackWidth: number
   ): Vector2D | null {
     const radius = this.radius + trackWidth;
-    const point = RaceCorner.intersectCircleLine(
+    const point = IntersectCircleLineNear(
       this.center,
       radius,
-      x0,
-      y0,
-      dirX,
-      dirY
+      rayPoint,
+      rayDir
     );
-    return point;
+    if (point) {
+      if (!IsAngleBetween(point, this.center, this.startAngle, this.endAngle)) {
+        return null;
+      }
+      return point;
+    }
+    return null;
   }
 
   courseEffect(x: number, y: number, speed: number): Vector2D {
@@ -130,39 +137,6 @@ export class RaceCorner extends RaceSegment {
       };
     }
     return { x: 0, y: 0 };
-  }
-
-  static normalize(a: number) {
-    return (a + 2 * Math.PI) % (2 * Math.PI);
-  }
-
-  static intersectCircleLine(
-    center: Vector2D,
-    radius: number,
-    x0: number,
-    y0: number,
-    dirX: number,
-    dirY: number
-  ): Vector2D | null {
-    const dx = x0 - center.x;
-    const dy = y0 - center.y;
-    const a = dirX * dirX + dirY * dirY;
-    const b = 2 * (dx * dirX + dy * dirY);
-    const c = dx * dx + dy * dy - radius * radius;
-    const d = b * b - 4 * a * c;
-    if (d < 0) {
-      return null;
-    }
-    const sqrtD = Math.sqrt(d);
-    const t1 = (-b - sqrtD) / (2 * a);
-    if (t1 >= 0) {
-      return { x: x0 + dirX * t1, y: y0 + dirY * t1 };
-    }
-    const t2 = (-b + sqrtD) / (2 * a);
-    if (t2 >= 0) {
-      return { x: x0 + dirX * t2, y: y0 + dirY * t2 };
-    }
-    return null;
   }
 }
 

@@ -2,7 +2,6 @@ import * as child_process from "child_process";
 import * as fs from "fs";
 import { RaceCorner } from "./raceCorner";
 import { RaceLog } from "./raceLog";
-import { Vector2D } from "./raceMath";
 import { RaceTrack } from "./raceTrack";
 
 export function generateRaceWebGLHtml(
@@ -52,16 +51,15 @@ export function generateRaceWebGLHtml(
     "#8e44ad",
     "#2c3e50",
   ];
-  function toCanvas(p: Vector2D) {
-    return {
-      x: p.x - minX,
-      y: p.y - minY,
-    };
-  }
-  const centerLinePoints: Vector2D[] = [];
+  // centerLinePoints: {x, y, color}
+  const centerLinePoints: { x: number; y: number; color: string }[] = [];
   for (const segment of segments) {
     if (segment.type === "line") {
-      centerLinePoints.push(segment.start);
+      centerLinePoints.push({
+        x: segment.start.x,
+        y: segment.start.y,
+        color: "#000000",
+      });
     } else if (segment.type === "corner") {
       const corner = segment as RaceCorner;
       const res = 32;
@@ -72,14 +70,25 @@ export function generateRaceWebGLHtml(
         centerLinePoints.push({
           x: corner.center.x + corner.radius * Math.cos(theta),
           y: corner.center.y + corner.radius * Math.sin(theta),
+          color: "#27ae60",
         });
       }
     }
   }
-  centerLinePoints.push(segments[segments.length - 1].end);
+  centerLinePoints.push({
+    x: segments[segments.length - 1].end.x,
+    y: segments[segments.length - 1].end.y,
+    color: "#000000",
+  });
   const js = `
     const logs = ${JSON.stringify(logs)};
-    const trackPoints = ${JSON.stringify(centerLinePoints.map(toCanvas))};
+    const trackPoints = ${JSON.stringify(
+      centerLinePoints.map((p) => ({
+        x: p.x - minX,
+        y: p.y - minY,
+        color: p.color,
+      }))
+    )};
     const horseColors = ${JSON.stringify(horseColors)};
     const canvas = document.getElementById('race-canvas');
     const ctx = canvas.getContext('2d');
@@ -91,15 +100,15 @@ export function generateRaceWebGLHtml(
     function drawTrack() {
       ctx.save();
       ctx.clearRect(0, 0, width, height);
-      ctx.beginPath();
-      ctx.moveTo(trackPoints[0].x, trackPoints[0].y);
       for (let i = 1; i < trackPoints.length; i++) {
+        ctx.beginPath();
+        ctx.moveTo(trackPoints[i - 1].x, trackPoints[i - 1].y);
         ctx.lineTo(trackPoints[i].x, trackPoints[i].y);
+        ctx.strokeStyle = trackPoints[i - 1].color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
       }
-      ctx.closePath();
-      ctx.strokeStyle = '#333';
-      ctx.lineWidth = 4;
-      ctx.stroke();
+      // START/GOAL 마커
       ctx.beginPath();
       ctx.arc(trackPoints[0].x, trackPoints[0].y, 12, 0, 2 * Math.PI);
       ctx.fillStyle = '#27ae60';
@@ -120,8 +129,7 @@ export function generateRaceWebGLHtml(
       ctx.fillStyle = '#fff';
       ctx.fillText('GOAL', trackPoints[trackPoints.length-1].x, trackPoints[trackPoints.length-1].y - 18);
       ctx.restore();
-    }
-    // 모든 턴의 경계점 누적 시각화
+    } 
     function drawBoundaryPoints() {
       for (let t = 0; t < logs.length; t++) {
         const horses = logs[t].horseStates;
@@ -149,8 +157,7 @@ export function generateRaceWebGLHtml(
           }
         });
       }
-    }
-
+    } 
     function drawHorses(turnIdx) {
       const log = logs[turnIdx];
       const horses = log.horseStates;

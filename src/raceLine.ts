@@ -65,10 +65,8 @@ export class RaceLine extends RaceSegment {
   }
 
   raycastBoundary(
-    x0: number,
-    y0: number,
-    dirX: number,
-    dirY: number,
+    rayPoint: Vector2D,
+    rayDir: Vector2D,
     trackWidth: number
   ): Vector2D | null {
     const x1 = this.start.x;
@@ -78,7 +76,7 @@ export class RaceLine extends RaceSegment {
     let offsetX = 0;
     let offsetY = 0;
     if (0 < trackWidth) {
-      const ortho = this.orthoVectorAt(x0, y0);
+      const ortho = this.orthoVectorAt(rayPoint.x, rayPoint.y);
       offsetX = ortho.x * trackWidth;
       offsetY = ortho.y * trackWidth;
     }
@@ -88,17 +86,15 @@ export class RaceLine extends RaceSegment {
     const y2b = y2 + offsetY;
     const dx = x2b - x1b;
     const dy = y2b - y1b;
-    const det = dirX * dy - dirY * dx;
-    if (Math.abs(det) < 1e-8) {
-      return null;
-    }
-    const t = ((x1b - x0) * dy - (y1b - y0) * dx) / det;
-    const s = ((x1b - x0) * dirY - (y1b - y0) * dirX) / det;
+    const det = rayDir.x * dy - rayDir.y * dx;
+    const t = ((x1b - rayPoint.x) * dy - (y1b - rayPoint.y) * dx) / det;
+    const s =
+      ((x1b - rayPoint.x) * rayDir.y - (y1b - rayPoint.y) * rayDir.x) / det;
     if (t < 0 || s < 0 || s > 1) {
       return null;
     }
-    const ix = x0 + dirX * t;
-    const iy = y0 + dirY * t;
+    const ix = rayPoint.x + rayDir.x * t;
+    const iy = rayPoint.y + rayDir.y * t;
     return { x: ix, y: iy };
   }
 

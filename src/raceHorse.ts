@@ -1,9 +1,8 @@
-import { raycastBoundary, RaycastResult } from "./raceRaycastUtil";
 import { RaceSegment } from "./raceSegment";
+import { raycastBoundary, RaycastResult } from "./raceSimulator";
 import { Horse } from "./types/horse";
 
-const DIRECTIONS = [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2];
-const TRACK_WIDTH = 40;
+const TRACK_WIDTH = 80;
 
 export class RaceHorse implements Horse {
   id: number;
@@ -26,20 +25,15 @@ export class RaceHorse implements Horse {
   riskLevel: number = 0;
   finished: boolean = false;
 
-  constructor(
-    h: Horse,
-    segments: RaceSegment[],
-    fullGate: number,
-    gate: number
-  ) {
-    this.id = h.id;
-    this.name = h.name;
+  constructor(horse: Horse, segments: RaceSegment[], gate: number) {
+    this.id = horse.id;
+    this.name = horse.name;
     this.speed = 0;
     this.acceleration = 0.2;
     this.maxAcceleration = 0.2;
-    this.maxSpeed = h.speed;
-    this.stamina = h.stamina;
-    this.reaction = h.reaction;
+    this.maxSpeed = horse.speed;
+    this.stamina = horse.stamina;
+    this.reaction = horse.reaction;
     this.segments = segments;
     this.segment = segments[0];
     this.segmentIndex = 0;
@@ -49,8 +43,7 @@ export class RaceHorse implements Horse {
     let baseX = firstSegment.start.x;
     let baseY = firstSegment.start.y;
     let ortho = firstSegment.orthoVectorAt(baseX, baseY);
-    const gateFrac = fullGate === 1 ? 0.5 : gate / (fullGate - 1);
-    const gateOffset = gateFrac * (TRACK_WIDTH - 6);
+    const gateOffset = 5 + gate * 5;
     this.x = baseX + ortho.x * gateOffset;
     this.y = baseY + ortho.y * gateOffset;
     this.heading = startDir;
@@ -81,9 +74,9 @@ export class RaceHorse implements Horse {
       this.x,
       this.y,
       this.heading,
-      [this.segment, nextSegment],
-      TRACK_WIDTH,
-      DIRECTIONS
+      this.segment,
+      nextSegment,
+      TRACK_WIDTH
     );
     this.closestRaycast = closestRaycast;
     this.farthestRaycast = farthestRaycast;
@@ -111,41 +104,19 @@ export class RaceHorse implements Horse {
         1 - farthestRaycast.hitDistance / (safeDist * 1.2)
       );
     }
-    let targetX = this.segment.end.x;
-    let targetY = this.segment.end.y;
-    if (riskWeight > 0.5 && closestRaycast) {
-      targetX =
-        this.x +
-        Math.cos(closestRaycast.rayAngle) * (safeDist * (1 + riskWeight));
-      targetY =
-        this.y +
-        Math.sin(closestRaycast.rayAngle) * (safeDist * (1 + riskWeight));
-    } else if (riskWeight > 0.5 && farthestRaycast) {
-      targetX =
-        this.x +
-        Math.cos(farthestRaycast.rayAngle) * (safeDist * (1 + riskWeight));
-      targetY =
-        this.y +
-        Math.sin(farthestRaycast.rayAngle) * (safeDist * (1 + riskWeight));
-    }
-    const targetAngle = Math.atan2(targetY - this.y, targetX - this.x);
     const courseAngle = this.segment.getTangentDirectionAt(this.x, this.y);
-    let farthestCourseAngle = courseAngle;
-    if (farthestRaycast) {
-      farthestCourseAngle = farthestRaycast.segment.getTangentDirectionAt(
-        farthestRaycast.hitPoint.x,
-        farthestRaycast.hitPoint.y
-      );
-    }
     let moveDir = courseAngle;
-    if (riskWeight < 0.3) {
-      // 위험이 낮을 때만 목표점과 코스 방향을 blending
-      const blend1 = RaceHorse.lerpAngle(targetAngle, courseAngle, 0.3);
-      moveDir = RaceHorse.lerpAngle(blend1, farthestCourseAngle, 0.2);
-    } else if (riskWeight < 0.7) {
-      // 중간 위험도에서는 목표점과 코스 방향을 약하게 blending
-      moveDir = RaceHorse.lerpAngle(targetAngle, courseAngle, 0.7);
-    } // 위험도가 높으면 courseAngle을 그대로 사용
+    if (farthestRaycast) {
+      const farthestAngle = farthestRaycast.rayAngle;
+      if (riskWeight < 0.2) {
+        // 위험도가 매우 낮으면 farthestRaycast.rayAngle을 거의 그대로 사용
+        moveDir = RaceHorse.lerpAngle(courseAngle, farthestAngle, 0.9);
+      } else if (riskWeight < 0.7) {
+        // 중간 위험도에서는 blending
+        const blendRatio = 0.5 * (1 - riskWeight);
+        moveDir = RaceHorse.lerpAngle(courseAngle, farthestAngle, blendRatio);
+      } // 위험도가 높으면 courseAngle만 사용
+    }
     return { moveDir, riskWeight };
   }
 
