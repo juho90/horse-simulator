@@ -87,7 +87,7 @@ export class RaceCorner extends RaceSegment {
     return dist > this.radius;
   }
 
-  isEndAt(x: number, y: number, tolerance: number): boolean {
+  isEndAt(x: number, y: number): boolean {
     const angle = Math.atan2(y - this.center.y, x - this.center.x);
     const norm = (angle - this.startAngle + 2 * Math.PI) % (2 * Math.PI);
     const span =

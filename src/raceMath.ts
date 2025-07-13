@@ -1,5 +1,7 @@
 export type Vector2D = { x: number; y: number };
 
+export const EPSILON = 1e-10;
+
 export function getOuterGuardrail(
   innerPoints: Vector2D[],
   offset: number

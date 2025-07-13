@@ -28,7 +28,7 @@ export abstract class RaceSegment {
   abstract getTangentDirectionAt(x: number, y: number): number;
   abstract getEndTangentDirection(): number;
   abstract isInner(x: number, y: number): boolean;
-  abstract isEndAt(x: number, y: number, tolerance: number): boolean;
+  abstract isEndAt(x: number, y: number): boolean;
   abstract orthoVectorAt(x: number, y: number): Vector2D;
   abstract raycastBoundary(
     rayPoint: Vector2D,

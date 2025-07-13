@@ -1,12 +1,5 @@
-import { RaceCorner } from "./raceCorner";
 import { RaceHorse } from "./raceHorse";
-import { RaceLine } from "./raceLine";
-import {
-  HorseTurnState,
-  RaceLog,
-  saveRaceCornerLogToFile,
-  saveRaceLineLogToFile,
-} from "./raceLog";
+import { HorseTurnState, RaceLog } from "./raceLog";
 import { Vector2D } from "./raceMath";
 import { RaceSegment } from "./raceSegment";
 import { RaceTrack } from "./raceTrack";
@@ -149,43 +142,7 @@ export function raycastBoundary(
     if (nextClosestRaycast) {
       closestRaycast = nextClosestRaycast;
     } else {
-      if (!closestRaycast) {
-        if (segment.type === "line") {
-          for (const offset of DIRECTIONS) {
-            const angle = heading + offset;
-            const rayDir = { x: Math.cos(angle), y: Math.sin(angle) };
-            console.log(
-              `[raycastNearBoundary] no outerPoint: x=${x}, y=${y}, angle=${angle.toFixed(
-                3
-              )}, rayDir=(${rayDir.x.toFixed(3)}, ${rayDir.y.toFixed(
-                3
-              )}), segmentType=${segment.type}, segmentPoint (${
-                segment.start.x
-              }, ${segment.start.y}) to (${segment.end.x}, ${
-                segment.end.y
-              }), trackWidth=${trackWidth}`
-            );
-          }
-          saveRaceLineLogToFile({
-            x,
-            y,
-            heading,
-            segment: segment as RaceLine,
-            trackWidth,
-            directions: DIRECTIONS,
-          });
-        } else if (segment.type === "corner") {
-          saveRaceCornerLogToFile({
-            x,
-            y,
-            heading,
-            segment: segment as RaceCorner,
-            trackWidth,
-            directions: DIRECTIONS,
-          });
-        }
-        throw new Error("No closest raycast found");
-      }
+      throw new Error("No closest raycast found");
     }
   }
   let farthestRaycast = raycastFarBoundary(x, y, heading, segment, trackWidth, [
@@ -212,7 +169,6 @@ export function runRaceSimulator(
   horses: Horse[],
   raceDistance?: number
 ): RaceLog[] {
-  const tolerance = 20;
   const logs: RaceLog[] = [];
   const totalLaps = Math.ceil(
     (raceDistance ?? track.totalLength) / track.totalLength
@@ -230,7 +186,7 @@ export function runRaceSimulator(
       for (; index < raceHorses.length; index++) {
         const horse = raceHorses[index];
         if (!horse.finished) {
-          horse.moveOnTrack(tolerance);
+          horse.moveOnTrack();
           if (horse.lap >= totalLaps && horse.segmentIndex === 0) {
             horse.finished = true;
           }

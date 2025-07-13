@@ -120,8 +120,8 @@ export class RaceHorse implements Horse {
     return { moveDir, riskWeight };
   }
 
-  moveOnTrack(tolerance: number): void {
-    if (this.segment.isEndAt(this.x, this.y, tolerance)) {
+  moveOnTrack(): void {
+    if (this.segment.isEndAt(this.x, this.y)) {
       this.moveNextSegment();
     }
     const { moveDir, riskWeight } = this.findDirOnTrack();

@@ -1,5 +1,5 @@
 import { RaceCorner } from "./raceCorner";
-import { Vector2D } from "./raceMath";
+import { EPSILON, Vector2D } from "./raceMath";
 import { BoundingBox, RaceSegment } from "./raceSegment";
 
 export class RaceLine extends RaceSegment {
@@ -45,7 +45,7 @@ export class RaceLine extends RaceSegment {
     return rel > 0;
   }
 
-  isEndAt(x: number, y: number, tolerance: number): boolean {
+  isEndAt(x: number, y: number): boolean {
     const dx = this.end.x - this.start.x;
     const dy = this.end.y - this.start.y;
     const len2 = dx * dx + dy * dy;
@@ -53,7 +53,7 @@ export class RaceLine extends RaceSegment {
       return false;
     }
     const t = ((x - this.start.x) * dx + (y - this.start.y) * dy) / len2;
-    return t >= 1 - tolerance / Math.sqrt(len2);
+    return t >= 1;
   }
 
   orthoVectorAt(x: number, y: number): Vector2D {
@@ -76,7 +76,12 @@ export class RaceLine extends RaceSegment {
     let offsetX = 0;
     let offsetY = 0;
     if (0 < trackWidth) {
-      const ortho = this.orthoVectorAt(rayPoint.x, rayPoint.y);
+      // segment의 법선 방향으로 offset 적용
+      const segAngle = Math.atan2(y2 - y1, x2 - x1);
+      const ortho = {
+        x: Math.cos(segAngle - Math.PI / 2),
+        y: Math.sin(segAngle - Math.PI / 2),
+      };
       offsetX = ortho.x * trackWidth;
       offsetY = ortho.y * trackWidth;
     }
@@ -87,10 +92,13 @@ export class RaceLine extends RaceSegment {
     const dx = x2b - x1b;
     const dy = y2b - y1b;
     const det = rayDir.x * dy - rayDir.y * dx;
+    if (Math.abs(det) < EPSILON) {
+      return null; // 평행 또는 겹침
+    }
     const t = ((x1b - rayPoint.x) * dy - (y1b - rayPoint.y) * dx) / det;
     const s =
       ((x1b - rayPoint.x) * rayDir.y - (y1b - rayPoint.y) * rayDir.x) / det;
-    if (t < 0 || s < 0 || s > 1) {
+    if (t < -EPSILON || s < -EPSILON || s > 1 + EPSILON) {
       return null;
     }
     const ix = rayPoint.x + rayDir.x * t;
