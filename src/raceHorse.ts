@@ -1,6 +1,9 @@
-import { lerpAngle as LerpAngle } from "./raceMath";
 import { RaceSegment } from "./raceSegment";
 import { raycastBoundary, RaycastResult } from "./raceSimulator";
+import { BlockedState } from "./states/blockedState";
+import { HorseState, HorseStateType } from "./states/horseState";
+import { MaintainingPaceState } from "./states/maintainingPaceState";
+import { OvertakingState } from "./states/overtakingState";
 import { Horse } from "./types/horse";
 
 export class RaceHorse implements Horse {
@@ -10,7 +13,9 @@ export class RaceHorse implements Horse {
   acceleration: number;
   maxAcceleration: number;
   maxSpeed: number;
-  stamina?: number;
+  stamina: number;
+  maxStamina: number;
+  currentStamina: number;
   reaction?: number;
   segments: RaceSegment[];
   segment: RaceSegment;
@@ -23,6 +28,7 @@ export class RaceHorse implements Horse {
   lap: number = 0;
   riskLevel: number = 0;
   finished: boolean = false;
+  states: Map<HorseStateType, HorseState>;
 
   constructor(horse: Horse, segments: RaceSegment[], gate: number) {
     this.id = horse.id;
@@ -31,7 +37,9 @@ export class RaceHorse implements Horse {
     this.acceleration = 0.2;
     this.maxAcceleration = 0.2;
     this.maxSpeed = horse.speed;
-    this.stamina = horse.stamina;
+    this.stamina = horse.stamina ?? 100;
+    this.maxStamina = horse.stamina ?? 100;
+    this.currentStamina = this.maxStamina;
     this.reaction = horse.reaction;
     this.segments = segments;
     this.segment = segments[0];
@@ -50,6 +58,12 @@ export class RaceHorse implements Horse {
     this.y = this.segment.start.y + ortho.y * gateOffset;
     this.heading = startDir;
     this.distance = 0;
+    this.states = new Map();
+    this.states.set("maintainingPace", new MaintainingPaceState());
+    this.states.set("overtaking", new OvertakingState());
+    this.states.set("blocked", new BlockedState());
+    const initialState = this.states.get("maintainingPace")!;
+    initialState.enter(this);
   }
 
   moveNextSegment() {
@@ -63,7 +77,10 @@ export class RaceHorse implements Horse {
 
   closestRaycasts: RaycastResult[] | null = null;
   farthestRaycast: RaycastResult | null = null;
-  findDirOnTrack(otherHorses: RaceHorse[]): { moveDir: number; riskWeight: number } {
+  findDirOnTrack(otherHorses: RaceHorse[]): {
+    moveDir: number;
+    riskWeight: number;
+  } {
     const nextSegmentIndex = (this.segmentIndex + 1) % this.segments.length;
     const nextSegment = this.segments[nextSegmentIndex];
     const { closestRaycasts, farthestRaycast } = raycastBoundary(
@@ -80,28 +97,26 @@ export class RaceHorse implements Horse {
 
   getHorseAvoidanceVector(otherHorses: RaceHorse[]): { x: number; y: number } {
     let avoidanceVector = { x: 0, y: 0 };
-    const AVOID_DISTANCE = 30; // Distance to start avoiding other horses
-
+    const AVOID_DISTANCE = 30;
     for (const other of otherHorses) {
-      if (other.id === this.id) continue;
-
+      if (other.id === this.id) {
+        continue;
+      }
       const dx = other.x - this.x;
       const dy = other.y - this.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
-
       if (distance < AVOID_DISTANCE && distance > 0) {
-        // Only avoid horses that are somewhat in front of us
         const angleToOther = Math.atan2(dy, dx);
-
-        // Normalize angle to be relative to current heading
         let relativeAngle = angleToOther - this.heading;
-        while (relativeAngle <= -Math.PI) relativeAngle += 2 * Math.PI;
-        while (relativeAngle > Math.PI) relativeAngle -= 2 * Math.PI;
-
-        // Only avoid horses in front-ish (e.g., +/- 90 degrees)
+        while (relativeAngle <= -Math.PI) {
+          relativeAngle += 2 * Math.PI;
+        }
+        while (relativeAngle > Math.PI) {
+          relativeAngle -= 2 * Math.PI;
+        }
         if (Math.abs(relativeAngle) < Math.PI / 2) {
-          const forceMagnitude = (1 / (distance * distance)) * 0.5; // Reduced force
-          const forceAngle = angleToOther + Math.PI; // Push away from the other horse
+          const forceMagnitude = (1 / (distance * distance)) * 0.5;
+          const forceAngle = angleToOther + Math.PI;
           avoidanceVector.x += Math.cos(forceAngle) * forceMagnitude;
           avoidanceVector.y += Math.sin(forceAngle) * forceMagnitude;
         }
@@ -121,8 +136,6 @@ export class RaceHorse implements Horse {
       return { moveDir: this.heading, riskWeight: 0 };
     }
     const courseAngle = this.segment.getTangentDirectionAt(this.x, this.y);
-
-    // Wall avoidance vector
     let wallAvoidanceVector = { x: 0, y: 0 };
     let minDistance = Infinity;
     if (closestRaycasts) {
@@ -136,10 +149,7 @@ export class RaceHorse implements Horse {
         }
       }
     }
-
-    // Horse avoidance vector
     const horseAvoidanceVector = this.getHorseAvoidanceVector(otherHorses);
-
     const RISK_DISTANCE = 20.0;
     let riskWeight = 0;
     if (minDistance < RISK_DISTANCE) {
@@ -153,7 +163,6 @@ export class RaceHorse implements Horse {
       x: Math.cos(courseAngle) * goalForce,
       y: Math.sin(courseAngle) * goalForce,
     };
-
     const finalVector = {
       x: goalVector.x + wallAvoidanceVector.x + horseAvoidanceVector.x,
       y: goalVector.y + wallAvoidanceVector.y + horseAvoidanceVector.y,
@@ -162,43 +171,95 @@ export class RaceHorse implements Horse {
     return { moveDir: bestDir, riskWeight };
   }
 
-  moveOnTrack(otherHorses: RaceHorse[]): void {
-    const { moveDir, riskWeight } = this.findDirOnTrack(otherHorses);
-    this.riskLevel = riskWeight;
-    let cornerAnticipationFactor = 0;
-    const LOOK_AHEAD_DISTANCE = 150;
-    if (
-      this.farthestRaycast &&
-      this.farthestRaycast.hitDistance < LOOK_AHEAD_DISTANCE
-    ) {
-      cornerAnticipationFactor = Math.pow(
-        1 - this.farthestRaycast.hitDistance / LOOK_AHEAD_DISTANCE,
-        2
-      );
-    }
-    const speedReduction = Math.max(
-      riskWeight * 0.5,
-      cornerAnticipationFactor * 0.7
-    );
-    const targetSpeed = this.maxSpeed * (1 - speedReduction);
-    const TTC_THRESHOLD = 2.0;
-    let collisionImminent = false;
-    if (this.speed > 1 && this.farthestRaycast) {
-      const timeToCollision = this.farthestRaycast.hitDistance / this.speed;
-      if (timeToCollision < TTC_THRESHOLD) {
-        collisionImminent = true;
+  getDistanceTo(other: RaceHorse): number {
+    const dx = other.x - this.x;
+    const dy = other.y - this.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  findClosestHorseInFront(otherHorses: RaceHorse[]): RaceHorse | null {
+    let closestHorse: RaceHorse | null = null;
+    let minDistance = Infinity;
+    for (const other of otherHorses) {
+      if (other.id === this.id) {
+        continue;
+      }
+      if (other.distance > this.distance) {
+        const distance = this.getDistanceTo(other);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestHorse = other;
+        }
       }
     }
-    if (collisionImminent) {
-      this.acceleration = -this.maxAcceleration;
-    } else if (this.speed > targetSpeed) {
-      this.acceleration = -this.maxAcceleration;
-    } else {
-      this.acceleration = this.maxAcceleration;
+    return closestHorse;
+  }
+
+  shouldAttemptOvertake(otherHorse: RaceHorse): boolean {
+    const distanceToTarget = this.getDistanceTo(otherHorse);
+    const isCloseEnough = distanceToTarget < 40 && distanceToTarget > 5;
+    const hasEnoughStamina = this.currentStamina > 40;
+    const isNotCurrentlyOvertaking = !this.isStateActive("overtaking");
+    return isCloseEnough && hasEnoughStamina && isNotCurrentlyOvertaking;
+  }
+
+  temporarilyBoostSpeed() {
+    this.acceleration = this.maxAcceleration * 1.5;
+    this.currentStamina -= 0.5;
+  }
+
+  activateState(stateName: HorseStateType, data?: any): void {
+    const state = this.states.get(stateName);
+    if (state && this.canActivateState(stateName)) {
+      state.enter(this, data);
     }
+  }
+
+  deactivateState(stateName: HorseStateType): void {
+    const state = this.states.get(stateName);
+    if (state && state.isActive) {
+      state.exit(this);
+    }
+  }
+
+  isStateActive(stateName: HorseStateType): boolean {
+    const state = this.states.get(stateName);
+    return state ? state.isActive : false;
+  }
+
+  canActivateState(stateName: HorseStateType): boolean {
+    const state = this.states.get(stateName);
+    return state ? state.cooldown <= 0 : false;
+  }
+
+  private updateCooldowns(): void {
+    for (const state of this.states.values()) {
+      if (state.cooldown > 0) {
+        state.cooldown--;
+      }
+    }
+  }
+
+  moveOnTrack(otherHorses: RaceHorse[]): void {
+    this.updateCooldowns();
+    for (const state of this.states.values()) {
+      if (state.isActive) {
+        state.execute(this, otherHorses);
+      }
+    }
+    if (this.acceleration > 0) {
+      this.currentStamina -= 0.1;
+    } else {
+      this.currentStamina += 0.05;
+    }
+    this.currentStamina = Math.max(
+      0,
+      Math.min(this.currentStamina, this.maxStamina)
+    );
+    const staminaEffect = Math.max(0.3, this.currentStamina / this.maxStamina);
+    const currentMaxSpeed = this.maxSpeed * staminaEffect;
     this.speed += this.acceleration;
-    this.speed = Math.max(0, Math.min(this.speed, this.maxSpeed));
-    this.heading = LerpAngle(this.heading, moveDir, 0.4);
+    this.speed = Math.max(0, Math.min(this.speed, currentMaxSpeed));
     this.x += Math.cos(this.heading) * this.speed;
     this.y += Math.sin(this.heading) * this.speed;
     this.distance += this.speed;
