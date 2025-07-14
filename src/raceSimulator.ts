@@ -189,7 +189,7 @@ export function runRaceSimulator(
       for (; index < raceHorses.length; index++) {
         const horse = raceHorses[index];
         if (!horse.finished) {
-          horse.moveOnTrack();
+          horse.moveOnTrack(raceHorses);
           if (horse.lap >= totalLaps && horse.segmentIndex === 0) {
             horse.finished = true;
           }

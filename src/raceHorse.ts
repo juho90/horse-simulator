@@ -41,11 +41,11 @@ export class RaceHorse implements Horse {
       this.segment.start.x,
       this.segment.start.y
     );
-    let ortho = this.segment.orthoVectorAt(
+    const ortho = this.segment.orthoVectorAt(
       this.segment.start.x,
       this.segment.start.y
     );
-    const gateOffset = (this.gate - 1) * 5;
+    const gateOffset = (this.gate + 1) * 5;
     this.x = this.segment.start.x + ortho.x * gateOffset;
     this.y = this.segment.start.y + ortho.y * gateOffset;
     this.heading = startDir;
@@ -60,9 +60,10 @@ export class RaceHorse implements Horse {
       this.lap++;
     }
   }
+
   closestRaycasts: RaycastResult[] | null = null;
   farthestRaycast: RaycastResult | null = null;
-  findDirOnTrack(): { moveDir: number; riskWeight: number } {
+  findDirOnTrack(otherHorses: RaceHorse[]): { moveDir: number; riskWeight: number } {
     const nextSegmentIndex = (this.segmentIndex + 1) % this.segments.length;
     const nextSegment = this.segments[nextSegmentIndex];
     const { closestRaycasts, farthestRaycast } = raycastBoundary(
@@ -74,10 +75,45 @@ export class RaceHorse implements Horse {
     );
     this.closestRaycasts = closestRaycasts;
     this.farthestRaycast = farthestRaycast;
-    return this.findDirOnTrackWithRays(closestRaycasts);
+    return this.findDirOnTrackWithRays(closestRaycasts, otherHorses);
   }
 
-  findDirOnTrackWithRays(closestRaycasts: RaycastResult[]): {
+  getHorseAvoidanceVector(otherHorses: RaceHorse[]): { x: number; y: number } {
+    let avoidanceVector = { x: 0, y: 0 };
+    const AVOID_DISTANCE = 30; // Distance to start avoiding other horses
+
+    for (const other of otherHorses) {
+      if (other.id === this.id) continue;
+
+      const dx = other.x - this.x;
+      const dy = other.y - this.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < AVOID_DISTANCE && distance > 0) {
+        // Only avoid horses that are somewhat in front of us
+        const angleToOther = Math.atan2(dy, dx);
+
+        // Normalize angle to be relative to current heading
+        let relativeAngle = angleToOther - this.heading;
+        while (relativeAngle <= -Math.PI) relativeAngle += 2 * Math.PI;
+        while (relativeAngle > Math.PI) relativeAngle -= 2 * Math.PI;
+
+        // Only avoid horses in front-ish (e.g., +/- 90 degrees)
+        if (Math.abs(relativeAngle) < Math.PI / 2) {
+          const forceMagnitude = (1 / (distance * distance)) * 0.5; // Reduced force
+          const forceAngle = angleToOther + Math.PI; // Push away from the other horse
+          avoidanceVector.x += Math.cos(forceAngle) * forceMagnitude;
+          avoidanceVector.y += Math.sin(forceAngle) * forceMagnitude;
+        }
+      }
+    }
+    return avoidanceVector;
+  }
+
+  findDirOnTrackWithRays(
+    closestRaycasts: RaycastResult[],
+    otherHorses: RaceHorse[]
+  ): {
     moveDir: number;
     riskWeight: number;
   } {
@@ -85,20 +121,25 @@ export class RaceHorse implements Horse {
       return { moveDir: this.heading, riskWeight: 0 };
     }
     const courseAngle = this.segment.getTangentDirectionAt(this.x, this.y);
-    if (!closestRaycasts || closestRaycasts.length === 0) {
-      return { moveDir: courseAngle, riskWeight: 0 };
-    }
-    let avoidanceVector = { x: 0, y: 0 };
+
+    // Wall avoidance vector
+    let wallAvoidanceVector = { x: 0, y: 0 };
     let minDistance = Infinity;
-    for (const ray of closestRaycasts) {
-      minDistance = Math.min(minDistance, ray.hitDistance);
-      if (ray.hitDistance > 0) {
-        const forceMagnitude = 1 / (ray.hitDistance * ray.hitDistance);
-        const forceAngle = ray.angle + Math.PI;
-        avoidanceVector.x += Math.cos(forceAngle) * forceMagnitude;
-        avoidanceVector.y += Math.sin(forceAngle) * forceMagnitude;
+    if (closestRaycasts) {
+      for (const ray of closestRaycasts) {
+        minDistance = Math.min(minDistance, ray.hitDistance);
+        if (ray.hitDistance > 0) {
+          const forceMagnitude = 1 / (ray.hitDistance * ray.hitDistance);
+          const forceAngle = ray.angle + Math.PI;
+          wallAvoidanceVector.x += Math.cos(forceAngle) * forceMagnitude;
+          wallAvoidanceVector.y += Math.sin(forceAngle) * forceMagnitude;
+        }
       }
     }
+
+    // Horse avoidance vector
+    const horseAvoidanceVector = this.getHorseAvoidanceVector(otherHorses);
+
     const RISK_DISTANCE = 20.0;
     let riskWeight = 0;
     if (minDistance < RISK_DISTANCE) {
@@ -112,16 +153,17 @@ export class RaceHorse implements Horse {
       x: Math.cos(courseAngle) * goalForce,
       y: Math.sin(courseAngle) * goalForce,
     };
+
     const finalVector = {
-      x: goalVector.x + avoidanceVector.x,
-      y: goalVector.y + avoidanceVector.y,
+      x: goalVector.x + wallAvoidanceVector.x + horseAvoidanceVector.x,
+      y: goalVector.y + wallAvoidanceVector.y + horseAvoidanceVector.y,
     };
     const bestDir = Math.atan2(finalVector.y, finalVector.x);
     return { moveDir: bestDir, riskWeight };
   }
 
-  moveOnTrack(): void {
-    const { moveDir, riskWeight } = this.findDirOnTrack();
+  moveOnTrack(otherHorses: RaceHorse[]): void {
+    const { moveDir, riskWeight } = this.findDirOnTrack(otherHorses);
     this.riskLevel = riskWeight;
     let cornerAnticipationFactor = 0;
     const LOOK_AHEAD_DISTANCE = 150;
