@@ -56,7 +56,7 @@ export class MaintainingPaceState extends HorseState {
     } else {
       this.horse.accel = this.horse.maxAccel;
     }
-    this.horse.heading = LerpAngle(this.horse.heading, moveDir, 0.4);
+    this.horse.raceHeading = LerpAngle(this.horse.raceHeading, moveDir, 0.4);
   }
 
   exit(): void {

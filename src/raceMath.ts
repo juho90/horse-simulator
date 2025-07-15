@@ -117,7 +117,7 @@ export function HorseAvoidanceVector(
       const dx = other.x - horse.x;
       const dy = other.y - horse.y;
       const angleToOther = Math.atan2(dy, dx);
-      let relativeAngle = angleToOther - horse.heading;
+      let relativeAngle = angleToOther - horse.raceHeading;
       while (relativeAngle <= -Math.PI) {
         relativeAngle += 2 * Math.PI;
       }

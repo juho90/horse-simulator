@@ -37,7 +37,7 @@ export class OvertakingState extends HorseState {
     this.overtakeTurns++;
     const distanceToTarget = Distance(this.target, this.horse);
     if (
-      this.horse.distance > this.target.distance ||
+      this.horse.raceDistance > this.target.raceDistance ||
       distanceToTarget > 60 ||
       this.overtakeTurns > this.MAX_OVERTAKE_TURNS ||
       this.horse.stamina < 20

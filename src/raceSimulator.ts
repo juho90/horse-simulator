@@ -1,9 +1,9 @@
+import { Horse } from "./horse";
 import { RaceHorse } from "./raceHorse";
 import { HorseTurnState, RaceLog } from "./raceLog";
 import { Vector2D } from "./raceMath";
 import { RaceSegment } from "./raceSegment";
 import { RaceTrack } from "./raceTrack";
-import { Horse } from "./types/horse";
 
 export interface RaycastResult {
   segment: RaceSegment;
@@ -201,7 +201,7 @@ export function runRaceSimulator(
           y: horse.y,
           speed: horse.speed,
           stamina: horse.stamina,
-          dist: horse.distance,
+          dist: horse.raceDistance,
           closestHitPoints: horse.closestRaycasts?.map((r) => r.hitPoint),
           farthestHitPoint: horse.farthestRaycast?.hitPoint,
         };

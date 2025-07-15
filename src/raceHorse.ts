@@ -1,3 +1,4 @@
+import { Horse } from "./horse";
 import { Distance, HorseAvoidanceVector } from "./raceMath";
 import { RaceSegment } from "./raceSegment";
 import { raycastBoundary, RaycastResult } from "./raceSimulator";
@@ -5,26 +6,27 @@ import { BlockedState } from "./states/blockedState";
 import { HorseState, HorseStateType } from "./states/horseState";
 import { MaintainingPaceState } from "./states/maintainingPaceState";
 import { OvertakingState } from "./states/overtakingState";
-import { Horse } from "./types/horse";
 
-export class RaceHorse implements Horse {
+export class RaceHorse {
   id: number;
   name: string;
-  speed: number;
   maxSpeed: number;
-  accel: number;
   maxAccel: number;
-  stamina: number;
   maxStamina: number;
-  reaction?: number;
+  reaction: number;
+  staminaConsumption: number;
+  staminaRecovery: number;
+  speed: number;
+  accel: number;
+  stamina: number;
   segments: RaceSegment[];
   segment: RaceSegment;
   segmentIndex: number;
   gate: number;
   x: number;
   y: number;
-  heading: number;
-  distance: number;
+  raceHeading: number;
+  raceDistance: number;
   lap: number = 0;
   riskLevel: number = 0;
   finished: boolean = false;
@@ -33,17 +35,23 @@ export class RaceHorse implements Horse {
   constructor(horse: Horse, segments: RaceSegment[], gate: number) {
     this.id = horse.id;
     this.name = horse.name;
+    this.maxSpeed = horse.calculateMaxSpeed();
+    this.maxAccel = horse.calculateMaxAcceleration();
+    this.maxStamina = horse.calculateMaxStamina();
+    this.reaction = horse.calculateReaction();
+    this.staminaConsumption = horse.calculateStaminaConsumption();
+    this.staminaRecovery = horse.calculateStaminaRecovery();
+
     this.speed = 0;
-    this.maxSpeed = horse.speed;
-    this.accel = 0.2;
-    this.maxAccel = 0.2;
-    this.stamina = horse.stamina ?? 100;
-    this.maxStamina = horse.stamina ?? 100;
-    this.reaction = horse.reaction;
+    this.accel = this.maxAccel;
+    this.stamina = this.maxStamina;
+
     this.segments = segments;
     this.segment = segments[0];
     this.segmentIndex = 0;
+
     this.gate = gate;
+
     const startDir = this.segment.getTangentDirectionAt(
       this.segment.start.x,
       this.segment.start.y
@@ -55,12 +63,15 @@ export class RaceHorse implements Horse {
     const gateOffset = (this.gate + 1) * 5;
     this.x = this.segment.start.x + ortho.x * gateOffset;
     this.y = this.segment.start.y + ortho.y * gateOffset;
-    this.heading = startDir;
-    this.distance = 0;
+
+    this.raceHeading = startDir;
+    this.raceDistance = 0;
+
     this.states = new Map();
     this.states.set("maintainingPace", new MaintainingPaceState(this));
     this.states.set("overtaking", new OvertakingState(this));
     this.states.set("blocked", new BlockedState(this));
+
     const initialState = this.states.get("maintainingPace")!;
     initialState.enter(this);
   }
@@ -85,7 +96,7 @@ export class RaceHorse implements Horse {
     const { closestRaycasts, farthestRaycast } = raycastBoundary(
       this.x,
       this.y,
-      this.heading,
+      this.raceHeading,
       this.segment,
       nextSegment
     );
@@ -102,7 +113,7 @@ export class RaceHorse implements Horse {
     riskWeight: number;
   } {
     if (this.speed <= 0) {
-      return { moveDir: this.heading, riskWeight: 0 };
+      return { moveDir: this.raceHeading, riskWeight: 0 };
     }
     const courseAngle = this.segment.getTangentDirectionAt(this.x, this.y);
     let wallAvoidanceVector = { x: 0, y: 0 };
@@ -146,9 +157,9 @@ export class RaceHorse implements Horse {
       state.execute(otherHorses);
     }
     if (this.accel > 0) {
-      this.stamina -= 0.1;
+      this.stamina -= this.staminaConsumption;
     } else {
-      this.stamina += 0.05;
+      this.stamina += this.staminaRecovery;
     }
     this.stamina = Math.max(0, Math.min(this.stamina, this.maxStamina));
     const staminaRatio = this.stamina / this.maxStamina;
@@ -157,9 +168,9 @@ export class RaceHorse implements Horse {
     const currentMaxSpeed = this.maxSpeed * staminaEffect;
     this.speed += this.accel;
     this.speed = Math.max(0, Math.min(this.speed, currentMaxSpeed));
-    this.x += Math.cos(this.heading) * this.speed;
-    this.y += Math.sin(this.heading) * this.speed;
-    this.distance += this.speed;
+    this.x += Math.cos(this.raceHeading) * this.speed;
+    this.y += Math.sin(this.raceHeading) * this.speed;
+    this.raceDistance += this.speed;
     if (this.segment.isEndAt(this.x, this.y)) {
       this.moveNextSegment();
     }
@@ -172,7 +183,7 @@ export class RaceHorse implements Horse {
       if (other.id === this.id) {
         continue;
       }
-      if (other.distance > this.distance) {
+      if (other.raceDistance > this.raceDistance) {
         const distance = Distance(other, this);
         if (distance < minDistance) {
           minDistance = distance;

@@ -1,10 +1,10 @@
 import * as fs from "fs";
+import { Horse } from "./horse";
 import { RaceCorner } from "./raceCorner";
 import { RaceLine } from "./raceLine";
 import { Vector2D } from "./raceMath";
 import { RaceSegment } from "./raceSegment";
 import { RaceTrack } from "./raceTrack";
-import { Horse } from "./types/horse";
 
 export interface HorseTurnState {
   id: number;

@@ -1,21 +1,9 @@
 import * as path from "path";
+import { createSampleHorses } from "./horse";
 import { displayTrackInfo, RaceLog } from "./raceLog";
 import { runRaceSimulator } from "./raceSimulator";
 import { createTrack } from "./raceTrack";
-import { generateRaceWebGLHtml as renderRaceWebGLHtml } from "./raceViewerWebGL";
-import { Horse } from "./types/horse";
-
-function createHorses(count: number = 10): Horse[] {
-  const horses: Horse[] = [];
-  for (let i = 0; i < count; i++) {
-    horses.push({
-      id: i + 1,
-      name: `Horse${i + 1}`,
-      speed: 18 + Math.random() * 4,
-    });
-  }
-  return horses;
-}
+import { generateRaceWebGLHtml } from "./raceViewerWebGL";
 
 function findFinishTurn(
   logs: RaceLog[],
@@ -36,7 +24,7 @@ function main() {
   const segmentCount = Math.floor(Math.random() * 12) + 6;
   const track = createTrack(segmentCount);
   const targetRaceDistance = track.totalLength * 3;
-  const horses = createHorses(10);
+  const horses = createSampleHorses();
   const logs = runRaceSimulator(track, horses, track.totalLength * 3);
   let winner = null;
   let minTurn = Infinity;
@@ -48,7 +36,7 @@ function main() {
     }
   }
   const outPath = path.resolve(__dirname, "../race-result.html");
-  renderRaceWebGLHtml(outPath, logs, track);
+  generateRaceWebGLHtml(outPath, logs, track);
   displayTrackInfo(track);
   // displayRaceResults(track, horses, logs, targetRaceDistance, winner, minTurn);
 }
