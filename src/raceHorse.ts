@@ -13,9 +13,9 @@ export class RaceHorse {
   maxSpeed: number;
   maxAccel: number;
   maxStamina: number;
-  reaction: number;
   staminaConsumption: number;
   staminaRecovery: number;
+  reaction: number;
   speed: number;
   accel: number;
   stamina: number;
@@ -38,9 +38,9 @@ export class RaceHorse {
     this.maxSpeed = horse.calculateMaxSpeed();
     this.maxAccel = horse.calculateMaxAcceleration();
     this.maxStamina = horse.calculateMaxStamina();
-    this.reaction = horse.calculateReaction();
     this.staminaConsumption = horse.calculateStaminaConsumption();
     this.staminaRecovery = horse.calculateStaminaRecovery();
+    this.reaction = horse.calculateReaction();
 
     this.speed = 0;
     this.accel = this.maxAccel;
@@ -158,8 +158,8 @@ export class RaceHorse {
     }
     if (this.accel > 0) {
       this.stamina -= this.staminaConsumption;
-    } else {
-      this.stamina += this.staminaRecovery;
+    } else if (this.speed > 0) {
+      this.stamina -= this.staminaConsumption * 0.5;
     }
     this.stamina = Math.max(0, Math.min(this.stamina, this.maxStamina));
     const staminaRatio = this.stamina / this.maxStamina;

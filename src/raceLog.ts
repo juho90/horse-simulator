@@ -12,6 +12,7 @@ export interface HorseTurnState {
   x: number;
   y: number;
   speed: number;
+  accel: number;
   stamina: number;
   dist: number;
   closestHitPoints?: Vector2D[];
@@ -79,35 +80,10 @@ export function displayTrackInfo(track: RaceTrack) {
 }
 
 export function displayRaceResults(
-  track: RaceTrack,
   horses: Horse[],
   logs: RaceLog[],
-  targetRaceDistance: number,
-  winner: Horse | null,
-  minTurn: number
+  targetRaceDistance: number
 ) {
-  console.log("\n=== 경주 결과 ===");
-  console.log(
-    `경주 거리: ${targetRaceDistance}m (${
-      targetRaceDistance / track.totalLength
-    }바퀴)`
-  );
-  if (winner) {
-    console.log(`🏆 우승마: ${winner.name}`);
-    console.log(`   - ID: ${winner.id}`);
-    console.log(`   - 속도: ${winner.speed.toFixed(2)}m/턴`);
-    console.log(`   - 완주 턴: ${minTurn + 1}턴`);
-    console.log(
-      `   - 소요 시간: ${(
-        (minTurn + 1) *
-        (track.totalLength / winner.speed / track.totalLength)
-      ).toFixed(1)}초 (가정)`
-    );
-  } else {
-    console.log("❌ 우승마 없음 (모두 결승선 미도달)");
-  }
-  console.log("\n=== 전체 말 순위 ===");
-
   function findFinishTurn(
     logs: RaceLog[],
     horseId: number,

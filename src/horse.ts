@@ -28,7 +28,7 @@ export class Horse {
   }
 
   calculateMaxSpeed(): number {
-    const baseSpeed = 3.0;
+    const baseSpeed = 18.0;
     const speedRange = 5.0;
     const strengthWeight = 0.7;
     const agilityWeight = 0.3;
@@ -38,8 +38,8 @@ export class Horse {
   }
 
   calculateMaxAcceleration(): number {
-    const baseAccel = 0.1;
-    const accelRange = 0.3;
+    const baseAccel = 3.5;
+    const accelRange = 0.5;
     const agilityWeight = 0.8;
     const strengthWeight = 0.2;
     const statValue =
@@ -48,8 +48,8 @@ export class Horse {
   }
 
   calculateMaxStamina(): number {
-    const baseStamina = 60;
-    const staminaRange = 90;
+    const baseStamina = 80;
+    const staminaRange = 20;
     const enduranceWeight = 0.8;
     const spiritWeight = 0.2;
     const statValue =

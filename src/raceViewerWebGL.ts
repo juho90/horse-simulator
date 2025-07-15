@@ -220,8 +220,8 @@ export function generateRaceWebGLHtml(
         return;
       }
       panel.innerHTML = \`<table style="width:100%;border-collapse:collapse;">
-        <tr style="background:#eee;"><th>이름</th><th>순위</th><th>속도</th><th>스태미나</th></tr>
-        \${horses.map((h, i) => \`<tr><td>\${h.name}</td><td style='text-align:center;'>\${i+1}</td><td>\${h.speed.toFixed(2)}</td><td>\${h.stamina.toFixed(1)}</td></tr>\`).join('')}
+        <tr style="background:#eee;"><th>이름</th><th>순위</th><th>속도</th><th>가속도</th><th>스태미나</th></tr>
+        \${horses.map((h, i) => \`<tr><td>\${h.name}</td><td style='text-align:center;'>\${i+1}</td><td>\${h.speed.toFixed(2)}</td><td>\${h.accel.toFixed(3)}</td><td>\${h.stamina.toFixed(1)}</td></tr>\`).join('')}
       </table>\`;
     }
     function render() {
