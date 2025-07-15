@@ -1,3 +1,4 @@
+import { Distance, HorseAvoidanceVector } from "./raceMath";
 import { RaceSegment } from "./raceSegment";
 import { raycastBoundary, RaycastResult } from "./raceSimulator";
 import { BlockedState } from "./states/blockedState";
@@ -10,12 +11,11 @@ export class RaceHorse implements Horse {
   id: number;
   name: string;
   speed: number;
+  maxSpeed: number;
   acceleration: number;
   maxAcceleration: number;
-  maxSpeed: number;
   stamina: number;
   maxStamina: number;
-  currentStamina: number;
   reaction?: number;
   segments: RaceSegment[];
   segment: RaceSegment;
@@ -34,12 +34,11 @@ export class RaceHorse implements Horse {
     this.id = horse.id;
     this.name = horse.name;
     this.speed = 0;
+    this.maxSpeed = horse.speed;
     this.acceleration = 0.2;
     this.maxAcceleration = 0.2;
-    this.maxSpeed = horse.speed;
     this.stamina = horse.stamina ?? 100;
     this.maxStamina = horse.stamina ?? 100;
-    this.currentStamina = this.maxStamina;
     this.reaction = horse.reaction;
     this.segments = segments;
     this.segment = segments[0];
@@ -59,9 +58,9 @@ export class RaceHorse implements Horse {
     this.heading = startDir;
     this.distance = 0;
     this.states = new Map();
-    this.states.set("maintainingPace", new MaintainingPaceState());
-    this.states.set("overtaking", new OvertakingState());
-    this.states.set("blocked", new BlockedState());
+    this.states.set("maintainingPace", new MaintainingPaceState(this));
+    this.states.set("overtaking", new OvertakingState(this));
+    this.states.set("blocked", new BlockedState(this));
     const initialState = this.states.get("maintainingPace")!;
     initialState.enter(this);
   }
@@ -95,36 +94,6 @@ export class RaceHorse implements Horse {
     return this.findDirOnTrackWithRays(closestRaycasts, otherHorses);
   }
 
-  getHorseAvoidanceVector(otherHorses: RaceHorse[]): { x: number; y: number } {
-    let avoidanceVector = { x: 0, y: 0 };
-    const AVOID_DISTANCE = 30;
-    for (const other of otherHorses) {
-      if (other.id === this.id) {
-        continue;
-      }
-      const dx = other.x - this.x;
-      const dy = other.y - this.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      if (distance < AVOID_DISTANCE && distance > 0) {
-        const angleToOther = Math.atan2(dy, dx);
-        let relativeAngle = angleToOther - this.heading;
-        while (relativeAngle <= -Math.PI) {
-          relativeAngle += 2 * Math.PI;
-        }
-        while (relativeAngle > Math.PI) {
-          relativeAngle -= 2 * Math.PI;
-        }
-        if (Math.abs(relativeAngle) < Math.PI / 2) {
-          const forceMagnitude = (1 / (distance * distance)) * 0.5;
-          const forceAngle = angleToOther + Math.PI;
-          avoidanceVector.x += Math.cos(forceAngle) * forceMagnitude;
-          avoidanceVector.y += Math.sin(forceAngle) * forceMagnitude;
-        }
-      }
-    }
-    return avoidanceVector;
-  }
-
   findDirOnTrackWithRays(
     closestRaycasts: RaycastResult[],
     otherHorses: RaceHorse[]
@@ -149,7 +118,7 @@ export class RaceHorse implements Horse {
         }
       }
     }
-    const horseAvoidanceVector = this.getHorseAvoidanceVector(otherHorses);
+    const horseAvoidanceVector = HorseAvoidanceVector(this, otherHorses);
     const RISK_DISTANCE = 20.0;
     let riskWeight = 0;
     if (minDistance < RISK_DISTANCE) {
@@ -171,10 +140,27 @@ export class RaceHorse implements Horse {
     return { moveDir: bestDir, riskWeight };
   }
 
-  getDistanceTo(other: RaceHorse): number {
-    const dx = other.x - this.x;
-    const dy = other.y - this.y;
-    return Math.sqrt(dx * dx + dy * dy);
+  moveOnTrack(otherHorses: RaceHorse[]): void {
+    this.cooldownsTick(1);
+    for (const state of this.states.values()) {
+      state.execute(otherHorses);
+    }
+    if (this.acceleration > 0) {
+      this.stamina -= 0.1;
+    } else {
+      this.stamina += 0.05;
+    }
+    this.stamina = Math.max(0, Math.min(this.stamina, this.maxStamina));
+    const staminaEffect = Math.max(0.3, this.stamina / this.maxStamina);
+    const currentMaxSpeed = this.maxSpeed * staminaEffect;
+    this.speed += this.acceleration;
+    this.speed = Math.max(0, Math.min(this.speed, currentMaxSpeed));
+    this.x += Math.cos(this.heading) * this.speed;
+    this.y += Math.sin(this.heading) * this.speed;
+    this.distance += this.speed;
+    if (this.segment.isEndAt(this.x, this.y)) {
+      this.moveNextSegment();
+    }
   }
 
   findClosestHorseInFront(otherHorses: RaceHorse[]): RaceHorse | null {
@@ -185,7 +171,7 @@ export class RaceHorse implements Horse {
         continue;
       }
       if (other.distance > this.distance) {
-        const distance = this.getDistanceTo(other);
+        const distance = Distance(other, this);
         if (distance < minDistance) {
           minDistance = distance;
           closestHorse = other;
@@ -196,75 +182,47 @@ export class RaceHorse implements Horse {
   }
 
   shouldAttemptOvertake(otherHorse: RaceHorse): boolean {
-    const distanceToTarget = this.getDistanceTo(otherHorse);
+    const distanceToTarget = Distance(otherHorse, this);
     const isCloseEnough = distanceToTarget < 40 && distanceToTarget > 5;
-    const hasEnoughStamina = this.currentStamina > 40;
-    const isNotCurrentlyOvertaking = !this.isStateActive("overtaking");
+    const hasEnoughStamina = this.stamina > 40;
+    const isNotCurrentlyOvertaking = !this.isActiveState("overtaking");
     return isCloseEnough && hasEnoughStamina && isNotCurrentlyOvertaking;
   }
 
-  temporarilyBoostSpeed() {
-    this.acceleration = this.maxAcceleration * 1.5;
-    this.currentStamina -= 0.5;
+  private cooldownsTick(tick: number): void {
+    for (const state of this.states.values()) {
+      state.cooldownTick(tick);
+    }
+  }
+
+  canActivateState(stateName: HorseStateType): boolean {
+    const state = this.states.get(stateName);
+    if (!state) {
+      return false;
+    }
+    return state.isOnCooldown() === false;
   }
 
   activateState(stateName: HorseStateType, data?: any): void {
     const state = this.states.get(stateName);
     if (state && this.canActivateState(stateName)) {
-      state.enter(this, data);
+      state.enter(data);
     }
   }
 
   deactivateState(stateName: HorseStateType): void {
     const state = this.states.get(stateName);
-    if (state && state.isActive) {
-      state.exit(this);
+    if (!state) {
+      return;
     }
+    state.exit();
   }
 
-  isStateActive(stateName: HorseStateType): boolean {
+  isActiveState(stateName: HorseStateType): boolean {
     const state = this.states.get(stateName);
-    return state ? state.isActive : false;
-  }
-
-  canActivateState(stateName: HorseStateType): boolean {
-    const state = this.states.get(stateName);
-    return state ? state.cooldown <= 0 : false;
-  }
-
-  private updateCooldowns(): void {
-    for (const state of this.states.values()) {
-      if (state.cooldown > 0) {
-        state.cooldown--;
-      }
+    if (!state) {
+      return false;
     }
-  }
-
-  moveOnTrack(otherHorses: RaceHorse[]): void {
-    this.updateCooldowns();
-    for (const state of this.states.values()) {
-      if (state.isActive) {
-        state.execute(this, otherHorses);
-      }
-    }
-    if (this.acceleration > 0) {
-      this.currentStamina -= 0.1;
-    } else {
-      this.currentStamina += 0.05;
-    }
-    this.currentStamina = Math.max(
-      0,
-      Math.min(this.currentStamina, this.maxStamina)
-    );
-    const staminaEffect = Math.max(0.3, this.currentStamina / this.maxStamina);
-    const currentMaxSpeed = this.maxSpeed * staminaEffect;
-    this.speed += this.acceleration;
-    this.speed = Math.max(0, Math.min(this.speed, currentMaxSpeed));
-    this.x += Math.cos(this.heading) * this.speed;
-    this.y += Math.sin(this.heading) * this.speed;
-    this.distance += this.speed;
-    if (this.segment.isEndAt(this.x, this.y)) {
-      this.moveNextSegment();
-    }
+    return state.isActiveState();
   }
 }

@@ -1,17 +1,13 @@
+import { RaceHorse } from "./raceHorse";
+
 export type Vector2D = { x: number; y: number };
 
 export const EPSILON = 1e-10;
 
-export function getOuterGuardrail(
-  innerPoints: Vector2D[],
-  offset: number
-): Vector2D[] {
-  return innerPoints.map((pt: Vector2D, i: number) => {
-    const prev = innerPoints[i === 0 ? innerPoints.length - 1 : i - 1];
-    const next = innerPoints[(i + 1) % innerPoints.length];
-    const n = NormalVector(prev, next);
-    return { x: pt.x + n.x * offset, y: pt.y + n.y * offset };
-  });
+export function Distance(a: Vector2D, b: Vector2D): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  return Math.sqrt(dx * dx + dy * dy);
 }
 
 export function NormalVector(a: Vector2D, b: Vector2D): Vector2D {
@@ -29,6 +25,11 @@ export function Lerp(a: Vector2D, b: Vector2D, t: number): Vector2D {
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }
 
+export function LerpAngle(a: number, b: number, t: number): number {
+  const diff = Math.atan2(Math.sin(b - a), Math.cos(b - a));
+  return a + diff * t;
+}
+
 export function ProjectOnSegment(
   x: number,
   y: number,
@@ -43,6 +44,18 @@ export function ProjectOnSegment(
   }
   let t = ((x - a.x) * dx + (y - a.y) * dy) / len2;
   return Math.max(0, Math.min(1, t));
+}
+
+export function OuterGuardrail(
+  innerPoints: Vector2D[],
+  offset: number
+): Vector2D[] {
+  return innerPoints.map((pt: Vector2D, i: number) => {
+    const prev = innerPoints[i === 0 ? innerPoints.length - 1 : i - 1];
+    const next = innerPoints[(i + 1) % innerPoints.length];
+    const n = NormalVector(prev, next);
+    return { x: pt.x + n.x * offset, y: pt.y + n.y * offset };
+  });
 }
 
 export function IntersectCircleLineNear(
@@ -89,7 +102,35 @@ export function IsAngleBetween(
   }
 }
 
-export function lerpAngle(a: number, b: number, t: number): number {
-  const diff = Math.atan2(Math.sin(b - a), Math.cos(b - a));
-  return a + diff * t;
+export function HorseAvoidanceVector(
+  horse: RaceHorse,
+  otherHorses: RaceHorse[]
+): Vector2D {
+  let avoidanceVector = { x: 0, y: 0 };
+  const AVOID_DISTANCE = 30;
+  for (const other of otherHorses) {
+    if (other.id === horse.id) {
+      continue;
+    }
+    const distance = Distance(other, horse);
+    if (0 < distance && distance < AVOID_DISTANCE) {
+      const dx = other.x - horse.x;
+      const dy = other.y - horse.y;
+      const angleToOther = Math.atan2(dy, dx);
+      let relativeAngle = angleToOther - horse.heading;
+      while (relativeAngle <= -Math.PI) {
+        relativeAngle += 2 * Math.PI;
+      }
+      while (relativeAngle > Math.PI) {
+        relativeAngle -= 2 * Math.PI;
+      }
+      if (Math.abs(relativeAngle) < Math.PI / 2) {
+        const forceMagnitude = (1 / (distance * distance)) * 0.5;
+        const forceAngle = angleToOther + Math.PI;
+        avoidanceVector.x += Math.cos(forceAngle) * forceMagnitude;
+        avoidanceVector.y += Math.sin(forceAngle) * forceMagnitude;
+      }
+    }
+  }
+  return avoidanceVector;
 }

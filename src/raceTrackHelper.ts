@@ -8,12 +8,7 @@ import {
   createLineFromSegment,
   RaceLine,
 } from "./raceLine";
-import {
-  Lerp,
-  getOuterGuardrail as OuterGuardrail,
-  ProjectOnSegment,
-  Vector2D,
-} from "./raceMath";
+import { Lerp, OuterGuardrail, ProjectOnSegment, Vector2D } from "./raceMath";
 import { RaceSegment } from "./raceSegment";
 
 export const LINE_LENGTHS = [300, 350, 400, 450];

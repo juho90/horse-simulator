@@ -1,54 +1,64 @@
 import { RaceHorse } from "../raceHorse";
-import { lerpAngle } from "../raceMath";
-import { HorseState, HorseStateType } from "./horseState";
+import { Distance } from "../raceMath";
+import { HorseState } from "./horseState";
 
-export class OvertakingState implements HorseState {
-  readonly name: HorseStateType = "overtaking";
-  isActive: boolean = false;
-  cooldown: number = 0;
-  private target!: RaceHorse;
+export class OvertakingState extends HorseState {
+  private readonly MAX_OVERTAKE_TURNS = 10;
+  private readonly OVERTAKE_COOLDOWN = 80;
+  private target: RaceHorse | null = null;
   private overtakeTurns: number = 0;
-  private readonly MAX_OVERTAKE_TURNS = 150; // Increased duration
-  private readonly OVERTAKE_COOLDOWN = 200; // Cooldown after attempting
+  private overtakeSpeedBoost: number = 0;
 
-  enter(horse: RaceHorse, data: { target: RaceHorse }): void {
-    this.isActive = true;
-    this.target = data.target;
+  constructor(horse: RaceHorse) {
+    super("overtaking", horse);
+    this.cooldown = 0;
     this.overtakeTurns = 0;
-    horse.temporarilyBoostSpeed(); // Boost speed upon entering state
   }
 
-  execute(horse: RaceHorse, otherHorses: RaceHorse[]): void {
-    this.overtakeTurns++;
-
-    const distanceToTarget = horse.getDistanceTo(this.target);
-    // Exit conditions
-    if (
-      horse.distance > this.target.distance || // Successfully overtaken
-      distanceToTarget > 60 || // Target is too far
-      this.overtakeTurns > this.MAX_OVERTAKE_TURNS || // Timed out
-      horse.currentStamina < 20 // Too tired
-    ) {
-      horse.deactivateState(this.name);
+  enter(target?: RaceHorse): void {
+    if (this.isActiveState()) {
       return;
     }
-
-    // Continue boost
-    horse.temporarilyBoostSpeed();
-
-    // Direction logic
-    const { moveDir } = horse.findDirOnTrack(otherHorses);
-    const angleToTarget = Math.atan2(
-      this.target.y - horse.y,
-      this.target.x - horse.x
-    );
-    const finalDir = lerpAngle(moveDir, angleToTarget, 0.2); // Stronger pull towards target
-    horse.heading = lerpAngle(horse.heading, finalDir, 0.5);
+    this.isActive = true;
+    this.target = target!;
+    this.overtakeTurns = 0;
+    this.overtakeSpeedBoost = this.horse.maxAcceleration * 1.5;
+    this.horse.maxAcceleration += this.overtakeSpeedBoost;
   }
 
-  exit(horse: RaceHorse): void {
+  execute(otherHorses: RaceHorse[]): void {
+    if (this.isActiveState() === false) {
+      return;
+    }
+    if (!this.target) {
+      this.horse.deactivateState(this.name);
+      return;
+    }
+    this.overtakeTurns++;
+    const distanceToTarget = Distance(this.target, this.horse);
+    if (
+      this.horse.distance > this.target.distance ||
+      distanceToTarget > 60 ||
+      this.overtakeTurns > this.MAX_OVERTAKE_TURNS ||
+      this.horse.stamina < 20
+    ) {
+      this.horse.deactivateState(this.name);
+      return;
+    }
+    this.horse.stamina -= 0.5;
+  }
+
+  exit(): void {
+    if (this.isActiveState() === false) {
+      return;
+    }
+    this.target = null;
     this.isActive = false;
-    // Set a cooldown for the overtaking state when we exit
     this.cooldown = this.OVERTAKE_COOLDOWN;
+    this.horse.maxAcceleration = Math.max(
+      0,
+      this.overtakeSpeedBoost - this.overtakeSpeedBoost
+    );
+    this.overtakeSpeedBoost = 0;
   }
 }

@@ -1,65 +1,68 @@
 import type { RaceHorse } from "../raceHorse";
-import { lerpAngle } from "../raceMath";
-import { HorseState, HorseStateType } from "./horseState";
+import { LerpAngle } from "../raceMath";
+import { HorseState } from "./horseState";
 
-export class MaintainingPaceState implements HorseState {
-  readonly name: HorseStateType = "maintainingPace";
-  isActive: boolean = false;
-  cooldown: number = 0;
+export class MaintainingPaceState extends HorseState {
+  constructor(horse: RaceHorse) {
+    super("maintainingPace", horse);
+  }
 
-  enter(horse: RaceHorse): void {
-    // This state is active by default
+  enter(): void {
+    if (this.isActiveState()) {
+      return;
+    }
     this.isActive = true;
   }
 
-  exit(horse: RaceHorse): void {
-    this.isActive = false;
-  }
-
-  execute(horse: RaceHorse, otherHorses: RaceHorse[]): void {
-    // Check for overtaking opportunity
-    const horseInFront = horse.findClosestHorseInFront(otherHorses);
-    if (
-      horse.canActivateState("overtaking") &&
-      horseInFront &&
-      horse.shouldAttemptOvertake(horseInFront)
-    ) {
-      horse.activateState("overtaking", { target: horseInFront });
-      // Note: We don't return, as MaintainingPace continues to run alongside Overtaking
+  execute(otherHorses: RaceHorse[]): void {
+    if (this.isActiveState() === false) {
+      return;
     }
-
-    const { moveDir, riskWeight } = horse.findDirOnTrack(otherHorses);
-    horse.riskLevel = riskWeight;
+    const horseInFront = this.horse.findClosestHorseInFront(otherHorses);
+    if (
+      this.horse.canActivateState("overtaking") &&
+      horseInFront &&
+      this.horse.shouldAttemptOvertake(horseInFront)
+    ) {
+      this.horse.activateState("overtaking", { target: horseInFront });
+    }
+    const { moveDir, riskWeight } = this.horse.findDirOnTrack(otherHorses);
+    this.horse.riskLevel = riskWeight;
 
     let cornerAnticipationFactor = 0;
     const LOOK_AHEAD_DISTANCE = 150;
     if (
-      horse.farthestRaycast &&
-      horse.farthestRaycast.hitDistance < LOOK_AHEAD_DISTANCE
+      this.horse.farthestRaycast &&
+      this.horse.farthestRaycast.hitDistance < LOOK_AHEAD_DISTANCE
     ) {
       cornerAnticipationFactor = Math.pow(
-        1 - horse.farthestRaycast.hitDistance / LOOK_AHEAD_DISTANCE,
+        1 - this.horse.farthestRaycast.hitDistance / LOOK_AHEAD_DISTANCE,
         2
       );
     }
-
     const speedReduction = Math.max(
       riskWeight * 0.5,
       cornerAnticipationFactor * 0.7
     );
-
     const staminaEffect = Math.max(
       0.3,
-      horse.currentStamina / horse.maxStamina
+      this.horse.stamina / this.horse.maxStamina
     );
-    const currentMaxSpeed = horse.maxSpeed * staminaEffect;
+    const currentMaxSpeed = this.horse.maxSpeed * staminaEffect;
     const targetSpeed = currentMaxSpeed * (1 - speedReduction);
 
-    if (horse.speed > targetSpeed) {
-      horse.acceleration = -horse.maxAcceleration;
+    if (this.horse.speed > targetSpeed) {
+      this.horse.acceleration = -this.horse.maxAcceleration;
     } else {
-      horse.acceleration = horse.maxAcceleration;
+      this.horse.acceleration = this.horse.maxAcceleration;
     }
-    horse.heading = lerpAngle(horse.heading, moveDir, 0.4);
+    this.horse.heading = LerpAngle(this.horse.heading, moveDir, 0.4);
+  }
+
+  exit(): void {
+    if (this.isActiveState() === false) {
+      return;
+    }
+    this.isActive = false;
   }
 }

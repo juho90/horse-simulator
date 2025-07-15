@@ -1,27 +1,32 @@
 import type { RaceHorse } from "../raceHorse";
-import { HorseState, HorseStateType } from "./horseState";
+import { HorseState } from "./horseState";
 
-export class BlockedState implements HorseState {
-  readonly name: HorseStateType = "blocked";
-  isActive: boolean = false;
-  cooldown: number = 0;
+export class BlockedState extends HorseState {
+  constructor(horse: RaceHorse) {
+    super("blocked", horse);
+  }
 
-  enter(horse: RaceHorse): void {
+  enter(): void {
+    if (this.isActiveState()) {
+      return;
+    }
     this.isActive = true;
   }
 
-  exit(horse: RaceHorse): void {
-    this.isActive = false;
+  execute(otherHorses: RaceHorse[]): void {
+    if (this.isActiveState() === false) {
+      return;
+    }
+    this.horse.deactivateState(this.name);
+    if (this.horse.canActivateState("maintainingPace")) {
+      this.horse.activateState("maintainingPace");
+    }
   }
 
-  execute(horse: RaceHorse, otherHorses: RaceHorse[]): void {
-    // Logic for when the horse is blocked
-    // e.g., slow down, look for a gap
-
-    // For now, just deactivate self and activate maintaining pace
-    horse.deactivateState(this.name);
-    if (horse.canActivateState("maintainingPace")) {
-      horse.activateState("maintainingPace");
+  exit(): void {
+    if (this.isActiveState() === false) {
+      return;
     }
+    this.isActive = false;
   }
 }
