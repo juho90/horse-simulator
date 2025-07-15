@@ -12,8 +12,8 @@ export class RaceHorse implements Horse {
   name: string;
   speed: number;
   maxSpeed: number;
-  acceleration: number;
-  maxAcceleration: number;
+  accel: number;
+  maxAccel: number;
   stamina: number;
   maxStamina: number;
   reaction?: number;
@@ -35,8 +35,8 @@ export class RaceHorse implements Horse {
     this.name = horse.name;
     this.speed = 0;
     this.maxSpeed = horse.speed;
-    this.acceleration = 0.2;
-    this.maxAcceleration = 0.2;
+    this.accel = 0.2;
+    this.maxAccel = 0.2;
     this.stamina = horse.stamina ?? 100;
     this.maxStamina = horse.stamina ?? 100;
     this.reaction = horse.reaction;
@@ -145,15 +145,17 @@ export class RaceHorse implements Horse {
     for (const state of this.states.values()) {
       state.execute(otherHorses);
     }
-    if (this.acceleration > 0) {
+    if (this.accel > 0) {
       this.stamina -= 0.1;
     } else {
       this.stamina += 0.05;
     }
     this.stamina = Math.max(0, Math.min(this.stamina, this.maxStamina));
-    const staminaEffect = Math.max(0.3, this.stamina / this.maxStamina);
+    const staminaRatio = this.stamina / this.maxStamina;
+    const staminaEffect =
+      staminaRatio >= 0.5 ? 1.0 : Math.max(0.3, staminaRatio * 2);
     const currentMaxSpeed = this.maxSpeed * staminaEffect;
-    this.speed += this.acceleration;
+    this.speed += this.accel;
     this.speed = Math.max(0, Math.min(this.speed, currentMaxSpeed));
     this.x += Math.cos(this.heading) * this.speed;
     this.y += Math.sin(this.heading) * this.speed;

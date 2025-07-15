@@ -22,8 +22,8 @@ export class OvertakingState extends HorseState {
     this.isActive = true;
     this.target = target!;
     this.overtakeTurns = 0;
-    this.overtakeSpeedBoost = this.horse.maxAcceleration * 1.5;
-    this.horse.maxAcceleration += this.overtakeSpeedBoost;
+    this.overtakeSpeedBoost = this.horse.maxAccel * 1.5;
+    this.horse.maxAccel += this.overtakeSpeedBoost;
   }
 
   execute(otherHorses: RaceHorse[]): void {
@@ -55,10 +55,11 @@ export class OvertakingState extends HorseState {
     this.target = null;
     this.isActive = false;
     this.cooldown = this.OVERTAKE_COOLDOWN;
-    this.horse.maxAcceleration = Math.max(
+    const newMaxAccel = Math.max(
       0,
-      this.overtakeSpeedBoost - this.overtakeSpeedBoost
+      this.horse.maxAccel - this.overtakeSpeedBoost
     );
+    this.horse.maxAccel = newMaxAccel;
     this.overtakeSpeedBoost = 0;
   }
 }

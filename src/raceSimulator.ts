@@ -200,6 +200,7 @@ export function runRaceSimulator(
           x: horse.x,
           y: horse.y,
           speed: horse.speed,
+          stamina: horse.stamina,
           dist: horse.distance,
           closestHitPoints: horse.closestRaycasts?.map((r) => r.hitPoint),
           farthestHitPoint: horse.farthestRaycast?.hitPoint,

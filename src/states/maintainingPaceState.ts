@@ -52,9 +52,9 @@ export class MaintainingPaceState extends HorseState {
     const targetSpeed = currentMaxSpeed * (1 - speedReduction);
 
     if (this.horse.speed > targetSpeed) {
-      this.horse.acceleration = -this.horse.maxAcceleration;
+      this.horse.accel = -this.horse.maxAccel;
     } else {
-      this.horse.acceleration = this.horse.maxAcceleration;
+      this.horse.accel = this.horse.maxAccel;
     }
     this.horse.heading = LerpAngle(this.horse.heading, moveDir, 0.4);
   }
