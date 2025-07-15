@@ -60,7 +60,7 @@ export class RaceHorse {
       this.segment.start.x,
       this.segment.start.y
     );
-    const gateOffset = (this.gate + 1) * 5;
+    const gateOffset = (this.gate + 1) * 10;
     this.x = this.segment.start.x + ortho.x * gateOffset;
     this.y = this.segment.start.y + ortho.y * gateOffset;
 

@@ -4,11 +4,18 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Debug TypeScript",
+      "name": "Horse Simulator",
       "program": "${workspaceFolder}/src/main.ts",
+      "args": [],
       "runtimeArgs": ["-r", "ts-node/register"],
       "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal"
+      "console": "integratedTerminal",
+      "restart": true,
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "sourceMaps": true,
+      "outFiles": []
     }
   ]
 }

@@ -12,8 +12,8 @@ import { Lerp, OuterGuardrail, ProjectOnSegment, Vector2D } from "./raceMath";
 import { RaceSegment } from "./raceSegment";
 
 export const LINE_LENGTHS = [300, 350, 400, 450];
-export const CORNER_ANGLES = [Math.PI / 6, Math.PI / 4, Math.PI / 2];
-export const CORNER_RADIUS = [150, 200, 250, 300];
+export const CORNER_ANGLES = [Math.PI / 5, Math.PI / 4, Math.PI / 3];
+export const CORNER_RADIUS = [200, 250, 300];
 
 export interface RaceTrackHint {
   type: "line" | "corner";
