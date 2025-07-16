@@ -167,15 +167,8 @@ export function raycastBoundary(
   return { closestRaycasts, farthestRaycast };
 }
 
-export function runRaceSimulator(
-  track: RaceTrack,
-  horses: Horse[],
-  raceDistance?: number
-): RaceLog[] {
+export function runRaceSimulator(track: RaceTrack, horses: Horse[]): RaceLog[] {
   const logs: RaceLog[] = [];
-  const totalLaps = Math.ceil(
-    (raceDistance ?? track.totalLength) / track.totalLength
-  );
   let turn = 0;
   const maxTurns = 300;
   const segments = track.segments || [];
@@ -190,7 +183,7 @@ export function runRaceSimulator(
         const horse = raceHorses[index];
         if (!horse.finished) {
           horse.moveOnTrack(raceHorses);
-          if (horse.lap >= totalLaps && horse.segmentIndex === 0) {
+          if (track.isGoal(horse)) {
             horse.finished = true;
           }
         }

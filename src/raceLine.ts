@@ -21,6 +21,16 @@ export class RaceLine extends RaceSegment {
     };
   }
 
+  getProgress(x: number, y: number): number {
+    const directionX = this.end.x - this.start.x;
+    const directionY = this.end.y - this.start.y;
+    const positionX = x - this.start.x;
+    const positionY = y - this.start.y;
+    const projectedDistance =
+      (positionX * directionX + positionY * directionY) / this.length;
+    return Math.max(0, Math.min(this.length, projectedDistance));
+  }
+
   getTangentDirectionAt(x: number, y: number): number {
     return Math.atan2(this.end.y - this.start.y, this.end.x - this.start.x);
   }

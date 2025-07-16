@@ -30,7 +30,7 @@ export function displayTrackInfo(track: RaceTrack) {
     `트랙 크기: ${track.width.toFixed(1)} x ${track.height.toFixed(1)}`
   );
   console.log(
-    `총 길이: ${track.totalLength}m (${(track.totalLength / 1000).toFixed(
+    `총 길이: ${track.trackLength}m (${(track.trackLength / 1000).toFixed(
       1
     )}km)`
   );
@@ -120,36 +120,9 @@ export function displayRaceResults(
     };
   }
 
-  function compareHorseResults(a: any, b: any): number {
-    if (a.finishTurn !== null && b.finishTurn !== null) {
-      return a.finishTurn - b.finishTurn;
-    }
-    if (a.finishTurn !== null) return -1;
-    if (b.finishTurn !== null) return 1;
-    return b.finalDistance - a.finalDistance;
-  }
-
   const horseResults: any[] = [];
   for (const horse of horses) {
     horseResults.push(mapHorseToResult(horse));
-  }
-
-  horseResults.sort(compareHorseResults);
-
-  function displayHorseRank(horse: any, index: number): void {
-    const status =
-      horse.finishTurn !== null
-        ? `완주 (${horse.finishTurn + 1}턴)`
-        : `미완주 (${horse.finalDistance.toFixed(0)}m)`;
-    console.log(
-      `${index + 1}위: ${horse.name} - 속도: ${horse.speed.toFixed(
-        2
-      )}m/턴, ${status}`
-    );
-  }
-
-  for (let i = 0; i < horseResults.length; i++) {
-    displayHorseRank(horseResults[i], i);
   }
 }
 

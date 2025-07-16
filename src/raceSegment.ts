@@ -25,6 +25,7 @@ export abstract class RaceSegment {
   protected abstract calculateLength(): number;
 
   abstract getBounds(): BoundingBox;
+  abstract getProgress(x: number, y: number): number;
   abstract getTangentDirectionAt(x: number, y: number): number;
   abstract getEndTangentDirection(): number;
   abstract isInner(x: number, y: number): boolean;

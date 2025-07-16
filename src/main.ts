@@ -8,13 +8,12 @@ import { generateRaceWebGLHtml } from "./raceViewerWebGL";
 function main() {
   const segmentCount = Math.floor(Math.random() * 12) + 6;
   const track = createTrack(segmentCount);
-  const targetRaceDistance = track.totalLength * 3;
   const horses = createSampleHorses();
-  const logs = runRaceSimulator(track, horses, track.totalLength * 3);
+  const logs = runRaceSimulator(track, horses);
   const outPath = path.resolve(__dirname, "../race-result.html");
   generateRaceWebGLHtml(outPath, logs, track);
   displayTrackInfo(track);
-  displayRaceResults(horses, logs, targetRaceDistance);
+  displayRaceResults(horses, logs, track.raceLength);
 }
 
 /*

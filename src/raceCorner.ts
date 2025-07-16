@@ -48,6 +48,17 @@ export class RaceCorner extends RaceSegment {
     };
   }
 
+  getProgress(x: number, y: number): number {
+    const currentAngle = Math.atan2(y - this.center.y, x - this.center.x);
+    let angleDifference = currentAngle - this.startAngle;
+    angleDifference =
+      ((angleDifference % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    const totalAngle = Math.abs(this.angle);
+    angleDifference = Math.min(angleDifference, totalAngle);
+    const progressDistance = this.radius * angleDifference;
+    return Math.max(0, Math.min(this.length, progressDistance));
+  }
+
   getTangentDirectionAt(x: number, y: number): number {
     const angle = Math.atan2(y - this.center.y, x - this.center.x);
     return angle + Math.PI / 2;

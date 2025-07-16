@@ -1,3 +1,4 @@
+import { RaceHorse } from "./raceHorse";
 import { RaceSegment } from "./raceSegment";
 import { generateClosedTrackSegments } from "./raceTrackHelper";
 
@@ -5,13 +6,49 @@ export class RaceTrack {
   width: number;
   height: number;
   segments: RaceSegment[];
-  totalLength: number;
+  trackLength: number;
+  raceLength: number;
+  totalLaps: number;
+  private goalSegmentIndex: number;
+  private goalSegmentProgress: number;
 
-  constructor(width: number, height: number, segments: RaceSegment[]) {
+  constructor(
+    width: number,
+    height: number,
+    segments: RaceSegment[],
+    raceLength: number | null = null
+  ) {
     this.width = width;
     this.height = height;
     this.segments = segments;
-    this.totalLength = this.segments.reduce((sum, seg) => sum + seg.length, 0);
+    this.trackLength = this.segments.reduce((sum, seg) => sum + seg.length, 0);
+    if (raceLength === null) {
+      const minMultiplier = 0.8;
+      const maxMultiplier = 2.0;
+      const randomMultiplier =
+        minMultiplier + Math.random() * (maxMultiplier - minMultiplier);
+      this.raceLength =
+        Math.round((this.trackLength * randomMultiplier) / 100) * 100;
+    } else {
+      this.raceLength = raceLength;
+    }
+    const totalLaps = Math.floor(this.raceLength / this.trackLength);
+    this.totalLaps = totalLaps;
+    const remainingDistance = this.raceLength % this.trackLength;
+    let goalSegmentIndex = 0;
+    let goalSegmentProgress = 0;
+    let accumulatedLength = 0;
+    for (let i = 0; i < this.segments.length; i++) {
+      const segmentLength = this.segments[i].length;
+      if (accumulatedLength + segmentLength >= remainingDistance) {
+        goalSegmentIndex = i;
+        goalSegmentProgress = remainingDistance - accumulatedLength;
+        break;
+      }
+      accumulatedLength += segmentLength;
+    }
+    this.goalSegmentIndex = goalSegmentIndex;
+    this.goalSegmentProgress = goalSegmentProgress;
   }
 
   getFirstSegment(): RaceSegment {
@@ -26,6 +63,21 @@ export class RaceTrack {
       throw new Error("트랙에 세그먼트가 없습니다.");
     }
     return this.segments[this.segments.length - 1];
+  }
+
+  isGoal(horse: RaceHorse): boolean {
+    const hasCompletedRequiredLaps = horse.lap >= this.totalLaps;
+    const isInTargetSegment = horse.segmentIndex === this.goalSegmentIndex;
+    if (hasCompletedRequiredLaps && isInTargetSegment) {
+      const currentPositionInSegment = horse.segment.getProgress(
+        horse.x,
+        horse.y
+      );
+      if (currentPositionInSegment >= this.goalSegmentProgress) {
+        return true;
+      }
+    }
+    return false;
   }
 }
 
