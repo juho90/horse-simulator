@@ -160,6 +160,11 @@ export class RaceHorse {
       this.stamina -= this.staminaConsumption;
     } else if (this.speed > 0) {
       this.stamina -= this.staminaConsumption * 0.5;
+    } else {
+      this.stamina += this.staminaRecovery * 2;
+    }
+    if (this.accel < 0) {
+      this.stamina += this.staminaRecovery * 0.5;
     }
     this.stamina = Math.max(0, Math.min(this.stamina, this.maxStamina));
     const staminaRatio = this.stamina / this.maxStamina;
@@ -168,6 +173,14 @@ export class RaceHorse {
     const currentMaxSpeed = this.maxSpeed * staminaEffect;
     this.speed += this.accel;
     this.speed = Math.max(0, Math.min(this.speed, currentMaxSpeed));
+    if (
+      staminaRatio > 0.6 &&
+      this.speed < currentMaxSpeed * 0.85 &&
+      this.accel >= 0
+    ) {
+      const recoveryAccel = this.maxAccel * 0.5;
+      this.speed = Math.min(this.speed + recoveryAccel, currentMaxSpeed);
+    }
     this.x += Math.cos(this.raceHeading) * this.speed;
     this.y += Math.sin(this.raceHeading) * this.speed;
     this.raceDistance += this.speed;
