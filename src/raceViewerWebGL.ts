@@ -51,7 +51,6 @@ export function generateRaceWebGLHtml(
     "#8e44ad",
     "#2c3e50",
   ];
-  // centerLinePoints: {x, y, color}
   const centerLinePoints: { x: number; y: number; color: string }[] = [];
   for (const segment of segments) {
     if (segment.type === "line") {
@@ -80,6 +79,7 @@ export function generateRaceWebGLHtml(
     y: segments[segments.length - 1].end.y,
     color: "#000000",
   });
+  const goalPosition = track.getGoalPosition();
   const js = `
     const logs = ${JSON.stringify(logs)};
     const trackPoints = ${JSON.stringify(
@@ -89,6 +89,10 @@ export function generateRaceWebGLHtml(
         color: p.color,
       }))
     )};
+    const goalPosition = ${JSON.stringify({
+      x: goalPosition.x - minX,
+      y: goalPosition.y - minY,
+    })}; 
     const horseColors = ${JSON.stringify(horseColors)};
     const canvas = document.getElementById('race-canvas');
     const ctx = canvas.getContext('2d');
@@ -107,8 +111,7 @@ export function generateRaceWebGLHtml(
         ctx.strokeStyle = trackPoints[i - 1].color;
         ctx.lineWidth = 2;
         ctx.stroke();
-      }
-      // START/GOAL 마커
+      } 
       ctx.beginPath();
       ctx.arc(trackPoints[0].x, trackPoints[0].y, 12, 0, 2 * Math.PI);
       ctx.fillStyle = '#27ae60';
@@ -119,16 +122,15 @@ export function generateRaceWebGLHtml(
       ctx.fillStyle = '#fff';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('START', trackPoints[0].x, trackPoints[0].y - 18);
+      ctx.fillText('START', trackPoints[0].x, trackPoints[0].y - 18); 
       ctx.beginPath();
-      ctx.arc(trackPoints[trackPoints.length-1].x, trackPoints[trackPoints.length-1].y, 12, 0, 2 * Math.PI);
+      ctx.arc(goalPosition.x, goalPosition.y, 12, 0, 2 * Math.PI);
       ctx.fillStyle = '#c0392b';
       ctx.fill();
       ctx.strokeStyle = '#222';
       ctx.stroke();
       ctx.fillStyle = '#fff';
-      ctx.fillText('GOAL', trackPoints[trackPoints.length-1].x, trackPoints[trackPoints.length-1].y - 18);
-      ctx.restore();
+      ctx.fillText('GOAL', goalPosition.x, goalPosition.y - 18); 
     } 
     function drawBoundaryPoints() {
       for (let t = 0; t < logs.length; t++) {

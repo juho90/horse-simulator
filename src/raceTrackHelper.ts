@@ -12,8 +12,8 @@ import { Lerp, OuterGuardrail, ProjectOnSegment, Vector2D } from "./raceMath";
 import { RaceSegment } from "./raceSegment";
 
 export const LINE_LENGTHS = [300, 350, 400, 450];
-export const CORNER_ANGLES = [Math.PI / 5, Math.PI / 4, Math.PI / 3];
-export const CORNER_RADIUS = [200, 250, 300];
+export const CORNER_ANGLES = [Math.PI / 4, Math.PI / 3, Math.PI / 2];
+export const CORNER_RADIUS = [250, 275, 300, 325];
 
 export interface RaceTrackHint {
   type: "line" | "corner";
@@ -25,12 +25,12 @@ export interface RaceTrackHint {
 export function generateTrackPatternClosed(
   segmentCount: number
 ): RaceTrackHint[] {
-  if (segmentCount < 3) throw new Error("segmentCount는 3 이상이어야 합니다.");
-  // 항상 [line, corner, ... , corner, line] 패턴만 허용
-  // 첫 세그먼트는 무조건 직선
+  if (segmentCount < 3) {
+    throw new Error("segmentCount는 3 이상이어야 합니다.");
+  }
   const pattern: RaceTrackHint[] = [];
   let remainAngle = 2 * Math.PI;
-  let cornerCount = Math.floor((segmentCount - 2) / 2) + 1; // 최소 1개
+  let cornerCount = Math.floor((segmentCount - 2) / 2) + 1;
   let lineCount = segmentCount - cornerCount;
   pattern.push({
     type: "line",
@@ -66,25 +66,103 @@ export function generateTrackPatternClosed(
   }
   for (let i = pattern.length - 2; i > 0; i--) {
     if (pattern[i].type === "corner" && remainAngle > 1e-6) {
-      pattern[i].angle = (pattern[i].angle ?? 0) + remainAngle;
-      break;
+      const maxAdditionalAngle = Math.PI / 2;
+      const additionalAngle = Math.min(remainAngle, maxAdditionalAngle);
+      pattern[i].angle = (pattern[i].angle ?? 0) + additionalAngle;
+      remainAngle -= additionalAngle;
+      if (remainAngle <= 1e-6) break;
+    }
+  }
+  if (remainAngle > 1e-6) {
+    const numSmallCorners = Math.ceil(remainAngle / (Math.PI / 6));
+    const smallAngle = remainAngle / numSmallCorners;
+    for (let j = 0; j < numSmallCorners && remainAngle > 1e-6; j++) {
+      for (let i = pattern.length - 2; i > 0; i--) {
+        if (pattern[i].type === "corner" && remainAngle > 1e-6) {
+          const currentAngle = pattern[i].angle ?? 0;
+          const maxTotal = Math.PI;
+          if (currentAngle < maxTotal) {
+            const addAngle = Math.min(
+              smallAngle,
+              maxTotal - currentAngle,
+              remainAngle
+            );
+            pattern[i].angle = currentAngle + addAngle;
+            remainAngle -= addAngle;
+          }
+        }
+      }
+    }
+  }
+  const getTotalAngle = () => {
+    return pattern.reduce((total, seg) => {
+      return seg.type === "corner" ? total + (seg.angle ?? 0) : total;
+    }, 0);
+  };
+  for (let i = 1; i < pattern.length; i++) {
+    if (pattern[i].type === "line" && pattern[i - 1].type === "line") {
+      const currentTotal = getTotalAngle();
+      const availableAngle = 2 * Math.PI - currentTotal;
+      if (availableAngle > Math.PI / 6) {
+        const newAngle = Math.min(
+          CORNER_ANGLES[Math.floor(Math.random() * CORNER_ANGLES.length)],
+          availableAngle
+        );
+        pattern[i - 1] = {
+          type: "corner",
+          radius:
+            CORNER_RADIUS[Math.floor(Math.random() * CORNER_RADIUS.length)],
+          angle: newAngle,
+        };
+      }
     }
   }
   for (let i = 1; i < pattern.length; i++) {
-    if (pattern[i].type === "line" && pattern[i - 1].type === "line") {
-      pattern[i - 1] = {
-        type: "corner",
-        radius: CORNER_RADIUS[Math.floor(Math.random() * CORNER_RADIUS.length)],
-        angle: CORNER_ANGLES[Math.floor(Math.random() * CORNER_ANGLES.length)],
+    if (pattern[i].type === "corner" && pattern[i - 1].type === "corner") {
+      pattern[i] = {
+        type: "line",
+        length: LINE_LENGTHS[Math.floor(Math.random() * LINE_LENGTHS.length)],
       };
     }
   }
-  // 첫 세그먼트가 반드시 직선인지 최종 보장
+  for (let i = 0; i < pattern.length; i++) {
+    const prev = pattern[(i - 1 + pattern.length) % pattern.length];
+    const curr = pattern[i];
+    const next = pattern[(i + 1) % pattern.length];
+    if (
+      prev.type === "corner" &&
+      curr.type === "corner" &&
+      next.type === "corner"
+    ) {
+      curr.type = "line";
+      curr.length =
+        LINE_LENGTHS[Math.floor(Math.random() * LINE_LENGTHS.length)];
+      delete curr.radius;
+      delete curr.angle;
+    }
+  }
+  for (let i = 1; i < pattern.length; i++) {
+    if (pattern[i].type === "corner" && pattern[i - 1].type === "corner") {
+      pattern[i] = {
+        type: "line",
+        length: LINE_LENGTHS[Math.floor(Math.random() * LINE_LENGTHS.length)],
+      };
+    }
+  }
   if (pattern[0].type !== "line") {
     pattern[0] = {
       type: "line",
       length: LINE_LENGTHS[Math.floor(Math.random() * LINE_LENGTHS.length)],
     };
+  }
+  const finalTotalAngle = getTotalAngle();
+  if (finalTotalAngle > 2 * Math.PI + 1e-6) {
+    const scaleFactor = (2 * Math.PI) / finalTotalAngle;
+    for (let i = 0; i < pattern.length; i++) {
+      if (pattern[i].type === "corner" && pattern[i].angle) {
+        pattern[i].angle = pattern[i].angle! * scaleFactor;
+      }
+    }
   }
   return pattern;
 }
@@ -98,7 +176,6 @@ export function generateClosedTrackSegments(
   const pattern = generateTrackPatternClosed(segmentCount);
   const segments: RaceSegment[] = [];
   let prevSegment: RaceSegment | null = null;
-  let firstSegment: RaceSegment | null = null;
   for (let i = 0; i < pattern.length - 2; i++) {
     const hint = pattern[i];
     if (hint.type === "line") {
@@ -107,7 +184,6 @@ export function generateClosedTrackSegments(
         segment = createLineFromSegment(prevSegment, hint.length!);
       } else {
         segment = createHorizontalLine(hint.length!);
-        firstSegment = segment;
       }
       segments.push(segment);
       prevSegment = segment;
@@ -119,7 +195,6 @@ export function generateClosedTrackSegments(
         segment = createCornerFromSegment(prevSegment, radius, angle);
       } else {
         segment = createHorizontalCorner(radius, angle);
-        firstSegment = segment;
       }
       segments.push(segment);
       prevSegment = segment;
@@ -175,14 +250,29 @@ export function generateClosedTrackSegments(
   }
   if (bestCorner && bestLine) {
     segments.push(bestCorner);
-    segments.push(bestLine);
+    const exactDistance = Math.hypot(
+      bestCorner.end.x - startPt.x,
+      bestCorner.end.y - startPt.y
+    );
+    const finalLine = new RaceLine(bestCorner.end, startPt);
+    if (Math.abs(finalLine.length - exactDistance) > 1e-6) {
+      finalLine.length = exactDistance;
+    }
+    segments.push(finalLine);
   } else {
     const angle = lastHint.angle ?? Math.PI / 4;
     const radius = lastHint.radius ?? 100;
     const corner = createCornerFromSegment(preLast, radius, angle);
-    const line = new RaceLine(corner.end, startPt);
+    const exactDistance = Math.hypot(
+      corner.end.x - startPt.x,
+      corner.end.y - startPt.y
+    );
+    const finalLine = new RaceLine(corner.end, startPt);
+    if (Math.abs(finalLine.length - exactDistance) > 1e-6) {
+      finalLine.length = exactDistance;
+    }
     segments.push(corner);
-    segments.push(line);
+    segments.push(finalLine);
   }
   return segments;
 }

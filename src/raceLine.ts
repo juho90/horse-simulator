@@ -28,7 +28,7 @@ export class RaceLine extends RaceSegment {
     const positionY = y - this.start.y;
     const projectedDistance =
       (positionX * directionX + positionY * directionY) / this.length;
-    return Math.max(0, Math.min(this.length, projectedDistance));
+    return Math.max(0, Math.min(1, projectedDistance));
   }
 
   getTangentDirectionAt(x: number, y: number): number {

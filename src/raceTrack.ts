@@ -1,3 +1,4 @@
+import { RaceCorner } from "./raceCorner";
 import { RaceHorse } from "./raceHorse";
 import { RaceSegment } from "./raceSegment";
 import { generateClosedTrackSegments } from "./raceTrackHelper";
@@ -42,7 +43,9 @@ export class RaceTrack {
       const segmentLength = this.segments[i].length;
       if (accumulatedLength + segmentLength >= remainingDistance) {
         goalSegmentIndex = i;
-        goalSegmentProgress = remainingDistance - accumulatedLength;
+        const distanceIntoSegment = remainingDistance - accumulatedLength;
+        // 거리를 세그먼트 길이에 대한 비율로 변환 (0-1 범위)
+        goalSegmentProgress = distanceIntoSegment / segmentLength;
         break;
       }
       accumulatedLength += segmentLength;
@@ -63,6 +66,29 @@ export class RaceTrack {
       throw new Error("트랙에 세그먼트가 없습니다.");
     }
     return this.segments[this.segments.length - 1];
+  }
+
+  getGoalPosition(): { x: number; y: number } {
+    const goalSegment = this.segments[this.goalSegmentIndex];
+    if (goalSegment.type === "line") {
+      const startX = goalSegment.start.x;
+      const startY = goalSegment.start.y;
+      const endX = goalSegment.end.x;
+      const endY = goalSegment.end.y;
+      return {
+        x: startX + (endX - startX) * this.goalSegmentProgress,
+        y: startY + (endY - startY) * this.goalSegmentProgress,
+      };
+    } else {
+      const corner = goalSegment as RaceCorner;
+      const totalAngle = Math.abs(corner.angle);
+      const currentAngle =
+        corner.startAngle + totalAngle * this.goalSegmentProgress;
+      return {
+        x: corner.center.x + corner.radius * Math.cos(currentAngle),
+        y: corner.center.y + corner.radius * Math.sin(currentAngle),
+      };
+    }
   }
 
   isGoal(horse: RaceHorse): boolean {

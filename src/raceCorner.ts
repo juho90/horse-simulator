@@ -56,7 +56,7 @@ export class RaceCorner extends RaceSegment {
     const totalAngle = Math.abs(this.angle);
     angleDifference = Math.min(angleDifference, totalAngle);
     const progressDistance = this.radius * angleDifference;
-    return Math.max(0, Math.min(this.length, progressDistance));
+    return Math.max(0, Math.min(1, progressDistance / this.length));
   }
 
   getTangentDirectionAt(x: number, y: number): number {
