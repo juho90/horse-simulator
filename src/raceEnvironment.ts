@@ -1,0 +1,166 @@
+import { RaceHorse } from "./raceHorse";
+import { Distance } from "./raceMath";
+import { RaycastResult, raycastBoundary } from "./raceSimulator";
+
+export class RaceEnvironment {
+  trackInfo: {
+    raycasts: RaycastResult[];
+    cornerApproach: number;
+    currentLane: "inner" | "middle" | "outer";
+  };
+  nearbyHorses: {
+    front: RaceHorse | null;
+    left: RaceHorse | null;
+    right: RaceHorse | null;
+    distances: { [horseId: number]: number };
+  };
+  selfStatus: {
+    speed: number;
+    stamina: number;
+    raceProgress: number;
+    currentRank: number;
+  };
+  closestRaycasts: RaycastResult[] | null = null;
+  farthestRaycast: RaycastResult | null = null;
+
+  constructor(private horse: RaceHorse) {
+    this.nearbyHorses = { front: null, left: null, right: null, distances: {} };
+    this.trackInfo = {
+      raycasts: [],
+      cornerApproach: 0,
+      currentLane: "middle",
+    };
+    this.selfStatus = { speed: 0, stamina: 0, raceProgress: 0, currentRank: 1 };
+  }
+
+  update(otherHorses: RaceHorse[]): void {
+    this.nearbyHorses = this.findNearbyHorses(otherHorses);
+    this.trackInfo = this.collectTrackInfo();
+    this.selfStatus = this.collectSelfStatus(otherHorses);
+  }
+
+  private findNearbyHorses(otherHorses: RaceHorse[]) {
+    const nearby: {
+      front: RaceHorse | null;
+      left: RaceHorse | null;
+      right: RaceHorse | null;
+      distances: { [horseId: number]: number };
+    } = { front: null, left: null, right: null, distances: {} };
+    for (const other of otherHorses) {
+      if (other.horseId === this.horse.horseId) {
+        continue;
+      }
+      const distance = Distance(other, this.horse);
+      nearby.distances[other.horseId] = distance;
+      if (distance < 50) {
+        const position = this.getRelativePosition(other);
+        if (
+          position === "front" &&
+          (!nearby.front || distance < Distance(nearby.front, this.horse))
+        ) {
+          nearby.front = other;
+        } else if (
+          position === "left" &&
+          (!nearby.left || distance < Distance(nearby.left, this.horse))
+        ) {
+          nearby.left = other;
+        } else if (
+          position === "right" &&
+          (!nearby.right || distance < Distance(nearby.right, this.horse))
+        ) {
+          nearby.right = other;
+        }
+      }
+    }
+    return nearby;
+  }
+
+  private getRelativePosition(
+    other: RaceHorse
+  ): "front" | "left" | "right" | "back" {
+    const dx = other.x - this.horse.x;
+    const dy = other.y - this.horse.y;
+    const angle = Math.atan2(dy, dx);
+    const relativeAngle = angle - this.horse.raceHeading;
+    const normalizedAngle =
+      ((relativeAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    if (normalizedAngle < Math.PI / 4 || normalizedAngle > (7 * Math.PI) / 4) {
+      return "front";
+    }
+    if (normalizedAngle < (3 * Math.PI) / 4) {
+      return "left";
+    }
+    if (normalizedAngle < (5 * Math.PI) / 4) {
+      return "back";
+    }
+    return "right";
+  }
+
+  private collectTrackInfo() {
+    this.updateRaycast();
+    return {
+      raycasts: this.closestRaycasts || [],
+      cornerApproach: this.calculateCornerApproach(),
+      currentLane: this.getCurrentLane(),
+    };
+  }
+
+  private updateRaycast(): void {
+    const nextSegmentIndex =
+      (this.horse.segmentIndex + 1) % this.horse.segments.length;
+    const nextSegment = this.horse.segments[nextSegmentIndex];
+    const { closestRaycasts, farthestRaycast } = raycastBoundary(
+      this.horse.x,
+      this.horse.y,
+      this.horse.raceHeading,
+      this.horse.segment,
+      nextSegment
+    );
+    this.closestRaycasts = closestRaycasts;
+    this.farthestRaycast = farthestRaycast;
+  }
+
+  private calculateCornerApproach(): number {
+    return this.horse.segment.getTangentDirectionAt(this.horse.x, this.horse.y);
+  }
+
+  private getCurrentLane(): "inner" | "middle" | "outer" {
+    const distanceFromInner = Math.abs(this.horse.gate - 0);
+    const distanceFromOuter = Math.abs(this.horse.gate - 7);
+    if (distanceFromInner <= 2) {
+      return "inner";
+    }
+    if (distanceFromOuter <= 2) {
+      return "outer";
+    }
+    return "middle";
+  }
+
+  private collectSelfStatus(otherHorses: RaceHorse[]) {
+    return {
+      speed: this.horse.speed,
+      stamina: this.horse.stamina,
+      raceProgress: this.calculateRaceProgress(),
+      currentRank: this.calculateCurrentRank(otherHorses),
+    };
+  }
+
+  private calculateRaceProgress(): number {
+    const totalDistance = this.horse.segments.reduce(
+      (sum, seg) => sum + seg.length,
+      0
+    );
+    return Math.min(1, this.horse.raceDistance / totalDistance);
+  }
+
+  private calculateCurrentRank(otherHorses: RaceHorse[]): number {
+    let rank = 1;
+    const myDistance = this.horse.raceDistance;
+    for (const other of otherHorses) {
+      if (other.raceDistance > myDistance) {
+        rank++;
+      }
+    }
+    return rank;
+  }
+}

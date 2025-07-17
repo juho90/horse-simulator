@@ -1,7 +1,9 @@
 import { Horse } from "./horse";
-import { Distance, HorseAvoidanceVector } from "./raceMath";
+import { RaceEnvironment } from "./raceEnvironment";
+import { Distance } from "./raceMath";
 import { RaceSegment } from "./raceSegment";
-import { raycastBoundary, RaycastResult } from "./raceSimulator";
+import { RaceSituationAnalysis } from "./raceSituationAnalysis";
+import { RaceStrategyPlan } from "./raceStrategyPlan";
 import { BlockedState } from "./states/blockedState";
 import { HorseState, HorseStateType } from "./states/horseState";
 import { MaintainingPaceState } from "./states/maintainingPaceState";
@@ -28,9 +30,13 @@ export class RaceHorse {
   raceHeading: number;
   raceDistance: number;
   lap: number = 0;
-  riskLevel: number = 0;
   finished: boolean = false;
+
   states: Map<HorseStateType, HorseState>;
+
+  raceEnvironment: RaceEnvironment;
+  raceSituationAnalysis: RaceSituationAnalysis;
+  raceStrategyPlan: RaceStrategyPlan;
 
   constructor(horse: Horse, segments: RaceSegment[], gate: number) {
     this.horseId = horse.horseId;
@@ -72,6 +78,17 @@ export class RaceHorse {
     this.states.set("overtaking", new OvertakingState(this));
     this.states.set("blocked", new BlockedState(this));
 
+    // Initialize AI Components
+    this.raceEnvironment = new RaceEnvironment(this);
+    this.raceSituationAnalysis = new RaceSituationAnalysis(
+      this,
+      this.raceEnvironment
+    );
+    this.raceStrategyPlan = new RaceStrategyPlan(
+      this,
+      this.raceSituationAnalysis
+    );
+
     const initialState = this.states.get("maintainingPace")!;
     initialState.enter(this);
   }
@@ -85,77 +102,14 @@ export class RaceHorse {
     }
   }
 
-  closestRaycasts: RaycastResult[] | null = null;
-  farthestRaycast: RaycastResult | null = null;
-  findDirOnTrack(otherHorses: RaceHorse[]): {
-    moveDir: number;
-    riskWeight: number;
-  } {
-    const nextSegmentIndex = (this.segmentIndex + 1) % this.segments.length;
-    const nextSegment = this.segments[nextSegmentIndex];
-    const { closestRaycasts, farthestRaycast } = raycastBoundary(
-      this.x,
-      this.y,
-      this.raceHeading,
-      this.segment,
-      nextSegment
-    );
-    this.closestRaycasts = closestRaycasts;
-    this.farthestRaycast = farthestRaycast;
-    return this.findDirOnTrackWithRays(closestRaycasts, otherHorses);
-  }
-
-  findDirOnTrackWithRays(
-    closestRaycasts: RaycastResult[],
-    otherHorses: RaceHorse[]
-  ): {
-    moveDir: number;
-    riskWeight: number;
-  } {
-    if (this.speed <= 0) {
-      return { moveDir: this.raceHeading, riskWeight: 0 };
-    }
-    const courseAngle = this.segment.getTangentDirectionAt(this.x, this.y);
-    let wallAvoidanceVector = { x: 0, y: 0 };
-    let minDistance = Infinity;
-    if (closestRaycasts) {
-      for (const ray of closestRaycasts) {
-        minDistance = Math.min(minDistance, ray.hitDistance);
-        if (ray.hitDistance > 0) {
-          const forceMagnitude = 1 / (ray.hitDistance * ray.hitDistance);
-          const forceAngle = ray.angle + Math.PI;
-          wallAvoidanceVector.x += Math.cos(forceAngle) * forceMagnitude;
-          wallAvoidanceVector.y += Math.sin(forceAngle) * forceMagnitude;
-        }
-      }
-    }
-    const horseAvoidanceVector = HorseAvoidanceVector(this, otherHorses);
-    const RISK_DISTANCE = 20.0;
-    let riskWeight = 0;
-    if (minDistance < RISK_DISTANCE) {
-      riskWeight = Math.pow(1 - minDistance / RISK_DISTANCE, 2);
-    }
-    const baseGoalForce = 0.01;
-    const maxGoalForce = 0.1;
-    const goalForce =
-      baseGoalForce + (maxGoalForce - baseGoalForce) * riskWeight;
-    const goalVector = {
-      x: Math.cos(courseAngle) * goalForce,
-      y: Math.sin(courseAngle) * goalForce,
-    };
-    const finalVector = {
-      x: goalVector.x + wallAvoidanceVector.x + horseAvoidanceVector.x,
-      y: goalVector.y + wallAvoidanceVector.y + horseAvoidanceVector.y,
-    };
-    const bestDir = Math.atan2(finalVector.y, finalVector.x);
-    return { moveDir: bestDir, riskWeight };
-  }
-
   moveOnTrack(otherHorses: RaceHorse[]): void {
     this.cooldownsTick(1);
-    for (const state of this.states.values()) {
-      state.execute(otherHorses);
+
+    const activeState = this.getActiveState();
+    if (activeState) {
+      activeState.execute(otherHorses);
     }
+
     if (this.accel > 0) {
       this.stamina -= this.staminaConsumption;
     } else if (this.speed > 0) {
@@ -250,5 +204,29 @@ export class RaceHorse {
       return false;
     }
     return state.isActiveState();
+  }
+
+  getActiveState(): HorseState | null {
+    for (const state of this.states.values()) {
+      if (state.isActiveState()) {
+        return state;
+      }
+    }
+    return null;
+  }
+
+  updateEnvironment(otherHorses: RaceHorse[]): RaceEnvironment {
+    this.raceEnvironment.update(otherHorses);
+    return this.raceEnvironment;
+  }
+
+  updateAnalyzeSituation(): RaceSituationAnalysis {
+    this.raceSituationAnalysis.update();
+    return this.raceSituationAnalysis;
+  }
+
+  updatePlanStrategy(): RaceStrategyPlan {
+    this.raceStrategyPlan.update();
+    return this.raceStrategyPlan;
   }
 }

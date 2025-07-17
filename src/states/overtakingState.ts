@@ -1,5 +1,6 @@
 import { RaceHorse } from "../raceHorse";
-import { Distance } from "../raceMath";
+import { LerpAngle } from "../raceMath";
+import { RaceStrategyPlan } from "../raceStrategyPlan";
 import { HorseState } from "./horseState";
 
 export class OvertakingState extends HorseState {
@@ -30,45 +31,48 @@ export class OvertakingState extends HorseState {
   }
 
   execute(otherHorses: RaceHorse[]): void {
-    if (this.isActiveState() === false) {
+    if (!this.isActiveState()) {
       return;
     }
-    if (!this.target) {
-      this.horse.deactivateState(this.name);
-      return;
-    }
+    const envData = this.horse.updateEnvironment(otherHorses);
+    const analysis = this.horse.updateAnalyzeSituation();
+    const strategy = this.horse.updatePlanStrategy();
+    this.applyStatePattern(strategy);
+    this.updateOvertakeProgress();
+    this.checkStateTransition(analysis);
+  }
+
+  private applyStatePattern(strategy: RaceStrategyPlan): void {
+    this.horse.accel = strategy.targetAccel * 1.2;
+    this.horse.raceHeading = LerpAngle(
+      this.horse.raceHeading,
+      strategy.targetDirection,
+      0.5
+    );
+  }
+
+  private updateOvertakeProgress(): void {
     this.overtakeTurns++;
-    const distanceToTarget = Distance(this.target, this.horse);
-    if (
-      this.horse.raceDistance > this.target.raceDistance ||
-      distanceToTarget > 60 ||
-      this.overtakeTurns > this.MAX_OVERTAKE_TURNS ||
-      this.horse.stamina < 20
-    ) {
-      this.horse.deactivateState(this.name);
-      return;
+    if (this.overtakeTurns >= this.MAX_OVERTAKE_TURNS) {
+      this.horse.activateState("maintainingPace");
     }
-    this.horse.stamina -= 0.5;
+  }
+
+  private checkStateTransition(analysis: any): void {
+    if (analysis.recommendedState !== "overtaking") {
+      this.horse.activateState(analysis.recommendedState);
+    }
   }
 
   exit(): void {
-    if (this.isActiveState() === false) {
+    if (!this.isActiveState()) {
       return;
     }
-    this.target = null;
     this.isActive = false;
+    this.horse.maxSpeed -= this.overtakeSpeedBoost;
+    this.horse.maxAccel -= this.overtakeAccelBoost;
     this.cooldown = this.OVERTAKE_COOLDOWN;
-    const newMaxSpeed = Math.max(
-      0,
-      this.horse.maxSpeed - this.overtakeSpeedBoost
-    );
-    this.horse.maxSpeed = newMaxSpeed;
-    const newMaxAccel = Math.max(
-      0,
-      this.horse.maxAccel - this.overtakeAccelBoost
-    );
-    this.horse.maxAccel = newMaxAccel;
-    this.overtakeSpeedBoost = 0;
-    this.overtakeAccelBoost = 0;
+    this.target = null;
+    this.overtakeTurns = 0;
   }
 }
