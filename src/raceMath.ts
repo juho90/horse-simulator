@@ -109,7 +109,7 @@ export function HorseAvoidanceVector(
   let avoidanceVector = { x: 0, y: 0 };
   const AVOID_DISTANCE = 30;
   for (const other of otherHorses) {
-    if (other.id === horse.id) {
+    if (other.horseId === horse.horseId) {
       continue;
     }
     const distance = Distance(other, horse);

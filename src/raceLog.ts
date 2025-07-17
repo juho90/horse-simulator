@@ -109,9 +109,12 @@ export function displayRaceResults(
   }
 
   function mapHorseToResult(horse: Horse): any {
-    const finishTurn = findFinishTurn(logs, horse.id, targetRaceDistance);
+    const finishTurn = findFinishTurn(logs, horse.horseId, targetRaceDistance);
     const finalLog = logs[logs.length - 1];
-    const finalPosition = findFinalPosition(finalLog.horseStates, horse.id);
+    const finalPosition = findFinalPosition(
+      finalLog.horseStates,
+      horse.horseId
+    );
 
     return {
       ...horse,

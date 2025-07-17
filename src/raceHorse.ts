@@ -8,7 +8,7 @@ import { MaintainingPaceState } from "./states/maintainingPaceState";
 import { OvertakingState } from "./states/overtakingState";
 
 export class RaceHorse {
-  id: number;
+  horseId: number;
   name: string;
   maxSpeed: number;
   maxAccel: number;
@@ -33,7 +33,7 @@ export class RaceHorse {
   states: Map<HorseStateType, HorseState>;
 
   constructor(horse: Horse, segments: RaceSegment[], gate: number) {
-    this.id = horse.id;
+    this.horseId = horse.horseId;
     this.name = horse.name;
     this.maxSpeed = horse.calculateMaxSpeed();
     this.maxAccel = horse.calculateMaxAcceleration();
@@ -60,7 +60,7 @@ export class RaceHorse {
       this.segment.start.x,
       this.segment.start.y
     );
-    const gateOffset = (this.gate + 1) * 10;
+    const gateOffset = (this.gate + 1) * 17;
     this.x = this.segment.start.x + ortho.x * gateOffset;
     this.y = this.segment.start.y + ortho.y * gateOffset;
 
@@ -193,7 +193,7 @@ export class RaceHorse {
     let closestHorse: RaceHorse | null = null;
     let minDistance = Infinity;
     for (const other of otherHorses) {
-      if (other.id === this.id) {
+      if (other.horseId === this.horseId) {
         continue;
       }
       if (other.raceDistance > this.raceDistance) {

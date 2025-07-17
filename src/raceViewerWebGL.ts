@@ -31,7 +31,7 @@ export function generateRaceWebGLHtml(
       maxY = b.maxY;
     }
   });
-  const trackWidth = 120;
+  const trackWidth = 160;
   minX -= trackWidth + marginX;
   maxX += trackWidth + marginX;
   minY -= trackWidth + marginY;

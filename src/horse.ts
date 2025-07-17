@@ -1,5 +1,5 @@
 export class Horse {
-  id: number;
+  horseId: number;
   name: string;
   strength: number;
   endurance: number;
@@ -8,7 +8,7 @@ export class Horse {
   spirit: number;
 
   constructor(
-    id: number,
+    horseId: number,
     name: string,
     stats: {
       strength: number;
@@ -18,7 +18,7 @@ export class Horse {
       spirit: number;
     }
   ) {
-    this.id = id;
+    this.horseId = horseId;
     this.name = name;
     this.strength = stats.strength;
     this.endurance = stats.endurance;
@@ -136,4 +136,29 @@ export function createRandomHorse(id: number, name: string): Horse {
     intelligence: Math.floor(Math.random() * 60) + 40, // 40-100
     spirit: Math.floor(Math.random() * 60) + 40, // 40-100
   });
+}
+
+export function convertHorsesForRace(
+  horses: {
+    horseId: number;
+    name: string;
+    strength: number;
+    endurance: number;
+    agility: number;
+    intelligence: number;
+    spirit: number;
+  }[]
+): Horse[] {
+  const convertedHorses: Horse[] = new Array<Horse>(horses.length);
+  for (let index = 0; index < horses.length; index++) {
+    const horse = horses[index];
+    convertedHorses[index] = new Horse(horse.horseId, horse.name, {
+      strength: horse.strength,
+      endurance: horse.endurance,
+      agility: horse.agility,
+      intelligence: horse.intelligence,
+      spirit: horse.spirit,
+    });
+  }
+  return convertedHorses;
 }

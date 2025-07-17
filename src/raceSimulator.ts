@@ -104,7 +104,7 @@ export function raycastFarBoundary(
   return farthestRaycast;
 }
 
-const TRACK_WIDTH = 120;
+const TRACK_WIDTH = 200;
 
 const DIRECTIONS = [
   -Math.PI / 2,
@@ -188,7 +188,7 @@ export function runRaceSimulator(track: RaceTrack, horses: Horse[]): RaceLog[] {
           }
         }
         horseStates[index] = {
-          id: horse.id,
+          id: horse.horseId,
           name: horse.name,
           x: horse.x,
           y: horse.y,

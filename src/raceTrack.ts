@@ -1,5 +1,6 @@
 import { RaceCorner } from "./raceCorner";
 import { RaceHorse } from "./raceHorse";
+import { RaceLine } from "./raceLine";
 import { RaceSegment } from "./raceSegment";
 import { generateClosedTrackSegments } from "./raceTrackHelper";
 
@@ -44,7 +45,6 @@ export class RaceTrack {
       if (accumulatedLength + segmentLength >= remainingDistance) {
         goalSegmentIndex = i;
         const distanceIntoSegment = remainingDistance - accumulatedLength;
-        // 거리를 세그먼트 길이에 대한 비율로 변환 (0-1 범위)
         goalSegmentProgress = distanceIntoSegment / segmentLength;
         break;
       }
@@ -122,4 +122,28 @@ export function createTrack(segmentCount: number): RaceTrack {
   const width = Math.max(...allX) - Math.min(...allX) + 200;
   const height = Math.max(...allY) - Math.min(...allY) + 200;
   return new RaceTrack(width, height, segmentPattern);
+}
+
+export function convertTrackForRace(raceTrack: {
+  width: number;
+  height: number;
+  segments: RaceSegment[];
+}) {
+  const raceSegments = new Array<RaceSegment>(raceTrack.segments.length);
+  for (let index = 0; index < raceTrack.segments.length; index++) {
+    const parseSegment = raceTrack.segments[index] as RaceSegment;
+    if (parseSegment.type === "line") {
+      const lineSegment = parseSegment as RaceLine;
+      raceSegments[index] = new RaceLine(lineSegment.start, lineSegment.end);
+    } else {
+      const cornerSegment = parseSegment as RaceCorner;
+      raceSegments[index] = new RaceCorner(
+        cornerSegment.start,
+        cornerSegment.center,
+        cornerSegment.radius,
+        cornerSegment.angle
+      );
+    }
+  }
+  return new RaceTrack(raceTrack.width, raceTrack.height, raceSegments);
 }
