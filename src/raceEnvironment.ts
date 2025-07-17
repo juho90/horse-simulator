@@ -1,3 +1,4 @@
+import { Lane } from "./laneEvaluation";
 import { RaceHorse } from "./raceHorse";
 import { Distance } from "./raceMath";
 import { RaycastResult, raycastBoundary } from "./raceSimulator";
@@ -6,7 +7,7 @@ export class RaceEnvironment {
   trackInfo: {
     raycasts: RaycastResult[];
     cornerApproach: number;
-    currentLane: "inner" | "middle" | "outer";
+    currentLane: Lane;
   };
   nearbyHorses: {
     front: RaceHorse | null;
@@ -28,7 +29,7 @@ export class RaceEnvironment {
     this.trackInfo = {
       raycasts: [],
       cornerApproach: 0,
-      currentLane: "middle",
+      currentLane: Lane.Middle,
     };
     this.selfStatus = { speed: 0, stamina: 0, raceProgress: 0, currentRank: 1 };
   }
@@ -124,16 +125,16 @@ export class RaceEnvironment {
     return this.horse.segment.getTangentDirectionAt(this.horse.x, this.horse.y);
   }
 
-  private getCurrentLane(): "inner" | "middle" | "outer" {
+  private getCurrentLane(): Lane {
     const distanceFromInner = Math.abs(this.horse.gate - 0);
     const distanceFromOuter = Math.abs(this.horse.gate - 7);
     if (distanceFromInner <= 2) {
-      return "inner";
+      return Lane.Inner;
     }
     if (distanceFromOuter <= 2) {
-      return "outer";
+      return Lane.Outer;
     }
-    return "middle";
+    return Lane.Middle;
   }
 
   private collectSelfStatus(otherHorses: RaceHorse[]) {

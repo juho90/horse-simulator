@@ -86,7 +86,6 @@ export class RaceLine extends RaceSegment {
     let offsetX = 0;
     let offsetY = 0;
     if (0 < trackWidth) {
-      // segment의 법선 방향으로 offset 적용
       const segAngle = Math.atan2(y2 - y1, x2 - x1);
       const ortho = {
         x: Math.cos(segAngle - Math.PI / 2),
@@ -103,7 +102,7 @@ export class RaceLine extends RaceSegment {
     const dy = y2b - y1b;
     const det = rayDir.x * dy - rayDir.y * dx;
     if (Math.abs(det) < EPSILON) {
-      return null; // 평행 또는 겹침
+      return null;
     }
     const t = ((x1b - rayPoint.x) * dy - (y1b - rayPoint.y) * dx) / det;
     const s =

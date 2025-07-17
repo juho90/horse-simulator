@@ -1,11 +1,11 @@
 export class PIDController {
-  private Kp: number; // Proportional gain
-  private Ki: number; // Integral gain
-  private Kd: number; // Derivative gain
-  private tau: number; // Derivative low-pass filter time constant
+  private Kp: number;
+  private Ki: number;
+  private Kd: number;
+  private tau: number;
 
-  private limMin: number; // Output limit min
-  private limMax: number; // Output limit max
+  private limMin: number;
+  private limMax: number;
 
   private integral: number = 0;
   private prevError: number = 0;
@@ -33,7 +33,6 @@ export class PIDController {
 
     const proportional = this.Kp * error;
 
-    // Derivative on measurement with low-pass filter
     this.differentiator =
       (2 * this.Kd * (measurement - this.prevMeasurement) +
         (2 * this.tau - dt) * this.differentiator) /
@@ -41,17 +40,14 @@ export class PIDController {
 
     const preSatIntegral = this.integral + this.Ki * error * dt;
 
-    // PID output with integral anti-windup
     let output = proportional - this.differentiator + this.integral;
 
-    // Clamp output
     if (output > this.limMax) {
       output = this.limMax;
     } else if (output < this.limMin) {
       output = this.limMin;
     }
 
-    // Anti-windup
     if (this.Ki !== 0) {
       const antiWindup =
         0.1 * (output - (proportional - this.differentiator + preSatIntegral));

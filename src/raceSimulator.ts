@@ -1,5 +1,5 @@
-import { AIPerformanceMonitor } from "./aiPerformanceMonitor";
 import { Horse } from "./horse";
+import { PerformanceMonitor } from "./performanceMonitor";
 import { RaceHorse } from "./raceHorse";
 import { HorseTurnState, RaceLog } from "./raceLog";
 import { Vector2D } from "./raceMath";
@@ -106,7 +106,6 @@ export function raycastFarBoundary(
 }
 
 const TRACK_WIDTH = 200;
-
 const DIRECTIONS = [
   -Math.PI / 2,
   -Math.PI / 3,
@@ -176,7 +175,7 @@ export function runRaceSimulator(track: RaceTrack, horses: Horse[]): RaceLog[] {
   const raceHorses: RaceHorse[] = horses.map((horse, gate) => {
     return new RaceHorse(horse, segments, gate);
   });
-  const aiMonitor = new AIPerformanceMonitor();
+  const aiMonitor = new PerformanceMonitor();
   for (const horse of raceHorses) {
     aiMonitor.addHorse(horse);
   }
@@ -220,7 +219,6 @@ export function runRaceSimulator(track: RaceTrack, horses: Horse[]): RaceLog[] {
         };
       }
     } catch (error) {
-      console.error(`Error in turn ${turn}:`, error);
       for (const horse of raceHorses) {
         horse.finished = true;
       }
@@ -231,6 +229,6 @@ export function runRaceSimulator(track: RaceTrack, horses: Horse[]): RaceLog[] {
     logs.push({ turn, horseStates } as RaceLog);
     turn++;
   }
-  console.log("\n" + aiMonitor.generateReport());
+  aiMonitor.generateReport();
   return logs;
 }

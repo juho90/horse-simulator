@@ -68,7 +68,6 @@ export class RaceHorse {
     this.raceHeading = startDir;
     this.raceDistance = 0;
 
-    // Initialize AI Components
     this.raceEnvironment = new RaceEnvironment(this);
     this.raceSituationAnalysis = new RaceSituationAnalysis(
       this,

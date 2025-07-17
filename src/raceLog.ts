@@ -3,7 +3,6 @@ import { Horse } from "./horse";
 import { RaceCorner } from "./raceCorner";
 import { RaceLine } from "./raceLine";
 import { Vector2D } from "./raceMath";
-import { RaceSegment } from "./raceSegment";
 import { RaceTrack } from "./raceTrack";
 
 export interface HorseTurnState {
@@ -24,60 +23,7 @@ export interface RaceLog {
   horseStates: HorseTurnState[];
 }
 
-export function displayTrackInfo(track: RaceTrack) {
-  console.log("=== 경기장 정보 ===");
-  console.log(
-    `트랙 크기: ${track.width.toFixed(1)} x ${track.height.toFixed(1)}`
-  );
-  console.log(
-    `총 길이: ${track.trackLength}m (${(track.trackLength / 1000).toFixed(
-      1
-    )}km)`
-  );
-  console.log(`세그먼트 수: ${track.segments.length}개`);
-
-  function getSegmentType(s: RaceSegment): string {
-    return s.type;
-  }
-
-  const segmentTypes: string[] = [];
-  for (const segment of track.segments) {
-    segmentTypes.push(getSegmentType(segment));
-  }
-  console.log(`패턴: ${segmentTypes.join(" -> ")}`);
-
-  const lineSegments: RaceSegment[] = [];
-  const cornerSegments: RaceSegment[] = [];
-
-  for (const segment of track.segments) {
-    if (segment.type === "line") {
-      lineSegments.push(segment);
-    } else if (segment.type === "corner") {
-      cornerSegments.push(segment);
-    }
-  }
-
-  function getSegmentLength(s: RaceSegment): number {
-    return s.length;
-  }
-
-  const lineLengths: number[] = [];
-  for (const segment of lineSegments) {
-    lineLengths.push(getSegmentLength(segment));
-  }
-
-  const cornerLengths: number[] = [];
-  for (const segment of cornerSegments) {
-    cornerLengths.push(getSegmentLength(segment));
-  }
-
-  console.log(
-    `직선 구간: ${lineSegments.length}개 (${lineLengths.join("m, ")}m)`
-  );
-  console.log(
-    `코너 구간: ${cornerSegments.length}개 (${cornerLengths.join("m, ")}m)`
-  );
-}
+export function displayTrackInfo(track: RaceTrack) {}
 
 export function displayRaceResults(
   horses: Horse[],
@@ -145,10 +91,7 @@ export function saveRaceLineLogToFile(raceLine: RaceLineLog) {
       JSON.stringify(raceLine, null, 2),
       "utf-8"
     );
-    console.log(`Race log saved to ${"raceline-log.json"}`);
-  } catch (err) {
-    console.error("Failed to save race log:", err);
-  }
+  } catch (err) {}
 }
 
 export interface RaceCornerLog {
@@ -167,8 +110,5 @@ export function saveRaceCornerLogToFile(raceCorner: RaceCornerLog) {
       JSON.stringify(raceCorner, null, 2),
       { encoding: "utf-8" }
     );
-    console.log(`Race log saved to ${"racecorner-log.json"}`);
-  } catch (err) {
-    console.error("Failed to save race log:", err);
-  }
+  } catch (err) {}
 }
