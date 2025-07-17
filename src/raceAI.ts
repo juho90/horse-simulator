@@ -1,6 +1,6 @@
 import { DirectionalRisk } from "./directionalRisk";
 import { DrivingMode } from "./drivingMode";
-import { Lane, LaneChange } from "./laneEvaluation";
+import { Lane, LaneChange, RacePhase } from "./laneEvaluation";
 import { RaceEnvironment } from "./raceEnvironment";
 import { RaceHorse } from "./raceHorse";
 import { RaceSituationAnalysis } from "./raceSituationAnalysis";
@@ -32,6 +32,12 @@ export enum ActionType {
   ChangeLane = "change_lane",
 }
 
+export interface AIDirectionalDecision {
+  action: ActionType;
+  targetLane?: Lane;
+  intensity: number;
+}
+
 export interface AIDecision {
   targetSpeed: number;
   targetDirection: number;
@@ -39,11 +45,11 @@ export interface AIDecision {
   laneChange: LaneChange;
   urgencyLevel: UrgencyLevel;
   currentMode: DrivingMode;
-  reasoning: string;
 }
 
 export interface HorseStateInfo {
   stamina: number;
+  maxStamina: number;
   speed: number;
   maxSpeed: number;
   acceleration: number;
@@ -107,14 +113,12 @@ const modeWeights: {
 
 export class RaceAI {
   private horse: RaceHorse;
-  private environment: RaceEnvironment;
-  private situationAnalysis: RaceSituationAnalysis;
-  private strategyPlan: RaceStrategyPlan;
+  private raceEnv: RaceEnvironment;
+  private raceAnalysis: RaceSituationAnalysis;
+  private racePlan: RaceStrategyPlan;
   private currentMode: DrivingMode = DrivingMode.MaintainingPace;
+  private aiDirectionalDecision: AIDirectionalDecision | null = null;
   private aiDecision: AIDecision | null = null;
-  private decisionHistory: AIDecision[];
-  private lastDecisionTime: number;
-  private modeTransitionCooldown: number = 0;
   private adaptiveParameters: {
     riskTolerance: number;
     aggressiveness: number;
@@ -124,35 +128,54 @@ export class RaceAI {
 
   constructor(
     horse: RaceHorse,
-    environment: RaceEnvironment,
-    situationAnalysis: RaceSituationAnalysis,
-    strategyPlan: RaceStrategyPlan
+    raceEnvironment: RaceEnvironment,
+    raceAnalysis: RaceSituationAnalysis,
+    racePlan: RaceStrategyPlan
   ) {
     this.horse = horse;
-    this.environment = environment;
-    this.situationAnalysis = situationAnalysis;
-    this.strategyPlan = strategyPlan;
+    this.raceEnv = raceEnvironment;
+    this.raceAnalysis = raceAnalysis;
+    this.racePlan = racePlan;
     this.currentMode = DrivingMode.MaintainingPace;
-    this.modeTransitionCooldown = 0;
-
     this.adaptiveParameters = {
       riskTolerance: 0.3,
       aggressiveness: 0.5,
       laneChangeCooldown: 3,
     };
     this.lastDecisionTurn = -1;
-    this.strategyPlan = strategyPlan;
-    this.decisionHistory = [];
-    this.lastDecisionTime = 0;
   }
 
-  makeDecision(): AIDecision {
-    const urgency = this.evaluateUrgency();
-    const mode = this.determineDrivingMode();
+  update(turn: number): AIDecision {
+    const directionalDecision = this.makeDirectionalDecision(turn);
+    this.aiDirectionalDecision = directionalDecision;
+    const decision = this.makeDecision(directionalDecision);
+    this.aiDecision = decision;
+    return decision;
+  }
+
+  getCurrentMode(): DrivingMode {
+    return this.currentMode;
+  }
+
+  getAIDirectionalDecision(): AIDirectionalDecision | null {
+    return this.aiDirectionalDecision;
+  }
+
+  getAIDecision(): AIDecision | null {
+    return this.aiDecision;
+  }
+
+  private makeDecision(directionalDecision: AIDirectionalDecision): AIDecision {
+    const collision = this.predictCollision();
+    const urgency = this.evaluateUrgency(collision);
+    const mode = this.determineDrivingMode(collision);
     const targetSpeed = this.calculateOptimalSpeed();
-    const targetDirection = this.calculateOptimalDirection();
+    const targetDirection = this.calculateOptimalDirection(
+      collision,
+      directionalDecision
+    );
     const targetAccel = this.calculateTargetAcceleration(targetSpeed);
-    const laneChange = this.decideLaneChange();
+    const laneChange = this.decideLaneChange(collision, directionalDecision);
     const decision: AIDecision = {
       targetSpeed,
       targetDirection,
@@ -160,28 +183,12 @@ export class RaceAI {
       laneChange,
       urgencyLevel: urgency,
       currentMode: mode,
-      reasoning: this.generateReasoning(mode, urgency),
     };
     this.currentMode = mode;
-    this.aiDecision = decision;
-    this.logDecision(decision);
     return decision;
   }
 
-  update(): AIDecision {
-    return this.makeDecision();
-  }
-
-  getCurrentMode(): DrivingMode {
-    return this.currentMode;
-  }
-
-  getAIDecision(): AIDecision | null {
-    return this.aiDecision;
-  }
-
-  private evaluateUrgency(): UrgencyLevel {
-    const collision = this.predictCollision();
+  private evaluateUrgency(collision: CollisionPrediction): UrgencyLevel {
     if (collision.willCollide && collision.turnsToCollision < 2) {
       return UrgencyLevel.Emergency;
     }
@@ -195,28 +202,25 @@ export class RaceAI {
     return UrgencyLevel.Low;
   }
 
-  private determineDrivingMode(): DrivingMode {
-    if (this.isEmergencyAvoidanceNeeded()) {
+  private determineDrivingMode(collision: CollisionPrediction): DrivingMode {
+    if (this.isEmergencyAvoidanceNeeded(collision)) {
       return DrivingMode.Blocked;
     }
     const horseState = this.getHorseState();
-    if (this.situationAnalysis.racePhase === "final") {
+    if (this.raceAnalysis.racePhase === RacePhase.Final) {
       return DrivingMode.LastSpurt;
     }
-    if (
-      horseState.stamina < 0.3 &&
-      this.situationAnalysis.racePhase !== "late"
-    ) {
+    if (horseState.stamina < 0.3 && this.raceAnalysis.racePhase !== "late") {
       return DrivingMode.Conserving;
     }
     if (
-      this.situationAnalysis.opportunities?.canOvertake &&
-      (this.situationAnalysis.racePhase === "late" ||
-        this.situationAnalysis.racePhase === "middle")
+      this.raceAnalysis.opportunities?.canOvertake &&
+      (this.raceAnalysis.racePhase === RacePhase.Late ||
+        this.raceAnalysis.racePhase === RacePhase.Middle)
     ) {
       return DrivingMode.Overtaking;
     }
-    if (this.situationAnalysis.drivingMode !== "maintainingPace") {
+    if (this.raceAnalysis.drivingMode !== DrivingMode.MaintainingPace) {
       return DrivingMode.Positioning;
     }
     return DrivingMode.MaintainingPace;
@@ -233,21 +237,50 @@ export class RaceAI {
     } else if (this.currentMode === DrivingMode.Overtaking) {
       baseSpeed = horseState.maxSpeed * 0.9;
     }
-    const staminaFactor = Math.max(0.3, horseState.stamina);
+    const staminaFactor = Math.max(
+      0.3,
+      horseState.stamina / horseState.maxStamina
+    );
     return baseSpeed * staminaFactor;
   }
 
-  private calculateOptimalDirection(): number {
+  private calculateOptimalDirection(
+    collision: CollisionPrediction,
+    directionalDecision: AIDirectionalDecision
+  ): number {
     const currentHeading = this.horse.raceHeading;
-    let targetHeading = currentHeading;
-    if (this.currentMode === DrivingMode.Blocked) {
-      const collision = this.predictCollision();
-      if (collision.avoidanceDirection === AvoidanceDirection.Left) {
-        targetHeading = currentHeading - 0.2;
-      } else if (collision.avoidanceDirection === AvoidanceDirection.Right) {
-        targetHeading = currentHeading + 0.2;
+    let targetHeading = this.racePlan.targetDirection;
+    let directionAdjustment = 0;
+    if (directionalDecision) {
+      if (directionalDecision.action === ActionType.ChangeLane) {
+        if (directionalDecision.targetLane === Lane.Inner) {
+          directionAdjustment = -0.3 * directionalDecision.intensity;
+        } else if (directionalDecision.targetLane === Lane.Outer) {
+          directionAdjustment = 0.3 * directionalDecision.intensity;
+        }
+      } else if (directionalDecision.action === ActionType.Overtake) {
+        directionAdjustment = 0.2 * directionalDecision.intensity;
       }
     }
+    if (this.currentMode === DrivingMode.Blocked) {
+      if (collision.avoidanceDirection === AvoidanceDirection.Left) {
+        directionAdjustment = Math.min(directionAdjustment, -0.4);
+      } else if (collision.avoidanceDirection === AvoidanceDirection.Right) {
+        directionAdjustment = Math.max(directionAdjustment, 0.4);
+      }
+    }
+    const directionalRisk = this.raceAnalysis.directionalRisk;
+    if (directionalRisk.left > 0.7 && directionalRisk.right < 0.3) {
+      directionAdjustment += 0.15;
+    } else if (directionalRisk.right > 0.7 && directionalRisk.left < 0.3) {
+      directionAdjustment -= 0.15;
+    }
+    targetHeading = targetHeading + directionAdjustment;
+    const maxAdjustment = 0.5;
+    targetHeading = Math.max(
+      currentHeading - maxAdjustment,
+      Math.min(currentHeading + maxAdjustment, targetHeading)
+    );
     return targetHeading;
   }
 
@@ -260,9 +293,18 @@ export class RaceAI {
     );
   }
 
-  private decideLaneChange(): LaneChange {
+  private decideLaneChange(
+    collision: CollisionPrediction,
+    directionalDecision: AIDirectionalDecision
+  ): LaneChange {
+    if (directionalDecision.action === ActionType.ChangeLane) {
+      if (directionalDecision.targetLane === Lane.Inner) {
+        return LaneChange.Inner;
+      } else if (directionalDecision.targetLane === Lane.Outer) {
+        return LaneChange.Outer;
+      }
+    }
     if (this.currentMode === DrivingMode.Blocked) {
-      const collision = this.predictCollision();
       if (collision.avoidanceDirection === AvoidanceDirection.Left) {
         return LaneChange.Inner;
       } else if (collision.avoidanceDirection === AvoidanceDirection.Right) {
@@ -275,12 +317,8 @@ export class RaceAI {
     return LaneChange.Stay;
   }
 
-  private generateReasoning(mode: DrivingMode, urgency: string): string {
-    return `Mode: ${mode}, Urgency: ${urgency}`;
-  }
-
   private predictCollision(): CollisionPrediction {
-    const nearbyHorses = this.environment.nearbyHorses;
+    const nearbyHorses = this.raceEnv.nearbyHorses;
     const horses = [
       nearbyHorses.front,
       nearbyHorses.left,
@@ -324,65 +362,14 @@ export class RaceAI {
     };
   }
 
-  private executeAvoidanceManeuver(
-    prediction: CollisionPrediction
-  ): Partial<AIDecision> {
-    if (prediction.severity === CollisionSeverity.High) {
-      return {
-        targetAccel: -this.horse.maxAccel,
-        laneChange:
-          prediction.avoidanceDirection === AvoidanceDirection.Left
-            ? LaneChange.Inner
-            : LaneChange.Outer,
-      };
-    }
-    return {};
-  }
-
-  private isEmergencyAvoidanceNeeded(): boolean {
-    const collision = this.predictCollision();
+  private isEmergencyAvoidanceNeeded(collision: CollisionPrediction): boolean {
     return collision.willCollide && collision.turnsToCollision < 3;
-  }
-
-  private executeMaintainingPaceMode(): Partial<AIDecision> {
-    return {
-      targetAccel: this.horse.maxAccel * 0.3,
-    };
-  }
-
-  private executeOvertakingMode(): Partial<AIDecision> {
-    return {
-      targetAccel: this.horse.maxAccel * 0.8,
-      laneChange: LaneChange.Outer,
-    };
-  }
-
-  private executeBlockedMode(): Partial<AIDecision> {
-    const collision = this.predictCollision();
-    return this.executeAvoidanceManeuver(collision);
-  }
-
-  private executePositioningMode(): Partial<AIDecision> {
-    return {
-      targetAccel: this.horse.maxAccel * 0.5,
-    };
-  }
-
-  private executeConservingMode(): Partial<AIDecision> {
-    return {
-      targetAccel: this.horse.maxAccel * 0.2,
-    };
-  }
-
-  private executeLastSpurtMode(): Partial<AIDecision> {
-    return {
-      targetAccel: this.horse.maxAccel,
-    };
   }
 
   private getHorseState(): HorseStateInfo {
     return {
       stamina: this.horse.stamina,
+      maxStamina: this.horse.maxStamina,
       speed: this.horse.speed,
       maxSpeed: this.horse.maxSpeed,
       acceleration: this.horse.accel,
@@ -392,53 +379,37 @@ export class RaceAI {
     };
   }
 
-  private logDecision(decision: AIDecision): void {
-    this.decisionHistory.push(decision);
-    if (this.decisionHistory.length > 100) {
-      this.decisionHistory.shift();
-    }
-  }
-
-  makeDirectionalDecision(currentTurn: number): {
-    action: ActionType;
-    targetLane?: Lane;
-    intensity: number;
-    reasoning: string;
-  } {
+  makeDirectionalDecision(turn: number): AIDirectionalDecision {
     if (
-      currentTurn - this.lastDecisionTurn <
+      turn - this.lastDecisionTurn <
       this.adaptiveParameters.laneChangeCooldown
     ) {
       return {
         action: ActionType.Maintain,
         intensity: 0.5,
-        reasoning: "레인 변경 쿨다운 중",
       };
     }
-
-    this.strategyPlan.updateLaneEvaluations();
-    const directionalRisk = this.situationAnalysis.directionalRisk;
-
+    this.racePlan.updateLaneEvaluations();
+    const directionalRisk = this.raceAnalysis.directionalRisk;
     if (this.shouldAvoidDanger(directionalRisk)) {
-      return this.makeSafetyDecision(directionalRisk, currentTurn);
+      this.lastDecisionTurn = turn;
+      return this.makeSafetyDecision(directionalRisk);
     }
-
     if (this.shouldChangeLane()) {
-      return this.makeLaneChangeDecision(currentTurn);
+      this.lastDecisionTurn = turn;
+      return this.makeLaneChangeDecision();
     }
-
     if (this.shouldOvertake()) {
-      return this.makeOvertakeDecision(currentTurn);
+      this.lastDecisionTurn = turn;
+      return this.makeOvertakeDecision();
     }
-
     if (this.shouldDefend()) {
-      return this.makeDefendDecision(currentTurn);
+      this.lastDecisionTurn = turn;
+      return this.makeDefendDecision();
     }
-
     return {
       action: ActionType.Maintain,
       intensity: this.calculateMaintainIntensity(),
-      reasoning: "현재 상황 유지",
     };
   }
 
@@ -448,49 +419,38 @@ export class RaceAI {
     return totalRisk > this.adaptiveParameters.riskTolerance * 2;
   }
 
-  private makeSafetyDecision(risk: DirectionalRisk, currentTurn: number): any {
-    this.lastDecisionTurn = currentTurn;
-
+  private makeSafetyDecision(risk: DirectionalRisk): AIDirectionalDecision {
     if (risk.left < risk.right && risk.left < 0.3) {
       return {
         action: ActionType.ChangeLane,
         targetLane: Lane.Inner,
         intensity: 0.8,
-        reasoning: "위험 회피를 위한 내측 이동",
       };
     }
-
     if (risk.right < risk.left && risk.right < 0.3) {
       return {
         action: ActionType.ChangeLane,
         targetLane: Lane.Outer,
         intensity: 0.8,
-        reasoning: "위험 회피를 위한 외측 이동",
       };
     }
-
     return {
       action: ActionType.Defend,
       intensity: 0.9,
-      reasoning: "고위험 상황에서 현재 위치 방어",
     };
   }
 
   private shouldChangeLane(): boolean {
-    return this.strategyPlan.shouldChangeLane();
+    return this.racePlan.shouldChangeLane();
   }
 
-  private makeLaneChangeDecision(currentTurn: number): any {
-    this.lastDecisionTurn = currentTurn;
-    const recommendation = this.strategyPlan.getLaneChangeRecommendation();
-
+  private makeLaneChangeDecision(): AIDirectionalDecision {
+    const recommendation = this.racePlan.getLaneChangeRecommendation();
     const intensity = this.calculateLaneChangeIntensity(recommendation.urgency);
-
     return {
       action: ActionType.ChangeLane,
       targetLane: recommendation.targetLane,
       intensity,
-      reasoning: recommendation.reasoning,
     };
   }
 
@@ -501,10 +461,8 @@ export class RaceAI {
       [UrgencyLevel.High]: 0.8,
       [UrgencyLevel.Emergency]: 0.9,
     }[urgency];
-
-    const raceProgress = this.situationAnalysis.envData.selfStatus.raceProgress;
+    const raceProgress = this.raceEnv.selfStatus.raceProgress;
     const progressMultiplier = raceProgress > 0.8 ? 1.2 : 1.0;
-
     return Math.min(
       1.0,
       baseIntensity *
@@ -514,23 +472,19 @@ export class RaceAI {
   }
 
   private shouldOvertake(): boolean {
-    const opportunities = this.situationAnalysis.opportunities;
-    const directionalRisk = this.situationAnalysis.directionalRisk;
-
-    if (!opportunities.canOvertake) return false;
-
+    const opportunities = this.raceAnalysis.opportunities;
+    const directionalRisk = this.raceAnalysis.directionalRisk;
+    if (!opportunities.canOvertake) {
+      return false;
+    }
     const riskThreshold = this.adaptiveParameters.riskTolerance;
     const safetyCheck =
       directionalRisk.front < riskThreshold &&
       directionalRisk.frontLeft < riskThreshold &&
       directionalRisk.frontRight < riskThreshold;
-
     const staminaCheck =
-      this.situationAnalysis.envData.selfStatus.stamina >
-      this.horse.maxStamina * 0.2;
-    const rankMotivation =
-      this.situationAnalysis.envData.selfStatus.currentRank > 3;
-
+      this.raceEnv.selfStatus.stamina > this.horse.maxStamina * 0.2;
+    const rankMotivation = this.raceEnv.selfStatus.currentRank > 3;
     return (
       safetyCheck &&
       staminaCheck &&
@@ -538,79 +492,66 @@ export class RaceAI {
     );
   }
 
-  private makeOvertakeDecision(currentTurn: number): any {
-    this.lastDecisionTurn = currentTurn;
-
-    const envData = this.situationAnalysis.envData;
+  private makeOvertakeDecision(): AIDirectionalDecision {
+    const envData = this.raceEnv;
     const rank = envData.selfStatus.currentRank;
     const raceProgress = envData.selfStatus.raceProgress;
-
     let intensity = 0.6;
-
-    if (rank > 5) intensity += 0.2;
-    if (raceProgress > 0.7) intensity += 0.15;
-
+    if (rank > 5) {
+      intensity += 0.2;
+    }
+    if (raceProgress > 0.7) {
+      intensity += 0.15;
+    }
     intensity *= this.adaptiveParameters.aggressiveness;
     intensity = Math.min(0.95, intensity);
-
     return {
       action: ActionType.Overtake,
       intensity,
-      reasoning: `추월 시도 (현재 ${rank}위, 진행률 ${(
-        raceProgress * 100
-      ).toFixed(1)}%)`,
     };
   }
 
   private shouldDefend(): boolean {
-    const envData = this.situationAnalysis.envData;
+    const envData = this.raceEnv;
     const rank = envData.selfStatus.currentRank;
     const raceProgress = envData.selfStatus.raceProgress;
-
-    if (rank > 3) return false;
-
+    if (rank > 3) {
+      return false;
+    }
     const nearbyHorses = envData.nearbyHorses;
     const hasNearbyThreat = Object.values(nearbyHorses.distances).some(
       (distance) => distance < 30
     );
-
     return hasNearbyThreat && raceProgress > 0.6;
   }
 
-  private makeDefendDecision(currentTurn: number): any {
-    this.lastDecisionTurn = currentTurn;
-
-    const envData = this.situationAnalysis.envData;
+  private makeDefendDecision(): AIDirectionalDecision {
+    const envData = this.raceEnv;
     const rank = envData.selfStatus.currentRank;
-
     let intensity = 0.7;
-    if (rank <= 2) intensity += 0.2;
-
+    if (rank <= 2) {
+      intensity += 0.2;
+    }
     return {
       action: ActionType.Defend,
       intensity,
-      reasoning: `현재 ${rank}위 유지를 위한 방어`,
     };
   }
 
   private calculateMaintainIntensity(): number {
-    const envData = this.situationAnalysis.envData;
+    const envData = this.raceEnv;
     const stamina = envData.selfStatus.stamina;
     const staminaRatio = stamina / this.horse.maxStamina;
     const raceProgress = envData.selfStatus.raceProgress;
-
     let intensity = 0.5;
-
     if (staminaRatio < 0.3) {
       intensity = 0.3;
     } else if (staminaRatio > 0.8 && raceProgress < 0.7) {
       intensity = 0.7;
     }
-
     if (raceProgress > 0.8) {
       intensity = Math.min(0.9, intensity + 0.2);
     }
-
     return intensity;
   }
 
@@ -642,7 +583,6 @@ export class RaceAI {
         this.adaptiveParameters.laneChangeCooldown - 0.5
       );
     }
-
     if (distanceEfficiency < 0.95) {
       this.adaptiveParameters.aggressiveness = Math.max(
         0.3,

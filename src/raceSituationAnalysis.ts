@@ -27,7 +27,7 @@ export class RaceSituationAnalysis {
   private lastRiskCalculationTurn: number = -1;
   private cachedDirectionalRisk: DirectionalRisk | null = null;
 
-  constructor(private horse: RaceHorse, public envData: RaceEnvironment) {
+  constructor(private horse: RaceHorse, private raceEnv: RaceEnvironment) {
     this.racePhase = RacePhase.Early;
     this.riskLevel = 0;
     this.opportunities = {
@@ -74,7 +74,7 @@ export class RaceSituationAnalysis {
   }
 
   private determineRacePhase(): RacePhase {
-    const progress = this.envData.selfStatus.raceProgress;
+    const progress = this.raceEnv.selfStatus.raceProgress;
     if (progress < 0.25) {
       return RacePhase.Early;
     } else if (progress < 0.65) {
@@ -114,7 +114,7 @@ export class RaceSituationAnalysis {
 
   private calculateMinDistance(): number {
     let minDistance = Infinity;
-    for (const raycast of this.envData.trackInfo.raycasts) {
+    for (const raycast of this.raceEnv.trackInfo.raycasts) {
       if (raycast.hitDistance < minDistance) {
         minDistance = raycast.hitDistance;
       }
@@ -124,26 +124,26 @@ export class RaceSituationAnalysis {
 
   private identifyOpportunities(): Opportunities {
     const canOvertake = !!(
-      this.envData.nearbyHorses.front &&
-      this.envData.nearbyHorses.distances[
-        this.envData.nearbyHorses.front.horseId
+      this.raceEnv.nearbyHorses.front &&
+      this.raceEnv.nearbyHorses.distances[
+        this.raceEnv.nearbyHorses.front.horseId
       ] < 30 &&
-      (!this.envData.nearbyHorses.left ||
-        this.envData.nearbyHorses.distances[
-          this.envData.nearbyHorses.left.horseId
+      (!this.raceEnv.nearbyHorses.left ||
+        this.raceEnv.nearbyHorses.distances[
+          this.raceEnv.nearbyHorses.left.horseId
         ] > 20)
     );
     const canMoveInner =
-      this.envData.trackInfo.currentLane !== Lane.Inner &&
-      (!this.envData.nearbyHorses.left ||
-        this.envData.nearbyHorses.distances[
-          this.envData.nearbyHorses.left.horseId
+      this.raceEnv.trackInfo.currentLane !== Lane.Inner &&
+      (!this.raceEnv.nearbyHorses.left ||
+        this.raceEnv.nearbyHorses.distances[
+          this.raceEnv.nearbyHorses.left.horseId
         ] > 25);
     const canMoveOuter =
-      this.envData.trackInfo.currentLane !== Lane.Outer &&
-      (!this.envData.nearbyHorses.right ||
-        this.envData.nearbyHorses.distances[
-          this.envData.nearbyHorses.right.horseId
+      this.raceEnv.trackInfo.currentLane !== Lane.Outer &&
+      (!this.raceEnv.nearbyHorses.right ||
+        this.raceEnv.nearbyHorses.distances[
+          this.raceEnv.nearbyHorses.right.horseId
         ] > 25);
     return { canOvertake, canMoveInner, canMoveOuter };
   }
@@ -191,14 +191,14 @@ export class RaceSituationAnalysis {
   }
 
   private shouldBlockCompetitor(): boolean {
-    const nearbyHorses = this.envData.nearbyHorses;
+    const nearbyHorses = this.raceEnv.nearbyHorses;
     return (
       !!(nearbyHorses.left || nearbyHorses.right) && this.racePhase === "final"
     );
   }
 
   analyzeDirectionalRisks(): RiskAnalysisDetail {
-    const currentTurn = this.envData.selfStatus.currentRank;
+    const currentTurn = this.raceEnv.selfStatus.currentRank;
     if (
       this.lastRiskCalculationTurn === currentTurn &&
       this.cachedDirectionalRisk
@@ -292,8 +292,8 @@ export class RaceSituationAnalysis {
   }
 
   private analyzeHorseProximityRisk(): DirectionalRisk {
-    const nearbyHorses = this.envData.nearbyHorses;
-    const distances = this.envData.nearbyHorses.distances;
+    const nearbyHorses = this.raceEnv.nearbyHorses;
+    const distances = this.raceEnv.nearbyHorses.distances;
     let frontRisk = 0;
     let leftRisk = 0;
     let rightRisk = 0;
@@ -326,14 +326,14 @@ export class RaceSituationAnalysis {
   }
 
   private analyzeSpeedRisk(): DirectionalRisk {
-    const currentSpeed = this.envData.selfStatus.speed;
+    const currentSpeed = this.raceEnv.selfStatus.speed;
     const maxSpeed = this.horse.maxSpeed;
     const speedRatio = currentSpeed / maxSpeed;
     let baseRisk = 0;
     if (speedRatio > 0.9) {
       baseRisk = (speedRatio - 0.9) / 0.1;
     }
-    const stamina = this.envData.selfStatus.stamina;
+    const stamina = this.raceEnv.selfStatus.stamina;
     const staminaRatio = stamina / this.horse.maxStamina;
     if (staminaRatio < 0.2) {
       baseRisk *= 1.5;
@@ -351,7 +351,7 @@ export class RaceSituationAnalysis {
   }
 
   private analyzeCornerRisk(): DirectionalRisk {
-    const cornerApproach = this.envData.trackInfo.cornerApproach;
+    const cornerApproach = this.raceEnv.trackInfo.cornerApproach;
     if (Math.abs(cornerApproach) < 0.1) {
       return {
         front: 0,
@@ -363,7 +363,7 @@ export class RaceSituationAnalysis {
       };
     }
     const intensity = Math.abs(cornerApproach);
-    const currentSpeed = this.envData.selfStatus.speed;
+    const currentSpeed = this.raceEnv.selfStatus.speed;
     const speedFactor = Math.min(
       1.0,
       currentSpeed / (this.horse.maxSpeed * 0.7)

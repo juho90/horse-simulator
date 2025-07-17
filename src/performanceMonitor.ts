@@ -188,7 +188,7 @@ export class PerformanceMonitor {
     metrics.staminaEfficiency = (speedRatio + staminaRatio) / 2;
   }
 
-  generateReport(): string {
+  generateReport() {
     const allMetrics = this.getAllPerformanceMetrics();
     const analysis = this.getPerformanceAnalysis();
 
@@ -254,8 +254,7 @@ export class PerformanceMonitor {
         report += `${index + 1}. ${rec}\n`;
       });
     }
-
-    return report;
+    console.log(report);
   }
 
   reset(): void {

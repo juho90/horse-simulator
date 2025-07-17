@@ -75,6 +75,7 @@ export class RaceHorse {
     );
     this.raceStrategyPlan = new RaceStrategyPlan(
       this,
+      this.raceEnvironment,
       this.raceSituationAnalysis
     );
     this.raceAI = new RaceAI(
@@ -94,11 +95,11 @@ export class RaceHorse {
     }
   }
 
-  moveOnTrack(otherHorses: RaceHorse[]): void {
+  moveOnTrack(turn: number, otherHorses: RaceHorse[]): void {
     this.raceEnvironment.update(otherHorses);
     this.raceSituationAnalysis.update();
     this.raceStrategyPlan.update();
-    const aiDecision = this.raceAI.makeDecision();
+    const aiDecision = this.raceAI.update(turn);
     this.speed = Math.min(
       this.speed + aiDecision.targetAccel,
       aiDecision.targetSpeed

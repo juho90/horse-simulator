@@ -187,7 +187,7 @@ export function runRaceSimulator(track: RaceTrack, horses: Horse[]): RaceLog[] {
         const horse = raceHorses[index];
         if (!horse.finished) {
           const prevMode = horse.raceAI.getCurrentMode();
-          horse.moveOnTrack(raceHorses);
+          horse.moveOnTrack(turn, raceHorses);
           const currentMode = horse.raceAI.getCurrentMode();
           const aiDecision = horse.raceAI.getAIDecision();
           if (aiDecision) {

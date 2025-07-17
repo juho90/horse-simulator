@@ -1,3 +1,4 @@
+import { DrivingMode } from "./drivingMode";
 import {
   Lane,
   LaneEvaluation,
@@ -5,6 +6,7 @@ import {
   RacePhase,
 } from "./laneEvaluation";
 import { UrgencyLevel } from "./raceAI";
+import { RaceEnvironment } from "./raceEnvironment";
 import { RaceHorse } from "./raceHorse";
 import { RaceSituationAnalysis } from "./raceSituationAnalysis";
 
@@ -25,7 +27,8 @@ export class RaceStrategyPlan {
 
   constructor(
     private horse: RaceHorse,
-    private analysis: RaceSituationAnalysis
+    private raceEnv: RaceEnvironment,
+    private raceAnalysis: RaceSituationAnalysis
   ) {
     this.targetSpeed = 0;
     this.targetDirection = 0;
@@ -35,24 +38,23 @@ export class RaceStrategyPlan {
     this.recommendedLane = Lane.Middle;
   }
 
-  update(): string {
+  update() {
     this.targetSpeed = this.calculateTargetSpeed();
     this.targetDirection = this.calculateTargetDirection();
     this.targetAccel = this.calculateTargetAccel();
     this.currentPhase = this.determineRacePhase();
     this.laneEvaluations = this.evaluateAllLanes();
     this.recommendedLane = this.selectOptimalLane();
-    return `Phase: ${this.currentPhase}, Recommended Lane: ${this.recommendedLane}`;
   }
 
   private calculateTargetSpeed(): number {
     const staminaRatio = this.horse.stamina / this.horse.maxStamina;
     let baseSpeed = this.horse.maxSpeed;
-    if (this.analysis.racePhase === "final") {
+    if (this.raceAnalysis.racePhase === RacePhase.Final) {
       baseSpeed *= 0.95;
     } else if (staminaRatio < 0.3) {
       baseSpeed *= 0.6;
-    } else if (this.analysis.drivingMode === "overtaking") {
+    } else if (this.raceAnalysis.drivingMode === DrivingMode.Overtaking) {
       baseSpeed *= 0.9;
     } else {
       baseSpeed *= 0.8;
@@ -77,7 +79,7 @@ export class RaceStrategyPlan {
   }
 
   private determineRacePhase(): RacePhase {
-    const raceProgress = this.analysis.envData.selfStatus.raceProgress;
+    const raceProgress = this.raceEnv.selfStatus.raceProgress;
     if (raceProgress < 0.25) {
       return RacePhase.Early;
     } else if (raceProgress < 0.65) {
@@ -91,8 +93,10 @@ export class RaceStrategyPlan {
 
   private evaluateAllLanes(): LaneEvaluation[] {
     const lanes: Lane[] = [Lane.Inner, Lane.Middle, Lane.Outer];
-    const currentLane = this.analysis.envData.trackInfo.currentLane;
-    return lanes.map((lane) => {
+    const currentLane = this.raceEnv.trackInfo.currentLane;
+    const laneEvaluations: LaneEvaluation[] = new Array(lanes.length);
+    for (let i = 0; i < lanes.length; i++) {
+      const lane = lanes[i];
       const safety = this.calculateLaneSafety(lane);
       const efficiency = this.calculateLaneEfficiency(lane);
       const opportunity = this.calculateLaneOpportunity(lane);
@@ -103,28 +107,22 @@ export class RaceStrategyPlan {
         efficiency * weights.efficiency +
         opportunity * weights.opportunity -
         transitionCost;
-      return {
+      laneEvaluations[i] = {
         lane,
         safety,
         efficiency,
         opportunity,
         totalScore,
         transitionCost,
-        reasoning: this.generateLaneReasoning(
-          lane,
-          safety,
-          efficiency,
-          opportunity,
-          weights
-        ),
       };
-    });
+    }
+    return laneEvaluations;
   }
 
   private calculateLaneSafety(lane: Lane): number {
-    const directionalRisk = this.analysis.directionalRisk;
-    const nearbyHorses = this.analysis.envData.nearbyHorses;
-    const currentLane = this.analysis.envData.trackInfo.currentLane;
+    const directionalRisk = this.raceAnalysis.directionalRisk;
+    const nearbyHorses = this.raceEnv.nearbyHorses;
+    const currentLane = this.raceEnv.trackInfo.currentLane;
     let baseSafety = 1.0;
     if (lane === Lane.Inner) {
       baseSafety -= directionalRisk.left * 0.8;
@@ -156,7 +154,7 @@ export class RaceStrategyPlan {
         baseSafety -= 0.2;
       }
     }
-    const cornerApproach = this.analysis.envData.trackInfo.cornerApproach;
+    const cornerApproach = this.raceEnv.trackInfo.cornerApproach;
     if (Math.abs(cornerApproach) > 0.05) {
       if (cornerApproach > 0) {
         if (lane === Lane.Inner) {
@@ -211,7 +209,7 @@ export class RaceStrategyPlan {
         efficiency -= 0.2;
       }
     }
-    const nearbyHorses = this.analysis.envData.nearbyHorses;
+    const nearbyHorses = this.raceEnv.nearbyHorses;
     let trafficDensity = 0;
     if (lane === Lane.Inner) {
       if (nearbyHorses.left) {
@@ -238,7 +236,7 @@ export class RaceStrategyPlan {
       }
     }
     efficiency -= trafficDensity;
-    const currentSpeed = this.analysis.envData.selfStatus.speed;
+    const currentSpeed = this.raceEnv.selfStatus.speed;
     const speedRatio = currentSpeed / this.horse.maxSpeed;
     if (speedRatio > 0.8) {
       if (lane === Lane.Outer) {
@@ -251,7 +249,7 @@ export class RaceStrategyPlan {
         efficiency += 0.08;
       }
     }
-    const stamina = this.analysis.envData.selfStatus.stamina;
+    const stamina = this.raceEnv.selfStatus.stamina;
     const staminaRatio = stamina / this.horse.maxStamina;
     if (staminaRatio < 0.3) {
       if (lane === Lane.Inner) {
@@ -260,7 +258,7 @@ export class RaceStrategyPlan {
         efficiency -= 0.1;
       }
     }
-    const raceProgress = this.analysis.envData.selfStatus.raceProgress;
+    const raceProgress = this.raceEnv.selfStatus.raceProgress;
     if (raceProgress > 0.8) {
       if (lane === Lane.Inner) {
         efficiency += 0.12;
@@ -271,10 +269,10 @@ export class RaceStrategyPlan {
 
   private calculateLaneOpportunity(lane: Lane): number {
     let opportunity = 0.5;
-    const currentRank = this.analysis.envData.selfStatus.currentRank;
-    const raceProgress = this.analysis.envData.selfStatus.raceProgress;
-    const nearbyHorses = this.analysis.envData.nearbyHorses;
-    const opportunities = this.analysis.opportunities;
+    const currentRank = this.raceEnv.selfStatus.currentRank;
+    const raceProgress = this.raceEnv.selfStatus.raceProgress;
+    const nearbyHorses = this.raceEnv.nearbyHorses;
+    const opportunities = this.raceAnalysis.opportunities;
     if (opportunities.canOvertake) {
       if (lane === Lane.Outer) {
         let outerBonus = 0.35;
@@ -306,7 +304,7 @@ export class RaceStrategyPlan {
       if (lane === Lane.Middle) {
         opportunity += 0.2;
       }
-      const currentLane = this.analysis.envData.trackInfo.currentLane;
+      const currentLane = this.raceEnv.trackInfo.currentLane;
       if (lane === currentLane) {
         opportunity += 0.1;
       }
@@ -323,7 +321,7 @@ export class RaceStrategyPlan {
         opportunity += 0.15;
       }
     }
-    const stamina = this.analysis.envData.selfStatus.stamina;
+    const stamina = this.raceEnv.selfStatus.stamina;
     const staminaRatio = stamina / this.horse.maxStamina;
     if (staminaRatio > 0.7) {
       if (lane === Lane.Outer) {
@@ -350,11 +348,11 @@ export class RaceStrategyPlan {
     } else {
       baseCost = 0.12;
     }
-    const currentSpeed = this.analysis.envData.selfStatus.speed;
+    const currentSpeed = this.raceEnv.selfStatus.speed;
     const speedRatio = currentSpeed / this.horse.maxSpeed;
     baseCost *= 1 + speedRatio * 0.4;
-    const directionalRisk = this.analysis.directionalRisk;
-    const nearbyHorses = this.analysis.envData.nearbyHorses;
+    const directionalRisk = this.raceAnalysis.directionalRisk;
+    const nearbyHorses = this.raceEnv.nearbyHorses;
     if (to === Lane.Inner) {
       baseCost += directionalRisk.left * 0.35;
       if (nearbyHorses.left) {
@@ -377,16 +375,16 @@ export class RaceStrategyPlan {
         }
       }
     }
-    const cornerApproach = this.analysis.envData.trackInfo.cornerApproach;
+    const cornerApproach = this.raceEnv.trackInfo.cornerApproach;
     if (Math.abs(cornerApproach) > 0.1) {
       baseCost += 0.15;
     }
-    const stamina = this.analysis.envData.selfStatus.stamina;
+    const stamina = this.raceEnv.selfStatus.stamina;
     const staminaRatio = stamina / this.horse.maxStamina;
     if (staminaRatio < 0.3) {
       baseCost += 0.2;
     }
-    const raceProgress = this.analysis.envData.selfStatus.raceProgress;
+    const raceProgress = this.raceEnv.selfStatus.raceProgress;
     if (raceProgress > 0.8) {
       baseCost += 0.1;
     }
@@ -400,21 +398,6 @@ export class RaceStrategyPlan {
     return sortedLanes[0].lane;
   }
 
-  private generateLaneReasoning(
-    lane: Lane,
-    safety: number,
-    efficiency: number,
-    opportunity: number,
-    weights: PhaseWeights
-  ): string {
-    const scores = {
-      safety: (safety * weights.safety).toFixed(2),
-      efficiency: (efficiency * weights.efficiency).toFixed(2),
-      opportunity: (opportunity * weights.opportunity).toFixed(2),
-    };
-    return `${lane}: 안전도${scores.safety} 효율성${scores.efficiency} 기회도${scores.opportunity}`;
-  }
-
   updateLaneEvaluations(): void {
     this.currentPhase = this.determineRacePhase();
     this.laneEvaluations = this.evaluateAllLanes();
@@ -425,7 +408,7 @@ export class RaceStrategyPlan {
     if (!this.laneEvaluations || this.laneEvaluations.length === 0) {
       this.updateLaneEvaluations();
     }
-    const currentLane = this.analysis.envData.trackInfo.currentLane;
+    const currentLane = this.raceEnv.trackInfo.currentLane;
     const optimalEvaluation = this.laneEvaluations.find(
       (le) => le.lane === this.recommendedLane
     );
@@ -458,7 +441,6 @@ export class RaceStrategyPlan {
     shouldChange: boolean;
     targetLane: Lane;
     urgency: UrgencyLevel;
-    reasoning: string;
   } {
     const shouldChange = this.shouldChangeLane();
     const targetLane = this.getOptimalLane();
@@ -467,10 +449,9 @@ export class RaceStrategyPlan {
         shouldChange: false,
         targetLane,
         urgency: UrgencyLevel.Low,
-        reasoning: "현재 레인이 최적",
       };
     }
-    const currentLane = this.analysis.envData.trackInfo.currentLane;
+    const currentLane = this.raceEnv.trackInfo.currentLane;
     const optimalEvaluation = this.laneEvaluations.find(
       (le) => le.lane === targetLane
     );
@@ -482,7 +463,6 @@ export class RaceStrategyPlan {
         shouldChange: false,
         targetLane,
         urgency: UrgencyLevel.Low,
-        reasoning: "평가 데이터 부족",
       };
     }
     const scoreDifference =
@@ -495,9 +475,6 @@ export class RaceStrategyPlan {
       shouldChange: true,
       targetLane,
       urgency,
-      reasoning: `${targetLane} 레인으로 변경 권장 (점수차: ${scoreDifference.toFixed(
-        2
-      )})`,
     };
   }
 

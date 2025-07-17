@@ -17,7 +17,6 @@ export interface LaneEvaluation {
   opportunity: number;
   totalScore: number;
   transitionCost: number;
-  reasoning: string;
 }
 
 export enum RacePhase {
