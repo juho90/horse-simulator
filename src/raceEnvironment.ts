@@ -3,6 +3,13 @@ import { RaceHorse } from "./raceHorse";
 import { Distance } from "./raceMath";
 import { RaycastResult, raycastBoundary } from "./raceSimulator";
 
+export enum RelativePosition {
+  Front = "front",
+  Left = "left",
+  Right = "right",
+  Back = "back",
+}
+
 export class RaceEnvironment {
   trackInfo: {
     raycasts: RaycastResult[];
@@ -56,17 +63,17 @@ export class RaceEnvironment {
       if (distance < 50) {
         const position = this.getRelativePosition(other);
         if (
-          position === "front" &&
+          position === RelativePosition.Front &&
           (!nearby.front || distance < Distance(nearby.front, this.horse))
         ) {
           nearby.front = other;
         } else if (
-          position === "left" &&
+          position === RelativePosition.Left &&
           (!nearby.left || distance < Distance(nearby.left, this.horse))
         ) {
           nearby.left = other;
         } else if (
-          position === "right" &&
+          position === RelativePosition.Right &&
           (!nearby.right || distance < Distance(nearby.right, this.horse))
         ) {
           nearby.right = other;
@@ -76,9 +83,7 @@ export class RaceEnvironment {
     return nearby;
   }
 
-  private getRelativePosition(
-    other: RaceHorse
-  ): "front" | "left" | "right" | "back" {
+  private getRelativePosition(other: RaceHorse): RelativePosition {
     const dx = other.x - this.horse.x;
     const dy = other.y - this.horse.y;
     const angle = Math.atan2(dy, dx);
@@ -86,15 +91,15 @@ export class RaceEnvironment {
     const normalizedAngle =
       ((relativeAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
     if (normalizedAngle < Math.PI / 4 || normalizedAngle > (7 * Math.PI) / 4) {
-      return "front";
+      return RelativePosition.Front;
     }
     if (normalizedAngle < (3 * Math.PI) / 4) {
-      return "left";
+      return RelativePosition.Left;
     }
     if (normalizedAngle < (5 * Math.PI) / 4) {
-      return "back";
+      return RelativePosition.Back;
     }
-    return "right";
+    return RelativePosition.Right;
   }
 
   private collectTrackInfo() {
@@ -126,6 +131,31 @@ export class RaceEnvironment {
   }
 
   private getCurrentLane(): Lane {
+    if (this.closestRaycasts && this.closestRaycasts.length > 0) {
+      const leftRaycast = this.closestRaycasts.find(
+        (raycast) =>
+          Math.abs(raycast.rayAngle - (this.horse.raceHeading - Math.PI / 2)) <
+          0.1
+      );
+      const rightRaycast = this.closestRaycasts.find(
+        (raycast) =>
+          Math.abs(raycast.rayAngle - (this.horse.raceHeading + Math.PI / 2)) <
+          0.1
+      );
+      if (leftRaycast && rightRaycast) {
+        const leftDistance = leftRaycast.hitDistance;
+        const rightDistance = rightRaycast.hitDistance;
+        const totalWidth = leftDistance + rightDistance;
+        const positionRatio = leftDistance / totalWidth;
+        if (positionRatio <= 0.33) {
+          return Lane.Inner;
+        } else if (positionRatio >= 0.67) {
+          return Lane.Outer;
+        } else {
+          return Lane.Middle;
+        }
+      }
+    }
     const distanceFromInner = Math.abs(this.horse.gate - 0);
     const distanceFromOuter = Math.abs(this.horse.gate - 7);
     if (distanceFromInner <= 2) {

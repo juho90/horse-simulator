@@ -251,30 +251,47 @@ export class RaceAI {
     const currentHeading = this.horse.raceHeading;
     let targetHeading = this.racePlan.targetDirection;
     let directionAdjustment = 0;
+
+    // 전략적 결정 적용
     if (directionalDecision) {
       if (directionalDecision.action === ActionType.ChangeLane) {
         if (directionalDecision.targetLane === Lane.Inner) {
-          directionAdjustment = -0.3 * directionalDecision.intensity;
+          directionAdjustment += -0.3 * directionalDecision.intensity;
         } else if (directionalDecision.targetLane === Lane.Outer) {
-          directionAdjustment = 0.3 * directionalDecision.intensity;
+          directionAdjustment += 0.3 * directionalDecision.intensity;
         }
       } else if (directionalDecision.action === ActionType.Overtake) {
-        directionAdjustment = 0.2 * directionalDecision.intensity;
+        directionAdjustment += 0.2 * directionalDecision.intensity;
       }
     }
+
+    // 충돌 회피 적용
     if (this.currentMode === DrivingMode.Blocked) {
       if (collision.avoidanceDirection === AvoidanceDirection.Left) {
-        directionAdjustment = Math.min(directionAdjustment, -0.4);
+        directionAdjustment += -0.4;
       } else if (collision.avoidanceDirection === AvoidanceDirection.Right) {
-        directionAdjustment = Math.max(directionAdjustment, 0.4);
+        directionAdjustment += 0.4;
       }
     }
+
+    // DirectionalRisk 기반 조정 - 가드레일 위험 포함
     const directionalRisk = this.raceAnalysis.directionalRisk;
+
+    // 좌측 위험이 높으면 우측으로, 우측 위험이 높으면 좌측으로
+    if (directionalRisk.left > 0.5) {
+      directionAdjustment += 0.4 * directionalRisk.left; // 우측으로
+    }
+    if (directionalRisk.right > 0.5) {
+      directionAdjustment -= 0.4 * directionalRisk.right; // 좌측으로
+    }
+
+    // 기존 로직 유지
     if (directionalRisk.left > 0.7 && directionalRisk.right < 0.3) {
       directionAdjustment += 0.15;
     } else if (directionalRisk.right > 0.7 && directionalRisk.left < 0.3) {
       directionAdjustment -= 0.15;
     }
+
     targetHeading = targetHeading + directionAdjustment;
     const maxAdjustment = 0.5;
     targetHeading = Math.max(
@@ -420,14 +437,37 @@ export class RaceAI {
   }
 
   private makeSafetyDecision(risk: DirectionalRisk): AIDirectionalDecision {
-    if (risk.left < risk.right && risk.left < 0.3) {
+    const currentLane = this.raceEnv.trackInfo.currentLane;
+    if (risk.left > 0.8 && currentLane !== Lane.Outer) {
+      return {
+        action: ActionType.ChangeLane,
+        targetLane: Lane.Outer,
+        intensity: 0.9,
+      };
+    }
+    if (risk.right > 0.8 && currentLane !== Lane.Inner) {
+      return {
+        action: ActionType.ChangeLane,
+        targetLane: Lane.Inner,
+        intensity: 0.9,
+      };
+    }
+    if (
+      risk.left < risk.right &&
+      risk.left < 0.3 &&
+      currentLane !== Lane.Inner
+    ) {
       return {
         action: ActionType.ChangeLane,
         targetLane: Lane.Inner,
         intensity: 0.8,
       };
     }
-    if (risk.right < risk.left && risk.right < 0.3) {
+    if (
+      risk.right < risk.left &&
+      risk.right < 0.3 &&
+      currentLane !== Lane.Outer
+    ) {
       return {
         action: ActionType.ChangeLane,
         targetLane: Lane.Outer,

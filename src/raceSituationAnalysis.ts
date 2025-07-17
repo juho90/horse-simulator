@@ -268,26 +268,58 @@ export class RaceSituationAnalysis {
   }
 
   private analyzeWallRisk(): DirectionalRisk {
-    const minDistance = this.calculateMinDistance();
+    const closestRaycasts = this.raceEnv.closestRaycasts;
+    if (!closestRaycasts || closestRaycasts.length === 0) {
+      return {
+        front: 0,
+        left: 0,
+        right: 0,
+        frontLeft: 0,
+        frontRight: 0,
+        overall: 0,
+      };
+    }
+    const currentHeading = this.horse.raceHeading;
     const criticalDistance = 20;
     const warningDistance = 35;
-    let riskFactor = 0;
-    if (minDistance < criticalDistance) {
-      riskFactor = 1.0 - minDistance / criticalDistance;
-    } else if (minDistance < warningDistance) {
-      riskFactor =
-        0.3 *
-        (1.0 -
-          (minDistance - criticalDistance) /
-            (warningDistance - criticalDistance));
-    }
+    const leftRaycast = closestRaycasts.find(
+      (raycast) =>
+        Math.abs(raycast.rayAngle - (currentHeading - Math.PI / 2)) < 0.2
+    );
+    const rightRaycast = closestRaycasts.find(
+      (raycast) =>
+        Math.abs(raycast.rayAngle - (currentHeading + Math.PI / 2)) < 0.2
+    );
+    const frontRaycast = closestRaycasts.find(
+      (raycast) => Math.abs(raycast.rayAngle - currentHeading) < 0.2
+    );
+    const calculateRisk = (distance: number) => {
+      if (distance < criticalDistance) {
+        return 1.0 - distance / criticalDistance;
+      } else if (distance < warningDistance) {
+        return (
+          0.3 *
+          (1.0 -
+            (distance - criticalDistance) /
+              (warningDistance - criticalDistance))
+        );
+      }
+      return 0;
+    };
+    const frontRisk = frontRaycast
+      ? calculateRisk(frontRaycast.hitDistance)
+      : 0;
+    const leftRisk = leftRaycast ? calculateRisk(leftRaycast.hitDistance) : 0;
+    const rightRisk = rightRaycast
+      ? calculateRisk(rightRaycast.hitDistance)
+      : 0;
     return {
-      front: riskFactor * 0.8,
-      left: riskFactor * 0.6,
-      right: riskFactor * 0.6,
-      frontLeft: riskFactor * 0.7,
-      frontRight: riskFactor * 0.7,
-      overall: riskFactor * 0.7,
+      front: frontRisk,
+      left: leftRisk,
+      right: rightRisk,
+      frontLeft: Math.max(frontRisk, leftRisk) * 0.8,
+      frontRight: Math.max(frontRisk, rightRisk) * 0.8,
+      overall: (frontRisk + leftRisk + rightRisk) / 3,
     };
   }
 
