@@ -1,6 +1,6 @@
 import * as path from "path";
-import { PerformanceAnalysis } from "./PerformanceMonitor";
 import { createSampleHorses } from "./horse";
+import { PerformanceAnalysis } from "./performanceMonitor";
 import { displayRaceResults, displayTrackInfo } from "./raceLog";
 import { runRaceSimulator } from "./raceSimulator";
 import { createTrack } from "./raceTrack";

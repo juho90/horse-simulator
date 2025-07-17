@@ -104,8 +104,9 @@ export function raycastFarBoundary(
   return farthestRaycast;
 }
 
-const TRACK_WIDTH = 200;
-const DIRECTIONS = [
+export const TRACK_WIDTH = 200;
+
+export const DIRECTIONS = [
   -Math.PI / 2,
   -Math.PI / 3,
   -Math.PI / 6,

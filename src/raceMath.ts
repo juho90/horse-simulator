@@ -1,5 +1,3 @@
-import { RaceHorse } from "./raceHorse";
-
 export type Vector2D = { x: number; y: number };
 
 export const EPSILON = 1e-10;
@@ -100,37 +98,4 @@ export function IsAngleBetween(
   } else {
     return start <= theta || theta <= end;
   }
-}
-
-export function HorseAvoidanceVector(
-  horse: RaceHorse,
-  otherHorses: RaceHorse[]
-): Vector2D {
-  let avoidanceVector = { x: 0, y: 0 };
-  const AVOID_DISTANCE = 30;
-  for (const other of otherHorses) {
-    if (other.horseId === horse.horseId) {
-      continue;
-    }
-    const distance = Distance(other, horse);
-    if (0 < distance && distance < AVOID_DISTANCE) {
-      const dx = other.x - horse.x;
-      const dy = other.y - horse.y;
-      const angleToOther = Math.atan2(dy, dx);
-      let relativeAngle = angleToOther - horse.raceHeading;
-      while (relativeAngle <= -Math.PI) {
-        relativeAngle += 2 * Math.PI;
-      }
-      while (relativeAngle > Math.PI) {
-        relativeAngle -= 2 * Math.PI;
-      }
-      if (Math.abs(relativeAngle) < Math.PI / 2) {
-        const forceMagnitude = (1 / (distance * distance)) * 0.5;
-        const forceAngle = angleToOther + Math.PI;
-        avoidanceVector.x += Math.cos(forceAngle) * forceMagnitude;
-        avoidanceVector.y += Math.sin(forceAngle) * forceMagnitude;
-      }
-    }
-  }
-  return avoidanceVector;
 }

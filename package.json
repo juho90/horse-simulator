@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc",
     "start": "ts-node src/main.ts",
-    "dev": "ts-node --watch src/main.ts"
+    "dev": "ts-node --watch src/main.ts",
+    "analysis": "ts-node src/main.ts --analysis"
   },
   "devDependencies": {
     "ts-node": "^10.9.2",

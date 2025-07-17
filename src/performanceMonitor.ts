@@ -3,6 +3,7 @@ import * as path from "path";
 import { Horse } from "./horse";
 import { RaceHorse } from "./raceHorse";
 import { HorseTurnState, RaceLog } from "./raceLog";
+import { TRACK_WIDTH } from "./raceSimulator";
 import { RaceTrack } from "./raceTrack";
 
 // 레이스 데이터 인터페이스
@@ -34,6 +35,8 @@ interface PerformanceMetrics {
   raceDistance: number;
   finished: boolean;
   finishTime?: number;
+  directionDistortions: number; // 새로 추가: 방향 왜곡 횟수
+  avgDirectionDistortion: number; // 새로 추가: 평균 방향 왜곡률
 }
 
 // 레이스 이벤트
@@ -47,7 +50,9 @@ interface RaceEvent {
     | "mode_change"
     | "finish"
     | "off_track"
-    | "segment_progress";
+    | "segment_progress"
+    | "guardrail_violation"
+    | "direction_distortion";
   description: string;
   position: { x: number; y: number };
 }
@@ -69,7 +74,7 @@ export class PerformanceAnalysis {
 
   constructor(options: MonitorOptions = {}) {
     this.options = {
-      realTimeInterval: 50,
+      realTimeInterval: 10,
       saveReports: true,
       enableWebStream: false,
       verbose: true,
@@ -170,7 +175,7 @@ export class PerformanceAnalysis {
             }
 
             // 이벤트 자동 감지
-            this.detectEvents(horse, raceHorses, turn);
+            this.detectEvents(horse, raceHorses, turn, track);
 
             // 골인 체크
             if (horse.finished) {
@@ -310,7 +315,8 @@ export class PerformanceAnalysis {
   private detectEvents(
     horse: RaceHorse,
     allHorses: RaceHorse[],
-    turn: number
+    turn: number,
+    track: RaceTrack
   ): void {
     const nearbyHorses = allHorses.filter(
       (h) =>
@@ -364,6 +370,194 @@ export class PerformanceAnalysis {
         `Attempting to overtake ${overtakingHorses.length} horse(s)`,
         { x: horse.x, y: horse.y }
       );
+    }
+
+    // 🚧 가드레일 침범 감지
+    this.detectGuardrailViolations(horse, track, turn);
+
+    // 🔄 방향 왜곡 감지
+    this.detectDirectionDistortion(horse, track, turn);
+  }
+
+  /**
+   * 가드레일 침범 감지
+   */
+  private detectGuardrailViolations(
+    horse: RaceHorse,
+    track: RaceTrack,
+    turn: number
+  ): void {
+    if (!track.segments || track.segments.length === 0) return;
+
+    const horsePosition = { x: horse.x, y: horse.y };
+    const currentSegment =
+      track.segments[horse.segmentIndex % track.segments.length];
+
+    // 기본 트랙 폭 설정 (조정 가능)
+    const trackWidth = TRACK_WIDTH;
+    let violationDistance = 0;
+    let violationType: "inner" | "outer" | null = null;
+
+    try {
+      if (currentSegment.type === "line") {
+        // 직선 구간에서의 가드레일 침범 체크
+        const lineSegment = currentSegment as any;
+        if (lineSegment.start && lineSegment.end) {
+          const segmentStart = lineSegment.start;
+          const segmentEnd = lineSegment.end;
+
+          // 직선과 점 사이의 거리 계산
+          const dx = segmentEnd.x - segmentStart.x;
+          const dy = segmentEnd.y - segmentStart.y;
+          const lineLength = Math.sqrt(dx * dx + dy * dy);
+
+          if (lineLength > 0) {
+            const distToLine = Math.abs(
+              (dy * horsePosition.x -
+                dx * horsePosition.y +
+                segmentEnd.x * segmentStart.y -
+                segmentEnd.y * segmentStart.x) /
+                lineLength
+            );
+
+            // 트랙 폭의 절반을 넘으면 침범
+            if (distToLine > trackWidth / 2) {
+              violationDistance = distToLine - trackWidth / 2;
+              violationType = "outer"; // 직선에서는 외측 침범으로 간주
+            }
+          }
+        }
+      } else if (currentSegment.type === "corner") {
+        // 코너 구간에서의 가드레일 침범 체크
+        const cornerSegment = currentSegment as any;
+        if (cornerSegment.center && cornerSegment.radius) {
+          const center = cornerSegment.center;
+          const radius = cornerSegment.radius;
+
+          // 말과 코너 중심 사이의 거리
+          const distFromCenter = Math.sqrt(
+            (horsePosition.x - center.x) ** 2 +
+              (horsePosition.y - center.y) ** 2
+          );
+
+          const innerRadius = radius - trackWidth / 2;
+          const outerRadius = radius + trackWidth / 2;
+
+          if (distFromCenter < innerRadius) {
+            violationDistance = innerRadius - distFromCenter;
+            violationType = "inner";
+          } else if (distFromCenter > outerRadius) {
+            violationDistance = distFromCenter - outerRadius;
+            violationType = "outer";
+          }
+        }
+      }
+
+      // 가드레일 침범 기록 (1m 이상 침범시에만)
+      if (violationType && violationDistance > 1) {
+        this.recordEvent(
+          turn,
+          horse.horseId.toString(),
+          "guardrail_violation",
+          `🚧 ${violationType?.toUpperCase()} guardrail violation! Distance: ${violationDistance.toFixed(
+            1
+          )}m from ${violationType} boundary (Segment: ${horse.segmentIndex})`,
+          { x: horse.x, y: horse.y }
+        );
+
+        // 심각한 침범의 경우 (5m 이상) off_track 이벤트도 기록
+        if (violationDistance > 5) {
+          this.recordEvent(
+            turn,
+            horse.horseId.toString(),
+            "off_track",
+            `⚠️ Severely off track! ${violationDistance.toFixed(
+              1
+            )}m from ${violationType} guardrail`,
+            { x: horse.x, y: horse.y }
+          );
+        }
+      }
+    } catch (error) {
+      // 에러 발생시 조용히 무시 (로그 스팸 방지)
+    }
+  }
+
+  /**
+   * 방향 왜곡 감지
+   */
+  private detectDirectionDistortion(
+    horse: RaceHorse,
+    track: RaceTrack,
+    turn: number
+  ): void {
+    if (!track.segments || track.segments.length === 0) return;
+
+    const currentSegment =
+      track.segments[horse.segmentIndex % track.segments.length];
+    let expectedDirection = 0;
+    let distortionAngle = 0;
+
+    try {
+      if (currentSegment.type === "line") {
+        // 직선 구간에서의 올바른 방향 계산
+        const lineSegment = currentSegment as any;
+        if (lineSegment.start && lineSegment.end) {
+          const dx = lineSegment.end.x - lineSegment.start.x;
+          const dy = lineSegment.end.y - lineSegment.start.y;
+          expectedDirection = Math.atan2(dy, dx);
+        }
+      } else if (currentSegment.type === "corner") {
+        // 코너 구간에서의 올바른 방향 계산
+        const cornerSegment = currentSegment as any;
+        if (cornerSegment.center && cornerSegment.radius) {
+          const center = cornerSegment.center;
+          const horsePosition = { x: horse.x, y: horse.y };
+
+          // 코너의 접선 방향 계산
+          const radialAngle = Math.atan2(
+            horsePosition.y - center.y,
+            horsePosition.x - center.x
+          );
+
+          // 접선 방향 (코너 방향에 따라 +90도 또는 -90도)
+          expectedDirection = radialAngle + Math.PI / 2;
+
+          // 코너의 회전 방향 고려 (시계방향/반시계방향)
+          if (cornerSegment.angle < 0) {
+            expectedDirection = radialAngle - Math.PI / 2;
+          }
+        }
+      }
+
+      // 말의 현재 주행 방향과 예상 방향 사이의 각도 차이 계산
+      let angleDiff = Math.abs(horse.raceHeading - expectedDirection);
+
+      // 각도를 0-π 범위로 정규화
+      if (angleDiff > Math.PI) {
+        angleDiff = 2 * Math.PI - angleDiff;
+      }
+
+      distortionAngle = angleDiff * (180 / Math.PI); // 라디안을 도수로 변환
+
+      // 왜곡률이 30도 이상인 경우 기록
+      if (distortionAngle > 30) {
+        const distortionPercent = (distortionAngle / 180) * 100; // 왜곡률을 백분율로 변환
+
+        this.recordEvent(
+          turn,
+          horse.horseId.toString(),
+          "direction_distortion",
+          `🔄 Direction distortion: ${distortionAngle.toFixed(
+            1
+          )}° (${distortionPercent.toFixed(1)}%) from optimal path (Segment: ${
+            horse.segmentIndex
+          })`,
+          { x: horse.x, y: horse.y }
+        );
+      }
+    } catch (error) {
+      // 에러 발생시 조용히 무시
     }
   }
 
@@ -580,6 +774,8 @@ export class PerformanceAnalysis {
       finish: 0,
       off_track: 0,
       segment_progress: 0,
+      guardrail_violation: 0,
+      direction_distortion: 0,
     };
 
     this.currentRaceData.events.forEach((event) => {
@@ -594,7 +790,10 @@ export class PerformanceAnalysis {
     console.log(`   🔄 Mode Changes: ${eventCounts.mode_change}`);
     console.log(`   🏁 Finishes: ${eventCounts.finish}`);
     console.log(`   ⚠️ Off Track: ${eventCounts.off_track}`);
-    console.log(`   📍 Segment Updates: ${eventCounts.segment_progress}`);
+    console.log(
+      `   � Guardrail Violations: ${eventCounts.guardrail_violation}`
+    );
+    console.log(`   �📍 Segment Updates: ${eventCounts.segment_progress}`);
   }
 
   // 유틸리티 메서드들
@@ -639,6 +838,8 @@ export class PerformanceAnalysis {
       finalPosition: 0,
       raceDistance: horse.raceDistance,
       finished: horse.finished,
+      directionDistortions: 0,
+      avgDirectionDistortion: 0,
     };
   }
 
@@ -651,6 +852,22 @@ export class PerformanceAnalysis {
       this.currentRaceData?.events.filter(
         (e) => e.horseId === horse.horseId.toString()
       ) || [];
+
+    // 방향 왜곡 이벤트 분석
+    const directionDistortionEvents = horseEvents.filter(
+      (e) => e.eventType === "direction_distortion"
+    );
+
+    // 평균 방향 왜곡률 계산
+    let avgDirectionDistortion = 0;
+    if (directionDistortionEvents.length > 0) {
+      const totalDistortion = directionDistortionEvents.reduce((sum, event) => {
+        const match = event.description.match(/(\d+\.?\d*)°/);
+        return sum + (match ? parseFloat(match[1]) : 0);
+      }, 0);
+      avgDirectionDistortion =
+        totalDistortion / directionDistortionEvents.length;
+    }
 
     return {
       horseId: horse.horseId.toString(),
@@ -676,6 +893,8 @@ export class PerformanceAnalysis {
       raceDistance: horse.raceDistance,
       finished: horse.finished,
       finishTime: this.finishTimes.get(horse.horseId.toString()),
+      directionDistortions: directionDistortionEvents.length,
+      avgDirectionDistortion: avgDirectionDistortion,
     };
   }
 
@@ -692,6 +911,55 @@ export class PerformanceAnalysis {
   private generateImprovementSuggestions(): void {
     // 개선 제안 생성
     console.log("💡 Generating improvement suggestions...");
+  }
+
+  private cleanupOldFiles(): void {
+    try {
+      const dir = path.resolve(process.cwd());
+      const files = fs.readdirSync(dir);
+
+      // 성능 파일들 찾기 (JSON)
+      const performanceFiles = files
+        .filter((f) => f.startsWith("performance-race_") && f.endsWith(".json"))
+        .map((f) => ({
+          name: f,
+          path: path.join(dir, f),
+          timestamp: fs.statSync(path.join(dir, f)).mtime.getTime(),
+        }))
+        .sort((a, b) => b.timestamp - a.timestamp); // 최신순 정렬
+
+      // CSV 파일들 찾기
+      const csvFiles = files
+        .filter(
+          (f) => f.startsWith("detailed_analysis_race_") && f.endsWith(".csv")
+        )
+        .map((f) => ({
+          name: f,
+          path: path.join(dir, f),
+          timestamp: fs.statSync(path.join(dir, f)).mtime.getTime(),
+        }))
+        .sort((a, b) => b.timestamp - a.timestamp); // 최신순 정렬
+
+      // 최신 2개 파일을 제외하고 나머지 삭제
+      const deleteFiles = (fileList: any[]) => {
+        if (fileList.length > 2) {
+          const filesToDelete = fileList.slice(2); // 처음 2개 (최신) 제외
+          filesToDelete.forEach((file) => {
+            try {
+              fs.unlinkSync(file.path);
+              console.log(`🗑️ Cleaned up old file: ${file.name}`);
+            } catch (err) {
+              console.warn(`⚠️ Failed to delete ${file.name}:`, err);
+            }
+          });
+        }
+      };
+
+      deleteFiles(performanceFiles);
+      deleteFiles(csvFiles);
+    } catch (err) {
+      console.warn("⚠️ Failed to cleanup old files:", err);
+    }
   }
 
   private async saveDetailedReports(raceId: string): Promise<void> {
@@ -732,6 +1000,9 @@ export class PerformanceAnalysis {
       console.log("\n💾 Detailed reports saved:");
       console.log(`   📄 performance-${raceId}.json`);
       console.log(`   📊 detailed_analysis_${raceId}.csv`);
+
+      // 이전 파일들 정리 (최신 2개만 유지)
+      this.cleanupOldFiles();
     } catch (error) {
       console.error("❌ Failed to save reports:", error);
     }
