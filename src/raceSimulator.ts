@@ -1,3 +1,4 @@
+import { AIPerformanceMonitor } from "./aiPerformanceMonitor";
 import { Horse } from "./horse";
 import { RaceHorse } from "./raceHorse";
 import { HorseTurnState, RaceLog } from "./raceLog";
@@ -175,6 +176,10 @@ export function runRaceSimulator(track: RaceTrack, horses: Horse[]): RaceLog[] {
   const raceHorses: RaceHorse[] = horses.map((horse, gate) => {
     return new RaceHorse(horse, segments, gate);
   });
+  const aiMonitor = new AIPerformanceMonitor();
+  for (const horse of raceHorses) {
+    aiMonitor.addHorse(horse);
+  }
   while (raceHorses.some((h) => !h.finished) && turn < maxTurns) {
     let horseStates: HorseTurnState[] = new Array(raceHorses.length);
     let index = 0;
@@ -182,7 +187,19 @@ export function runRaceSimulator(track: RaceTrack, horses: Horse[]): RaceLog[] {
       for (; index < raceHorses.length; index++) {
         const horse = raceHorses[index];
         if (!horse.finished) {
+          const prevMode = horse.raceAI.getCurrentMode();
           horse.moveOnTrack(raceHorses);
+          const currentMode = horse.raceAI.getCurrentMode();
+          const aiDecision = horse.raceAI.getAIDecision();
+          if (aiDecision) {
+            aiMonitor.recordDecision(horse.horseId.toString(), aiDecision);
+          }
+          if (prevMode !== currentMode) {
+            aiMonitor.recordModeChange(horse.horseId.toString(), currentMode, {
+              x: horse.x,
+              y: horse.y,
+            });
+          }
           if (track.isGoal(horse)) {
             horse.finished = true;
           }
@@ -214,5 +231,6 @@ export function runRaceSimulator(track: RaceTrack, horses: Horse[]): RaceLog[] {
     logs.push({ turn, horseStates } as RaceLog);
     turn++;
   }
+  console.log("\n" + aiMonitor.generateReport());
   return logs;
 }

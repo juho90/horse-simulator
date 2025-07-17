@@ -21,7 +21,7 @@ export class RaceStrategyPlan {
     this.targetSpeed = this.calculateTargetSpeed();
     this.targetDirection = this.calculateTargetDirection();
     this.targetAccel = this.calculateTargetAccel();
-    this.reasoning = `Phase: ${this.analysis.racePhase}, State: ${this.analysis.recommendedState}`;
+    this.reasoning = `Phase: ${this.analysis.racePhase}, State: ${this.analysis.drivingMode}`;
   }
 
   private calculateTargetSpeed(): number {
@@ -31,7 +31,7 @@ export class RaceStrategyPlan {
       baseSpeed *= 0.95;
     } else if (staminaRatio < 0.3) {
       baseSpeed *= 0.6;
-    } else if (this.analysis.recommendedState === "overtaking") {
+    } else if (this.analysis.drivingMode === "overtaking") {
       baseSpeed *= 0.9;
     } else {
       baseSpeed *= 0.8;

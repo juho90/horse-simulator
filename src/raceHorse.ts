@@ -1,13 +1,9 @@
 import { Horse } from "./horse";
+import { RaceAI } from "./raceAI";
 import { RaceEnvironment } from "./raceEnvironment";
-import { Distance } from "./raceMath";
 import { RaceSegment } from "./raceSegment";
 import { RaceSituationAnalysis } from "./raceSituationAnalysis";
 import { RaceStrategyPlan } from "./raceStrategyPlan";
-import { BlockedState } from "./states/blockedState";
-import { HorseState, HorseStateType } from "./states/horseState";
-import { MaintainingPaceState } from "./states/maintainingPaceState";
-import { OvertakingState } from "./states/overtakingState";
 
 export class RaceHorse {
   horseId: number;
@@ -32,11 +28,10 @@ export class RaceHorse {
   lap: number = 0;
   finished: boolean = false;
 
-  states: Map<HorseStateType, HorseState>;
-
   raceEnvironment: RaceEnvironment;
   raceSituationAnalysis: RaceSituationAnalysis;
   raceStrategyPlan: RaceStrategyPlan;
+  raceAI: RaceAI;
 
   constructor(horse: Horse, segments: RaceSegment[], gate: number) {
     this.horseId = horse.horseId;
@@ -73,11 +68,6 @@ export class RaceHorse {
     this.raceHeading = startDir;
     this.raceDistance = 0;
 
-    this.states = new Map();
-    this.states.set("maintainingPace", new MaintainingPaceState(this));
-    this.states.set("overtaking", new OvertakingState(this));
-    this.states.set("blocked", new BlockedState(this));
-
     // Initialize AI Components
     this.raceEnvironment = new RaceEnvironment(this);
     this.raceSituationAnalysis = new RaceSituationAnalysis(
@@ -88,9 +78,12 @@ export class RaceHorse {
       this,
       this.raceSituationAnalysis
     );
-
-    const initialState = this.states.get("maintainingPace")!;
-    initialState.enter(this);
+    this.raceAI = new RaceAI(
+      this,
+      this.raceEnvironment,
+      this.raceSituationAnalysis,
+      this.raceStrategyPlan
+    );
   }
 
   moveNextSegment() {
@@ -103,13 +96,16 @@ export class RaceHorse {
   }
 
   moveOnTrack(otherHorses: RaceHorse[]): void {
-    this.cooldownsTick(1);
-
-    const activeState = this.getActiveState();
-    if (activeState) {
-      activeState.execute(otherHorses);
-    }
-
+    this.raceEnvironment.update(otherHorses);
+    this.raceSituationAnalysis.update();
+    this.raceStrategyPlan.update();
+    const aiDecision = this.raceAI.makeDecision();
+    this.speed = Math.min(
+      this.speed + aiDecision.targetAccel,
+      aiDecision.targetSpeed
+    );
+    this.raceHeading = aiDecision.targetDirection;
+    this.accel = aiDecision.targetAccel;
     if (this.accel > 0) {
       this.stamina -= this.staminaConsumption;
     } else if (this.speed > 0) {
@@ -125,7 +121,6 @@ export class RaceHorse {
     const staminaEffect =
       staminaRatio >= 0.5 ? 1.0 : Math.max(0.3, staminaRatio * 2);
     const currentMaxSpeed = this.maxSpeed * staminaEffect;
-    this.speed += this.accel;
     this.speed = Math.max(0, Math.min(this.speed, currentMaxSpeed));
     if (
       staminaRatio > 0.6 &&
@@ -141,78 +136,6 @@ export class RaceHorse {
     if (this.segment.isEndAt(this.x, this.y)) {
       this.moveNextSegment();
     }
-  }
-
-  findClosestHorseInFront(otherHorses: RaceHorse[]): RaceHorse | null {
-    let closestHorse: RaceHorse | null = null;
-    let minDistance = Infinity;
-    for (const other of otherHorses) {
-      if (other.horseId === this.horseId) {
-        continue;
-      }
-      if (other.raceDistance > this.raceDistance) {
-        const distance = Distance(other, this);
-        if (distance < minDistance) {
-          minDistance = distance;
-          closestHorse = other;
-        }
-      }
-    }
-    return closestHorse;
-  }
-
-  shouldAttemptOvertake(otherHorse: RaceHorse): boolean {
-    const distanceToTarget = Distance(otherHorse, this);
-    const isCloseEnough = distanceToTarget < 40 && distanceToTarget > 5;
-    const hasEnoughStamina = this.stamina > 40;
-    const isNotCurrentlyOvertaking = !this.isActiveState("overtaking");
-    return isCloseEnough && hasEnoughStamina && isNotCurrentlyOvertaking;
-  }
-
-  private cooldownsTick(tick: number): void {
-    for (const state of this.states.values()) {
-      state.cooldownTick(tick);
-    }
-  }
-
-  canActivateState(stateName: HorseStateType): boolean {
-    const state = this.states.get(stateName);
-    if (!state) {
-      return false;
-    }
-    return state.isOnCooldown() === false;
-  }
-
-  activateState(stateName: HorseStateType, data?: any): void {
-    const state = this.states.get(stateName);
-    if (state && this.canActivateState(stateName)) {
-      state.enter(data);
-    }
-  }
-
-  deactivateState(stateName: HorseStateType): void {
-    const state = this.states.get(stateName);
-    if (!state) {
-      return;
-    }
-    state.exit();
-  }
-
-  isActiveState(stateName: HorseStateType): boolean {
-    const state = this.states.get(stateName);
-    if (!state) {
-      return false;
-    }
-    return state.isActiveState();
-  }
-
-  getActiveState(): HorseState | null {
-    for (const state of this.states.values()) {
-      if (state.isActiveState()) {
-        return state;
-      }
-    }
-    return null;
   }
 
   updateEnvironment(otherHorses: RaceHorse[]): RaceEnvironment {

@@ -1,6 +1,6 @@
+import { DrivingMode } from "./drivingMode";
 import { RaceEnvironment } from "./raceEnvironment";
 import { RaceHorse } from "./raceHorse";
-import { HorseStateType } from "./states/horseState";
 
 export interface Opportunities {
   canOvertake: boolean;
@@ -12,7 +12,7 @@ export class RaceSituationAnalysis {
   racePhase: "early" | "middle" | "late" | "final";
   riskLevel: number;
   opportunities: Opportunities;
-  recommendedState: HorseStateType;
+  drivingMode: DrivingMode;
 
   constructor(private horse: RaceHorse, private envData: RaceEnvironment) {
     this.racePhase = "early";
@@ -22,14 +22,14 @@ export class RaceSituationAnalysis {
       canMoveInner: false,
       canMoveOuter: false,
     };
-    this.recommendedState = "maintainingPace";
+    this.drivingMode = DrivingMode.MaintainingPace;
   }
 
   update(): void {
     this.racePhase = this.determineRacePhase();
     this.riskLevel = this.calculateRiskLevel();
     this.opportunities = this.identifyOpportunities();
-    this.recommendedState = this.determineRecommendedState();
+    this.drivingMode = this.determineRecommendedState();
   }
 
   private determineRacePhase(): "early" | "middle" | "late" | "final" {
@@ -108,7 +108,7 @@ export class RaceSituationAnalysis {
     return { canOvertake, canMoveInner, canMoveOuter };
   }
 
-  private determineRecommendedState(): HorseStateType {
+  private determineRecommendedState(): DrivingMode {
     if (this.isEmergencySituation()) {
       return this.getEmergencyState();
     }
@@ -125,55 +125,57 @@ export class RaceSituationAnalysis {
     );
   }
 
-  private getEmergencyState(): HorseStateType {
-    if (this.riskLevel > 0.8) return "blocked";
-    return "maintainingPace";
+  private getEmergencyState(): DrivingMode {
+    if (this.riskLevel > 0.8) {
+      return DrivingMode.Blocked;
+    }
+    return DrivingMode.MaintainingPace;
   }
 
-  private getPhaseBasedState(): HorseStateType {
+  private getPhaseBasedState(): DrivingMode {
     switch (this.racePhase) {
       case "early":
-        return "maintainingPace";
+        return DrivingMode.MaintainingPace;
       case "middle":
-        return "maintainingPace";
+        return DrivingMode.MaintainingPace;
       case "late":
         return this.envData.selfStatus.currentRank <= 3
-          ? "maintainingPace"
-          : "overtaking";
+          ? DrivingMode.MaintainingPace
+          : DrivingMode.Overtaking;
       case "final":
-        return "overtaking";
+        return DrivingMode.Overtaking;
       default:
-        return "maintainingPace";
+        return DrivingMode.MaintainingPace;
     }
   }
 
-  private adjustForStamina(baseState: HorseStateType): HorseStateType {
+  private adjustForStamina(baseMode: DrivingMode): DrivingMode {
     const staminaRatio = this.horse.stamina / this.horse.maxStamina;
 
     if (staminaRatio < 0.3 && this.racePhase !== "final") {
-      return "maintainingPace";
+      return DrivingMode.MaintainingPace;
     }
     if (
       staminaRatio > 0.7 &&
-      baseState === "maintainingPace" &&
+      baseMode === DrivingMode.MaintainingPace &&
       this.envData.selfStatus.currentRank > 5
     ) {
-      return "overtaking";
+      return DrivingMode.Overtaking;
     }
-    return baseState;
+    return baseMode;
   }
 
-  private checkForOpportunities(currentState: HorseStateType): HorseStateType {
-    if (currentState === "overtaking") {
-      return currentState;
+  private checkForOpportunities(currentMode: DrivingMode): DrivingMode {
+    if (currentMode === DrivingMode.Overtaking) {
+      return currentMode;
     }
     if (
       this.opportunities.canOvertake &&
       this.horse.stamina > this.horse.maxStamina * 0.4 &&
       this.racePhase !== "early"
     ) {
-      return "overtaking";
+      return DrivingMode.Overtaking;
     }
-    return currentState;
+    return currentMode;
   }
 }
