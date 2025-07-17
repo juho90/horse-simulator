@@ -5,11 +5,10 @@ import { RaceLog } from "./raceLog";
 import { RaceTrack } from "./raceTrack";
 
 export function generateRaceWebGLHtml(
-  outPath: string,
-  logs: RaceLog[],
   track: RaceTrack,
+  logs: RaceLog[],
   intervalMs: number = 200
-) {
+): string {
   const segments = track.segments;
   const marginX = 160;
   const marginY = 60;
@@ -248,7 +247,7 @@ export function generateRaceWebGLHtml(
       startReplay();
     };
   `;
-  const html = `
+  return `
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -299,6 +298,9 @@ export function generateRaceWebGLHtml(
 </body>
 </html>
   `.trim();
-  fs.writeFileSync(outPath, html, "utf-8");
+}
+
+export function testRaceWebGL(outPath: string, htmlString: string) {
+  fs.writeFileSync(outPath, htmlString, "utf-8");
   child_process.exec(`start "" "${outPath}"`);
 }
