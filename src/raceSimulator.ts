@@ -1,5 +1,4 @@
 import { Horse } from "./horse";
-import { PerformanceMonitor } from "./performanceMonitor";
 import { RaceHorse } from "./raceHorse";
 import { HorseTurnState, RaceLog } from "./raceLog";
 import { Vector2D } from "./raceMath";
@@ -170,15 +169,11 @@ export function raycastBoundary(
 export function runRaceSimulator(track: RaceTrack, horses: Horse[]): RaceLog[] {
   const logs: RaceLog[] = [];
   let turn = 0;
-  const maxTurns = 300;
+  const maxTurns = 2000;
   const segments = track.segments || [];
   const raceHorses: RaceHorse[] = horses.map((horse, gate) => {
     return new RaceHorse(horse, segments, gate);
   });
-  const aiMonitor = new PerformanceMonitor();
-  for (const horse of raceHorses) {
-    aiMonitor.addHorse(horse);
-  }
   while (raceHorses.some((h) => !h.finished) && turn < maxTurns) {
     let horseStates: HorseTurnState[] = new Array(raceHorses.length);
     let index = 0;
@@ -186,19 +181,7 @@ export function runRaceSimulator(track: RaceTrack, horses: Horse[]): RaceLog[] {
       for (; index < raceHorses.length; index++) {
         const horse = raceHorses[index];
         if (!horse.finished) {
-          const prevMode = horse.raceAI.getCurrentMode();
           horse.moveOnTrack(turn, raceHorses);
-          const currentMode = horse.raceAI.getCurrentMode();
-          const aiDecision = horse.raceAI.getAIDecision();
-          if (aiDecision) {
-            aiMonitor.recordDecision(horse.horseId.toString(), aiDecision);
-          }
-          if (prevMode !== currentMode) {
-            aiMonitor.recordModeChange(horse.horseId.toString(), currentMode, {
-              x: horse.x,
-              y: horse.y,
-            });
-          }
           if (track.isGoal(horse)) {
             horse.finished = true;
           }
@@ -229,6 +212,5 @@ export function runRaceSimulator(track: RaceTrack, horses: Horse[]): RaceLog[] {
     logs.push({ turn, horseStates } as RaceLog);
     turn++;
   }
-  aiMonitor.generateReport();
   return logs;
 }

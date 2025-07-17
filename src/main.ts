@@ -1,11 +1,20 @@
 import * as path from "path";
+import { PerformanceAnalysis } from "./PerformanceMonitor";
 import { createSampleHorses } from "./horse";
 import { displayRaceResults, displayTrackInfo } from "./raceLog";
 import { runRaceSimulator } from "./raceSimulator";
 import { createTrack } from "./raceTrack";
 import { generateRaceWebGLHtml, testRaceWebGL } from "./raceViewerWebGL";
 
-function main() {
+async function runAnalysisMode() {
+  const segmentCount = Math.floor(Math.random() * 12) + 6;
+  const track = createTrack(segmentCount);
+  const horses = createSampleHorses();
+  const monitor = new PerformanceAnalysis();
+  await monitor.runRaceWithAnalysis(track, horses);
+}
+
+function runSimulateMode() {
   const segmentCount = Math.floor(Math.random() * 12) + 6;
   const track = createTrack(segmentCount);
   const horses = createSampleHorses();
@@ -17,17 +26,13 @@ function main() {
   displayRaceResults(horses, logs, track.raceLength);
 }
 
-/*
-const log = fs.readFileSync("raceline-log.json", { encoding: "utf-8" });
-const raceCornerLog = JSON.parse(log) as RaceLineLog;
-raycastNearBoundary(
-  raceCornerLog.x,
-  raceCornerLog.y,
-  raceCornerLog.heading,
-  new RaceLine(raceCornerLog.segment.start, raceCornerLog.segment.end),
-  raceCornerLog.trackWidth,
-  raceCornerLog.directions
-);
-*/
+async function main() {
+  const args = process.argv.slice(2);
+  if (args.includes("--analysis") || args.includes("-a")) {
+    await runAnalysisMode();
+  } else {
+    runSimulateMode();
+  }
+}
 
-main();
+main().catch(console.error);
