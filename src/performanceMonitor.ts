@@ -1,12 +1,15 @@
 import * as fs from "fs";
 import * as path from "path";
+import {
+  DirectionalDistanceWithSource,
+  DistanceSource,
+} from "./directionalDistance";
 import { Horse } from "./horse";
 import { RaceHorse } from "./raceHorse";
 import { HorseTurnState, RaceLog } from "./raceLog";
 import { TRACK_WIDTH } from "./raceSimulator";
 import { RaceTrack } from "./raceTrack";
 
-// 레이스 데이터 인터페이스
 interface RaceData {
   raceId: string;
   timestamp: number;
@@ -17,7 +20,6 @@ interface RaceData {
   duration: number;
 }
 
-// 성능 메트릭
 interface PerformanceMetrics {
   horseId: string;
   horseName: string;
@@ -35,13 +37,12 @@ interface PerformanceMetrics {
   raceDistance: number;
   finished: boolean;
   finishTime?: number;
-  directionDistortions: number; // 방향 왜곡 횟수
-  avgDirectionDistortion: number; // 평균 방향 왜곡률
-  guardrailViolations: number; // 새로 추가: 가드레일 침범 횟수
-  avgGuardrailDistance: number; // 새로 추가: 평균 가드레일 침범 거리
+  directionDistortions: number;
+  avgDirectionDistortion: number;
+  guardrailViolations: number;
+  avgGuardrailDistance: number;
 }
 
-// 레이스 이벤트
 interface RaceEvent {
   turn: number;
   horseId: string;
@@ -54,12 +55,13 @@ interface RaceEvent {
     | "off_track"
     | "segment_progress"
     | "guardrail_violation"
-    | "direction_distortion";
+    | "direction_distortion"
+    | "threat_analysis"
+    | "source_pattern";
   description: string;
   position: { x: number; y: number };
 }
 
-// 설정 옵션
 interface MonitorOptions {
   realTimeInterval?: number;
   saveReports?: boolean;
@@ -67,12 +69,33 @@ interface MonitorOptions {
   verbose?: boolean;
 }
 
+interface ClosestThreatAnalysis {
+  source: DistanceSource;
+  direction: "front" | "left" | "right" | "frontLeft" | "frontRight";
+  distance: number;
+  severity: "low" | "medium" | "high" | "critical";
+  recommendedAction: string;
+}
+
+interface DirectionalThreatAnalysis {
+  closestThreat: ClosestThreatAnalysis;
+  threats: {
+    front: { source: DistanceSource; distance: number };
+    left: { source: DistanceSource; distance: number };
+    right: { source: DistanceSource; distance: number };
+    frontLeft: { source: DistanceSource; distance: number };
+    frontRight: { source: DistanceSource; distance: number };
+  };
+  safestDirection: "front" | "left" | "right" | "frontLeft" | "frontRight";
+  recommendedStrategy: string;
+}
+
 export class PerformanceAnalysis {
   private raceHistory: RaceData[] = [];
   private currentRaceData: RaceData | null = null;
   private options: MonitorOptions;
   private startTime: number = 0;
-  private finishTimes: Map<string, number> = new Map(); // 완주 시간 추적
+  private finishTimes: Map<string, number> = new Map();
 
   constructor(options: MonitorOptions = {}) {
     this.options = {
@@ -90,7 +113,6 @@ export class PerformanceAnalysis {
     raceId?: string
   ): Promise<RaceLog[]> {
     const finalRaceId = raceId || `race_${Date.now()}`;
-
     if (this.options.verbose) {
       console.log("🏇 Starting Performance Analysis...");
       console.log(
@@ -100,21 +122,13 @@ export class PerformanceAnalysis {
       );
       console.log(`🐎 Horses: ${horses.length} competitors\n`);
     }
-
-    // 1. 초기 설정
     this.initializeRace(horses, finalRaceId);
-
-    // 2. 실시간 모니터링과 함께 시뮬레이션 실행
     const logs = this.runSimulationWithMonitoring(track, horses);
-
-    // 3. 자동 분석 및 리포트
     this.analyzeRaceResults(logs);
     await this.generateInstantReport(finalRaceId);
-
     if (this.options.verbose) {
       console.log("✨ Race analysis completed!");
     }
-
     return logs;
   }
 
@@ -127,45 +141,30 @@ export class PerformanceAnalysis {
     );
     let turn = 0;
     const logs: RaceLog[] = [];
-    const maxTurns = 3000; // 기존 1000 -> 3000으로 증가
-
+    const maxTurns = 3000;
     if (this.options.verbose) {
       console.log("🏁 Race starting with live AI monitoring...");
       console.log(
         `🎯 Target distance: ${track.raceLength}m, Max turns: ${maxTurns}`
       );
     }
-
-    // 초기 말 등록
     this.currentRaceData!.horses = raceHorses;
 
     while (raceHorses.some((h) => !h.finished) && turn < maxTurns) {
-      // 매 턴 자동 모니터링
       this.monitorTurn(turn, raceHorses);
-
-      // 시뮬레이션 로직
       const horseStates: HorseTurnState[] = [];
-
       try {
         for (let index = 0; index < raceHorses.length; index++) {
           const horse = raceHorses[index];
-
           if (!horse.finished) {
-            // 성능 추적 시작
             this.trackHorsePerformance(horse, turn);
-
-            // AI 로직 실행
             const prevMode = horse.raceAI.getCurrentMode();
             horse.moveOnTrack(turn, raceHorses);
             const currentMode = horse.raceAI.getCurrentMode();
-
-            // 🎯 완주 체크 (중요!)
             if (track.isGoal(horse)) {
               horse.finished = true;
-              this.finishTimes.set(horse.horseId.toString(), turn); // 완주 시간 기록
+              this.finishTimes.set(horse.horseId.toString(), turn);
             }
-
-            // 모드 변경 감지
             if (prevMode !== currentMode) {
               this.recordEvent(
                 turn,
@@ -175,11 +174,7 @@ export class PerformanceAnalysis {
                 { x: horse.x, y: horse.y }
               );
             }
-
-            // 이벤트 자동 감지
             this.detectEvents(horse, raceHorses, turn, track);
-
-            // 골인 체크
             if (horse.finished) {
               this.recordEvent(
                 turn,
@@ -188,39 +183,34 @@ export class PerformanceAnalysis {
                 `Finished the race at turn ${turn}`,
                 { x: horse.x, y: horse.y }
               );
-
               if (this.options.verbose) {
                 console.log(`🏆 ${horse.name} finished at turn ${turn}!`);
               }
             }
           }
-
-          // 상태 캡처
           horseStates[index] = this.captureHorseState(horse);
         }
       } catch (error) {
         console.error(`❌ Error at turn ${turn}:`, error);
-        // 에러 발생시 모든 말 완주 처리
         raceHorses.forEach((h) => (h.finished = true));
       }
-
       logs.push({ turn, horseStates });
       turn++;
     }
-
     this.currentRaceData!.logs = logs;
     this.currentRaceData!.duration = Date.now() - this.startTime;
-
-    // 완주 상황 분석
     const finishedHorses = raceHorses.filter((h) => h.finished);
     const unfinishedHorses = raceHorses.filter((h) => !h.finished);
+
+    if (this.options.verbose) {
+      this.generateThreatAnalysisSummary(raceHorses);
+    }
 
     if (this.options.verbose) {
       console.log(`\n🏁 Race completed after ${turn} turns:`);
       console.log(
         `   ✅ Finished horses: ${finishedHorses.length}/${raceHorses.length}`
       );
-
       if (unfinishedHorses.length > 0) {
         console.log(`   ⚠️  Unfinished horses progress:`);
         unfinishedHorses.forEach((horse) => {
@@ -235,44 +225,32 @@ export class PerformanceAnalysis {
           );
         });
       }
-
       if (finishedHorses.length === 0) {
         console.log(
           `   🚨 CRITICAL: No horses finished! Consider increasing maxTurns or checking race logic`
         );
       }
     }
-
     return logs;
   }
 
-  /**
-   * 📊 다중 레이스 비교 분석
-   */
   async generateComparativeReport(): Promise<void> {
     if (this.raceHistory.length === 0) {
       console.log("⚠️ No race data available for comparison");
       return;
     }
-
     console.log("🔬 Generating Multi-Race Comparative Analysis...");
-
-    // 모든 레이스 데이터 비교
     this.compareRacePerformances();
     this.identifyPatterns();
     this.generateImprovementSuggestions();
-
     if (this.options.saveReports) {
       await this.saveComparativeData();
     }
   }
 
-  /**
-   * 초기 설정
-   */
   private initializeRace(horses: Horse[], raceId: string): void {
     this.startTime = Date.now();
-    this.finishTimes.clear(); // 완주 시간 맵 초기화
+    this.finishTimes.clear();
     this.currentRaceData = {
       raceId,
       timestamp: this.startTime,
@@ -284,31 +262,22 @@ export class PerformanceAnalysis {
     };
   }
 
-  /**
-   * 매 턴 모니터링
-   */
   private monitorTurn(turn: number, raceHorses: RaceHorse[]): void {
-    // 성능 데이터 업데이트
     for (const horse of raceHorses) {
       if (!horse.finished) {
         this.updatePerformanceMetrics(horse, turn);
+
+        if (turn % 50 === 0 || this.isEmergencyDetected(horse)) {
+          this.performRealTimeThreatAnalysis(horse, turn);
+        }
       }
     }
   }
 
-  /**
-   * 말 성능 추적
-   */
   private trackHorsePerformance(horse: RaceHorse, turn: number): void {
-    // 스태미나 효율성, 속도 변화 등을 추적
     const efficiency = horse.stamina > 0 ? horse.speed / horse.stamina : 0;
-
-    // 성능 메트릭 업데이트는 updatePerformanceMetrics에서 처리
   }
 
-  /**
-   * 이벤트 자동 감지
-   */
   private detectEvents(
     horse: RaceHorse,
     allHorses: RaceHorse[],
@@ -321,8 +290,6 @@ export class PerformanceAnalysis {
         !h.finished &&
         Math.hypot(h.x - horse.x, h.y - horse.y) < 50
     );
-
-    // 세그먼트 변경 감지
     if (turn > 0) {
       this.recordEvent(
         turn,
@@ -334,13 +301,10 @@ export class PerformanceAnalysis {
         { x: horse.x, y: horse.y }
       );
     }
-
-    // 충돌 회피 감지
     if (nearbyHorses.length > 0) {
       const minDistance = Math.min(
         ...nearbyHorses.map((h) => Math.hypot(h.x - horse.x, h.y - horse.y))
       );
-
       if (minDistance < 30) {
         this.recordEvent(
           turn,
@@ -353,12 +317,9 @@ export class PerformanceAnalysis {
         );
       }
     }
-
-    // 추월 시도 감지
     const overtakingHorses = nearbyHorses.filter(
       (h) => horse.raceDistance > h.raceDistance
     );
-
     if (overtakingHorses.length > 0) {
       this.recordEvent(
         turn,
@@ -368,46 +329,34 @@ export class PerformanceAnalysis {
         { x: horse.x, y: horse.y }
       );
     }
-
-    // 🚧 가드레일 침범 감지
     this.detectGuardrailViolations(horse, track, turn);
-
-    // 🔄 방향 왜곡 감지
     this.detectDirectionDistortion(horse, track, turn);
+    this.detectThreatSources(horse, turn);
   }
 
-  /**
-   * 가드레일 침범 감지
-   */
   private detectGuardrailViolations(
     horse: RaceHorse,
     track: RaceTrack,
     turn: number
   ): void {
-    if (!track.segments || track.segments.length === 0) return;
-
+    if (!track.segments || track.segments.length === 0) {
+      return;
+    }
     const horsePosition = { x: horse.x, y: horse.y };
     const currentSegment =
       track.segments[horse.segmentIndex % track.segments.length];
-
-    // 기본 트랙 폭 설정 (조정 가능)
     const trackWidth = TRACK_WIDTH;
     let violationDistance = 0;
     let violationType: "inner" | "outer" | null = null;
-
     try {
       if (currentSegment.type === "line") {
-        // 직선 구간에서의 가드레일 침범 체크
         const lineSegment = currentSegment as any;
         if (lineSegment.start && lineSegment.end) {
           const segmentStart = lineSegment.start;
           const segmentEnd = lineSegment.end;
-
-          // 직선과 점 사이의 거리 계산
           const dx = segmentEnd.x - segmentStart.x;
           const dy = segmentEnd.y - segmentStart.y;
           const lineLength = Math.sqrt(dx * dx + dy * dy);
-
           if (lineLength > 0) {
             const distToLine = Math.abs(
               (dy * horsePosition.x -
@@ -416,30 +365,23 @@ export class PerformanceAnalysis {
                 segmentEnd.y * segmentStart.x) /
                 lineLength
             );
-
-            // 트랙 폭의 절반을 넘으면 침범
             if (distToLine > trackWidth / 2) {
               violationDistance = distToLine - trackWidth / 2;
-              violationType = "outer"; // 직선에서는 외측 침범으로 간주
+              violationType = "outer";
             }
           }
         }
       } else if (currentSegment.type === "corner") {
-        // 코너 구간에서의 가드레일 침범 체크
         const cornerSegment = currentSegment as any;
         if (cornerSegment.center && cornerSegment.radius) {
           const center = cornerSegment.center;
           const radius = cornerSegment.radius;
-
-          // 말과 코너 중심 사이의 거리
           const distFromCenter = Math.sqrt(
             (horsePosition.x - center.x) ** 2 +
               (horsePosition.y - center.y) ** 2
           );
-
           const innerRadius = radius - trackWidth / 2;
           const outerRadius = radius + trackWidth / 2;
-
           if (distFromCenter < innerRadius) {
             violationDistance = innerRadius - distFromCenter;
             violationType = "inner";
@@ -449,8 +391,6 @@ export class PerformanceAnalysis {
           }
         }
       }
-
-      // 가드레일 침범 기록 (1m 이상 침범시에만)
       if (violationType && violationDistance > 1) {
         this.recordEvent(
           turn,
@@ -461,8 +401,6 @@ export class PerformanceAnalysis {
           )}m from ${violationType} boundary (Segment: ${horse.segmentIndex})`,
           { x: horse.x, y: horse.y }
         );
-
-        // 심각한 침범의 경우 (5m 이상) off_track 이벤트도 기록
         if (violationDistance > 5) {
           this.recordEvent(
             turn,
@@ -475,29 +413,23 @@ export class PerformanceAnalysis {
           );
         }
       }
-    } catch (error) {
-      // 에러 발생시 조용히 무시 (로그 스팸 방지)
-    }
+    } catch (error) {}
   }
 
-  /**
-   * 방향 왜곡 감지
-   */
   private detectDirectionDistortion(
     horse: RaceHorse,
     track: RaceTrack,
     turn: number
   ): void {
-    if (!track.segments || track.segments.length === 0) return;
-
+    if (!track.segments || track.segments.length === 0) {
+      return;
+    }
     const currentSegment =
       track.segments[horse.segmentIndex % track.segments.length];
     let expectedDirection = 0;
     let distortionAngle = 0;
-
     try {
       if (currentSegment.type === "line") {
-        // 직선 구간에서의 올바른 방향 계산
         const lineSegment = currentSegment as any;
         if (lineSegment.start && lineSegment.end) {
           const dx = lineSegment.end.x - lineSegment.start.x;
@@ -505,42 +437,27 @@ export class PerformanceAnalysis {
           expectedDirection = Math.atan2(dy, dx);
         }
       } else if (currentSegment.type === "corner") {
-        // 코너 구간에서의 올바른 방향 계산
         const cornerSegment = currentSegment as any;
         if (cornerSegment.center && cornerSegment.radius) {
           const center = cornerSegment.center;
           const horsePosition = { x: horse.x, y: horse.y };
-
-          // 코너의 접선 방향 계산
           const radialAngle = Math.atan2(
             horsePosition.y - center.y,
             horsePosition.x - center.x
           );
-
-          // 접선 방향 (코너 방향에 따라 +90도 또는 -90도)
           expectedDirection = radialAngle + Math.PI / 2;
-
-          // 코너의 회전 방향 고려 (시계방향/반시계방향)
           if (cornerSegment.angle < 0) {
             expectedDirection = radialAngle - Math.PI / 2;
           }
         }
       }
-
-      // 말의 현재 주행 방향과 예상 방향 사이의 각도 차이 계산
       let angleDiff = Math.abs(horse.raceHeading - expectedDirection);
-
-      // 각도를 0-π 범위로 정규화
       if (angleDiff > Math.PI) {
         angleDiff = 2 * Math.PI - angleDiff;
       }
-
-      distortionAngle = angleDiff * (180 / Math.PI); // 라디안을 도수로 변환
-
-      // 왜곡률이 30도 이상인 경우 기록
+      distortionAngle = angleDiff * (180 / Math.PI);
       if (distortionAngle > 30) {
-        const distortionPercent = (distortionAngle / 180) * 100; // 왜곡률을 백분율로 변환
-
+        const distortionPercent = (distortionAngle / 180) * 100;
         this.recordEvent(
           turn,
           horse.horseId.toString(),
@@ -553,14 +470,189 @@ export class PerformanceAnalysis {
           { x: horse.x, y: horse.y }
         );
       }
-    } catch (error) {
-      // 에러 발생시 조용히 무시
+    } catch (error) {}
+  }
+
+  private detectThreatSources(horse: RaceHorse, turn: number): void {
+    if (!horse.raceAnalysis || !horse.raceAnalysis.dirDistanceWithSource) {
+      return;
+    }
+
+    const dirDistance = horse.raceAnalysis.dirDistanceWithSource;
+    const analysis = this.analyzeClosestThreat(dirDistance);
+
+    const { closestThreat, threats, safestDirection } = analysis;
+
+    // 위험도에 따른 이벤트 기록
+    if (closestThreat.severity === "critical") {
+      this.recordEvent(
+        turn,
+        horse.horseId.toString(),
+        "collision_avoidance",
+        `🚨 CRITICAL THREAT: ${
+          closestThreat.source
+        } at ${closestThreat.distance.toFixed(1)}m (${
+          closestThreat.direction
+        }) - Escape: ${safestDirection}`,
+        { x: horse.x, y: horse.y }
+      );
+    } else if (closestThreat.severity === "high") {
+      this.recordEvent(
+        turn,
+        horse.horseId.toString(),
+        "collision_avoidance",
+        `⚠️ HIGH THREAT: ${
+          closestThreat.source
+        } at ${closestThreat.distance.toFixed(1)}m (${
+          closestThreat.direction
+        }) - Recommended: ${safestDirection}`,
+        { x: horse.x, y: horse.y }
+      );
+    }
+
+    const criticalDirections = Object.entries(threats).filter(
+      ([_, threat]) =>
+        this.calculateThreatSeverity(
+          (threat as any).distance,
+          (threat as any).source
+        ) === "critical"
+    );
+
+    if (criticalDirections.length > 1) {
+      this.recordEvent(
+        turn,
+        horse.horseId.toString(),
+        "collision_avoidance",
+        `🚨 MULTI-DIRECTIONAL THREAT: ${
+          criticalDirections.length
+        } critical directions - ${criticalDirections
+          .map(
+            ([dir, threat]) =>
+              `${dir}:${(threat as any).source}@${(
+                threat as any
+              ).distance.toFixed(1)}m`
+          )
+          .join(", ")}`,
+        { x: horse.x, y: horse.y }
+      );
+    }
+
+    this.analyzeSourcePatterns(horse, threats, turn);
+
+    if (this.options.verbose && turn % 100 === 0) {
+      this.logThreatStatus(horse, analysis, turn);
     }
   }
 
-  /**
-   * 말 상태 캡처
-   */
+  private analyzeSourcePatterns(
+    horse: RaceHorse,
+    threats: any,
+    turn: number
+  ): void {
+    const sourceThreats = {
+      wall: [] as string[],
+      horse: [] as string[],
+      corner: [] as string[],
+      speed: [] as string[],
+    };
+
+    Object.entries(threats).forEach(([direction, threat]) => {
+      const source = (threat as any).source;
+      const distance = (threat as any).distance;
+
+      if (distance < 25) {
+        if (source === "wall") {
+          sourceThreats.wall.push(`${direction}@${distance.toFixed(1)}m`);
+        } else if (source === "horse") {
+          sourceThreats.horse.push(`${direction}@${distance.toFixed(1)}m`);
+        } else if (source === "corner") {
+          sourceThreats.corner.push(`${direction}@${distance.toFixed(1)}m`);
+        } else if (source === "speed") {
+          sourceThreats.speed.push(`${direction}@${distance.toFixed(1)}m`);
+        }
+      }
+    });
+
+    if (sourceThreats.wall.length >= 2) {
+      this.recordEvent(
+        turn,
+        horse.horseId.toString(),
+        "guardrail_violation",
+        `🚧 WALL SQUEEZE: Multiple wall threats detected - ${sourceThreats.wall.join(
+          ", "
+        )}`,
+        { x: horse.x, y: horse.y }
+      );
+    }
+
+    if (sourceThreats.horse.length >= 2) {
+      this.recordEvent(
+        turn,
+        horse.horseId.toString(),
+        "collision_avoidance",
+        `🐎 HORSE CLUSTER: Multiple horse threats detected - ${sourceThreats.horse.join(
+          ", "
+        )}`,
+        { x: horse.x, y: horse.y }
+      );
+    }
+
+    if (sourceThreats.corner.length >= 1 && sourceThreats.wall.length >= 1) {
+      this.recordEvent(
+        turn,
+        horse.horseId.toString(),
+        "direction_distortion",
+        `🌀 CORNER PRESSURE: Corner + wall combination - Corner: ${sourceThreats.corner.join(
+          ", "
+        )}, Wall: ${sourceThreats.wall.join(", ")}`,
+        { x: horse.x, y: horse.y }
+      );
+    }
+  }
+
+  private logThreatStatus(
+    horse: RaceHorse,
+    analysis: DirectionalThreatAnalysis,
+    turn: number
+  ): void {
+    const { closestThreat, threats, safestDirection } = analysis;
+
+    console.log(`\n🎯 THREAT STATUS (Turn ${turn}) - ${horse.name}:`);
+    console.log(
+      `   🚨 Primary: ${
+        closestThreat.source
+      } at ${closestThreat.distance.toFixed(1)}m (${closestThreat.direction})`
+    );
+    console.log(`   📊 Severity: ${closestThreat.severity.toUpperCase()}`);
+    console.log(
+      `   🛡️ Escape: ${safestDirection} (${threats[
+        safestDirection
+      ].distance.toFixed(1)}m clear)`
+    );
+
+    const directionSummary = Object.entries(threats)
+      .map(([dir, threat]) => {
+        const severity = this.calculateThreatSeverity(
+          (threat as any).distance,
+          (threat as any).source
+        );
+        const emoji =
+          severity === "critical"
+            ? "🚨"
+            : severity === "high"
+            ? "⚠️"
+            : severity === "medium"
+            ? "🔸"
+            : "✅";
+        return `${emoji}${dir}:${(threat as any).source}@${(
+          threat as any
+        ).distance.toFixed(1)}m`;
+      })
+      .join(" ");
+
+    console.log(`   📍 All: ${directionSummary}`);
+  }
+
   private captureHorseState(horse: RaceHorse): HorseTurnState {
     return {
       id: horse.horseId,
@@ -578,73 +670,51 @@ export class PerformanceAnalysis {
     };
   }
 
-  /**
-   * 레이스 결과 분석
-   */
   private analyzeRaceResults(logs: RaceLog[]): void {
-    if (!this.currentRaceData) return;
-
-    // 최종 성능 메트릭 계산
+    if (!this.currentRaceData) {
+      return;
+    }
     this.currentRaceData.performance = this.currentRaceData.horses.map(
       (horse) => this.calculateFinalMetrics(horse, logs)
     );
-
-    // 순위 정렬
     this.currentRaceData.performance.sort(
       (a, b) => a.finalPosition - b.finalPosition
     );
   }
 
-  /**
-   * 🎯 즉석 분석 및 리포트
-   */
   private async generateInstantReport(raceId: string): Promise<void> {
-    if (!this.currentRaceData || !this.options.verbose) return;
-
+    if (!this.currentRaceData || !this.options.verbose) {
+      return;
+    }
     console.log("\n" + "=".repeat(60));
     console.log("🔥 INSTANT AI PERFORMANCE ANALYSIS 🔥");
     console.log("=".repeat(60));
-
-    // 모든 분석을 내부에서 자동 처리
     this.displayPerformanceRanking();
     this.showAIRecommendations();
     this.displayEventSummary();
-
     if (this.options.saveReports) {
       await this.saveDetailedReports(raceId);
     }
-
-    // 히스토리에 추가
     this.raceHistory.push({ ...this.currentRaceData });
-
     console.log("=".repeat(60));
     console.log("✨ Instant analysis completed! ✨");
     console.log("=".repeat(60));
   }
 
-  /**
-   * 성능 순위 표시
-   */
   private displayPerformanceRanking(): void {
-    if (!this.currentRaceData) return;
-
+    if (!this.currentRaceData) {
+      return;
+    }
     console.log("\n🏆 Final Race Results:");
-
-    // 완주한 말들을 먼저 완주 순서대로, 미완주 말들은 거리순으로 정렬
     const finishedHorses = this.currentRaceData.performance.filter(
       (m) => m.finished
     );
     const unfinishedHorses = this.currentRaceData.performance.filter(
       (m) => !m.finished
     );
-
-    // 완주한 말들은 완주 시간 순으로 정렬
     finishedHorses.sort((a, b) => (a.finishTime || 0) - (b.finishTime || 0));
-    // 미완주 말들은 거리 순으로 정렬
     unfinishedHorses.sort((a, b) => b.raceDistance - a.raceDistance);
-
     const allHorses = [...finishedHorses, ...unfinishedHorses];
-
     allHorses.forEach((metrics, index) => {
       const medal =
         index === 0
@@ -667,21 +737,15 @@ export class PerformanceAnalysis {
     });
   }
 
-  /**
-   * AI 개선 제안
-   */
   private showAIRecommendations(): void {
-    if (!this.currentRaceData) return;
-
+    if (!this.currentRaceData) {
+      return;
+    }
     console.log("\n🧠 AI Optimization Recommendations:");
-
     const recommendations: string[] = [];
-
-    // 🚨 완주 분석 (최우선)
     const finishedCount = this.currentRaceData.events.filter(
       (e) => e.eventType === "finish"
     ).length;
-
     if (finishedCount === 0) {
       recommendations.push(
         "🚨 CRITICAL: 완주한 말이 없음 - 레이스 로직 또는 maxTurns 조정 필요"
@@ -689,46 +753,32 @@ export class PerformanceAnalysis {
     } else if (finishedCount < this.currentRaceData.horses.length / 2) {
       recommendations.push("⚠️ 완주율 낮음 - 절반 이상의 말이 완주하지 못함");
     }
-
-    // 🚧 가드레일 침범 분석 (더 엄격한 기준)
     const guardrailViolations = this.currentRaceData.events.filter(
       (e) => e.eventType === "guardrail_violation"
     ).length;
-
     if (guardrailViolations > 10) {
-      // 기존 20에서 더 엄격하게
       recommendations.push(
         "🚧 CRITICAL: 가드레일 침범이 매우 빈번 - 트랙 경계 감지 및 회피 로직 강화 필요"
       );
     } else if (guardrailViolations > 5) {
-      // 기존 10에서 더 엄격하게
       recommendations.push(
         "🚧 가드레일 침범 다수 발생 - AI 방향 제어 정확도 개선 권장"
       );
     } else if (guardrailViolations > 2) {
-      // 기존 5에서 더 엄격하게
       recommendations.push("🚧 가드레일 침범 발생 - 안전 마진 증가 고려");
     } else if (guardrailViolations > 0) {
-      // 새로 추가
       recommendations.push("🚧 가드레일 침범 감지됨 - 예방적 안전 조치 권장");
     }
-
-    // 트랙 이탈 분석 (더 엄격하게)
     const offTrackEvents = this.currentRaceData.events.filter(
       (e) => e.eventType === "off_track"
     ).length;
-
     if (offTrackEvents > 2) {
-      // 기존 5에서 더 엄격하게
       recommendations.push(
         "⚠️ 심각한 트랙 이탈 발생 - 긴급 트랙 복귀 로직 추가 필요"
       );
     } else if (offTrackEvents > 0) {
-      // 새로 추가
       recommendations.push("⚠️ 트랙 이탈 감지됨 - 트랙 경계 인식 개선 필요");
     }
-
-    // 충돌 회피 분석
     const totalCollisions = this.currentRaceData.events.filter(
       (e) => e.eventType === "collision_avoidance"
     ).length;
@@ -737,8 +787,6 @@ export class PerformanceAnalysis {
         "충돌 회피 전략 개선 필요 - 너무 많은 충돌 상황 발생"
       );
     }
-
-    // 추월 성공률 분석
     const overtakeAttempts = this.currentRaceData.events.filter(
       (e) => e.eventType === "overtake_attempt"
     ).length;
@@ -748,19 +796,14 @@ export class PerformanceAnalysis {
     if (overtakeAttempts > 0 && overtakeSuccesses / overtakeAttempts < 0.3) {
       recommendations.push("추월 성공률이 낮음 - 추월 전략 재검토 필요");
     }
-
-    // 방향 왜곡 분석
     const directionDistortions = this.currentRaceData.events.filter(
       (e) => e.eventType === "direction_distortion"
     ).length;
-
     if (directionDistortions > 15) {
       recommendations.push(
         "🔄 방향 제어 불안정 - 코너링 및 직선 주행 알고리즘 최적화 필요"
       );
     }
-
-    // 스태미나 효율성 분석
     const avgEfficiency =
       this.currentRaceData.performance.reduce(
         (sum, p) => sum + p.staminaEfficiency,
@@ -769,7 +812,6 @@ export class PerformanceAnalysis {
     if (avgEfficiency < 0.8) {
       recommendations.push("스태미나 관리 효율성 향상 권장");
     }
-
     if (recommendations.length === 0) {
       console.log("   ✅ AI performance is optimal!");
     } else {
@@ -779,14 +821,11 @@ export class PerformanceAnalysis {
     }
   }
 
-  /**
-   * 이벤트 요약 표시
-   */
   private displayEventSummary(): void {
-    if (!this.currentRaceData) return;
-
+    if (!this.currentRaceData) {
+      return;
+    }
     console.log("\n📈 Race Event Summary:");
-
     const eventCounts = {
       collision_avoidance: 0,
       overtake_attempt: 0,
@@ -797,12 +836,12 @@ export class PerformanceAnalysis {
       segment_progress: 0,
       guardrail_violation: 0,
       direction_distortion: 0,
+      threat_analysis: 0,
+      source_pattern: 0,
     };
-
     this.currentRaceData.events.forEach((event) => {
       eventCounts[event.eventType]++;
     });
-
     console.log(
       `   🚫 Collision Avoidances: ${eventCounts.collision_avoidance}`
     );
@@ -818,9 +857,10 @@ export class PerformanceAnalysis {
       `   🔄 Direction Distortions: ${eventCounts.direction_distortion}`
     );
     console.log(`   📍 Segment Updates: ${eventCounts.segment_progress}`);
+    console.log(`   🎯 Threat Analysis: ${eventCounts.threat_analysis}`);
+    console.log(`   🔍 Source Patterns: ${eventCounts.source_pattern}`);
   }
 
-  // 유틸리티 메서드들
   private recordEvent(
     turn: number,
     horseId: string,
@@ -828,8 +868,9 @@ export class PerformanceAnalysis {
     description: string,
     position: { x: number; y: number }
   ): void {
-    if (!this.currentRaceData) return;
-
+    if (!this.currentRaceData) {
+      return;
+    }
     this.currentRaceData.events.push({
       turn,
       horseId,
@@ -839,13 +880,9 @@ export class PerformanceAnalysis {
     });
   }
 
-  private updatePerformanceMetrics(horse: RaceHorse, turn: number): void {
-    // 성능 메트릭 업데이트 로직
-    // 실제 구현에서는 더 상세한 계산이 필요
-  }
+  private updatePerformanceMetrics(horse: RaceHorse, turn: number): void {}
 
   private getCurrentMetrics(horse: RaceHorse): PerformanceMetrics {
-    // 현재 성능 메트릭 반환
     return {
       horseId: horse.horseId.toString(),
       horseName: horse.name,
@@ -864,8 +901,8 @@ export class PerformanceAnalysis {
       finished: horse.finished,
       directionDistortions: 0,
       avgDirectionDistortion: 0,
-      guardrailViolations: 0, // 새로 추가
-      avgGuardrailDistance: 0, // 새로 추가
+      guardrailViolations: 0,
+      avgGuardrailDistance: 0,
     };
   }
 
@@ -873,18 +910,13 @@ export class PerformanceAnalysis {
     horse: RaceHorse,
     logs: RaceLog[]
   ): PerformanceMetrics {
-    // 최종 성능 메트릭 계산
     const horseEvents =
       this.currentRaceData?.events.filter(
         (e) => e.horseId === horse.horseId.toString()
       ) || [];
-
-    // 방향 왜곡 이벤트 분석
     const directionDistortionEvents = horseEvents.filter(
       (e) => e.eventType === "direction_distortion"
     );
-
-    // 평균 방향 왜곡률 계산
     let avgDirectionDistortion = 0;
     if (directionDistortionEvents.length > 0) {
       const totalDistortion = directionDistortionEvents.reduce((sum, event) => {
@@ -894,13 +926,9 @@ export class PerformanceAnalysis {
       avgDirectionDistortion =
         totalDistortion / directionDistortionEvents.length;
     }
-
-    // 🚧 가드레일 침범 이벤트 분석
     const guardrailViolationEvents = horseEvents.filter(
       (e) => e.eventType === "guardrail_violation"
     );
-
-    // 평균 가드레일 침범 거리 계산
     let avgGuardrailDistance = 0;
     if (guardrailViolationEvents.length > 0) {
       const totalViolationDistance = guardrailViolationEvents.reduce(
@@ -913,11 +941,10 @@ export class PerformanceAnalysis {
       avgGuardrailDistance =
         totalViolationDistance / guardrailViolationEvents.length;
     }
-
     return {
       horseId: horse.horseId.toString(),
       horseName: horse.name,
-      averageSpeed: horse.speed, // 실제로는 평균 계산 필요
+      averageSpeed: horse.speed,
       maxSpeed: horse.speed,
       staminaEfficiency: horse.stamina > 0 ? horse.speed / horse.stamina : 0,
       modeTransitions: horseEvents.filter((e) => e.eventType === "mode_change")
@@ -934,29 +961,26 @@ export class PerformanceAnalysis {
       positionChanges: 0,
       lastSpurtDuration: 0,
       totalDecisions: logs.length,
-      finalPosition: 0, // 실제 순위 계산 필요
+      finalPosition: 0,
       raceDistance: horse.raceDistance,
       finished: horse.finished,
       finishTime: this.finishTimes.get(horse.horseId.toString()),
       directionDistortions: directionDistortionEvents.length,
       avgDirectionDistortion: avgDirectionDistortion,
-      guardrailViolations: guardrailViolationEvents.length, // 새로 추가
-      avgGuardrailDistance: avgGuardrailDistance, // 새로 추가
+      guardrailViolations: guardrailViolationEvents.length,
+      avgGuardrailDistance: avgGuardrailDistance,
     };
   }
 
   private compareRacePerformances(): void {
-    // 다중 레이스 성능 비교
     console.log(`📊 Comparing ${this.raceHistory.length} races...`);
   }
 
   private identifyPatterns(): void {
-    // 패턴 식별
     console.log("🔍 Identifying performance patterns...");
   }
 
   private generateImprovementSuggestions(): void {
-    // 개선 제안 생성
     console.log("💡 Generating improvement suggestions...");
   }
 
@@ -964,8 +988,6 @@ export class PerformanceAnalysis {
     try {
       const dir = path.resolve(process.cwd());
       const files = fs.readdirSync(dir);
-
-      // 성능 파일들 찾기 (JSON)
       const performanceFiles = files
         .filter((f) => f.startsWith("performance-race_") && f.endsWith(".json"))
         .map((f) => ({
@@ -973,9 +995,7 @@ export class PerformanceAnalysis {
           path: path.join(dir, f),
           timestamp: fs.statSync(path.join(dir, f)).mtime.getTime(),
         }))
-        .sort((a, b) => b.timestamp - a.timestamp); // 최신순 정렬
-
-      // CSV 파일들 찾기
+        .sort((a, b) => b.timestamp - a.timestamp);
       const csvFiles = files
         .filter(
           (f) => f.startsWith("detailed_analysis_race_") && f.endsWith(".csv")
@@ -985,12 +1005,10 @@ export class PerformanceAnalysis {
           path: path.join(dir, f),
           timestamp: fs.statSync(path.join(dir, f)).mtime.getTime(),
         }))
-        .sort((a, b) => b.timestamp - a.timestamp); // 최신순 정렬
-
-      // 최신 2개 파일을 제외하고 나머지 삭제
+        .sort((a, b) => b.timestamp - a.timestamp);
       const deleteFiles = (fileList: any[]) => {
         if (fileList.length > 2) {
-          const filesToDelete = fileList.slice(2); // 처음 2개 (최신) 제외
+          const filesToDelete = fileList.slice(2);
           filesToDelete.forEach((file) => {
             try {
               fs.unlinkSync(file.path);
@@ -1001,7 +1019,6 @@ export class PerformanceAnalysis {
           });
         }
       };
-
       deleteFiles(performanceFiles);
       deleteFiles(csvFiles);
     } catch (err) {
@@ -1010,10 +1027,10 @@ export class PerformanceAnalysis {
   }
 
   private async saveDetailedReports(raceId: string): Promise<void> {
-    if (!this.currentRaceData) return;
-
+    if (!this.currentRaceData) {
+      return;
+    }
     try {
-      // 순환 참조 문제를 해결하기 위해 필요한 데이터만 추출
       const saveData = {
         raceId: this.currentRaceData.raceId,
         timestamp: this.currentRaceData.timestamp,
@@ -1028,27 +1045,20 @@ export class PerformanceAnalysis {
           finished: horse.finished,
         })),
       };
-
-      // JSON 리포트 저장
       const jsonPath = path.resolve(
         process.cwd(),
         `performance-${raceId}.json`
       );
       await fs.promises.writeFile(jsonPath, JSON.stringify(saveData, null, 2));
-
-      // CSV 리포트 저장
       const csvPath = path.resolve(
         process.cwd(),
         `detailed_analysis_${raceId}.csv`
       );
       const csvContent = this.generateCSVContent();
       await fs.promises.writeFile(csvPath, csvContent);
-
       console.log("\n💾 Detailed reports saved:");
       console.log(`   📄 performance-${raceId}.json`);
       console.log(`   📊 detailed_analysis_${raceId}.csv`);
-
-      // 이전 파일들 정리 (최신 2개만 유지)
       this.cleanupOldFiles();
     } catch (error) {
       console.error("❌ Failed to save reports:", error);
@@ -1072,8 +1082,9 @@ export class PerformanceAnalysis {
   }
 
   private generateCSVContent(): string {
-    if (!this.currentRaceData) return "";
-
+    if (!this.currentRaceData) {
+      return "";
+    }
     const headers = [
       "Horse Name",
       "Horse ID",
@@ -1086,17 +1097,43 @@ export class PerformanceAnalysis {
       "Overtake Attempts",
       "Overtake Successes",
       "Race Distance",
-      "Guardrail Violations", // 새로 추가
-      "Direction Distortions", // 새로 추가
-      "Avg Direction Distortion", // 새로 추가
+      "Guardrail Violations",
+      "Direction Distortions",
+      "Avg Direction Distortion",
+      "Closest Threat Source",
+      "Closest Threat Distance",
+      "Risk Level",
+      "Safest Direction",
     ];
-
     const rows = this.currentRaceData.performance.map((metrics) => {
-      // 가드레일 침범 횟수 계산
       const guardrailViolations = this.currentRaceData!.events.filter(
         (e) =>
           e.horseId === metrics.horseId && e.eventType === "guardrail_violation"
       ).length;
+
+      const horse = this.currentRaceData!.horses.find(
+        (h) => h.horseId.toString() === metrics.horseId
+      );
+      let closestThreatSource = "Unknown";
+      let closestThreatDistance = "N/A";
+      let riskLevel = "Unknown";
+      let safestDirection = "Unknown";
+
+      if (
+        horse &&
+        horse.raceAnalysis &&
+        horse.raceAnalysis.dirDistanceWithSource
+      ) {
+        try {
+          const analysis = this.analyzeClosestThreat(
+            horse.raceAnalysis.dirDistanceWithSource
+          );
+          closestThreatSource = analysis.closestThreat.source;
+          closestThreatDistance = analysis.closestThreat.distance.toFixed(1);
+          riskLevel = analysis.closestThreat.severity.toUpperCase();
+          safestDirection = analysis.safestDirection;
+        } catch (error) {}
+      }
 
       return [
         metrics.horseName,
@@ -1110,12 +1147,412 @@ export class PerformanceAnalysis {
         metrics.overtakeAttempts,
         metrics.overtakeSuccesses,
         metrics.raceDistance.toFixed(0),
-        guardrailViolations, // 새로 추가
-        metrics.directionDistortions, // 새로 추가
-        metrics.avgDirectionDistortion.toFixed(1) + "°", // 새로 추가
+        guardrailViolations,
+        metrics.directionDistortions,
+        metrics.avgDirectionDistortion.toFixed(1) + "°",
+        closestThreatSource,
+        closestThreatDistance,
+        riskLevel,
+        safestDirection,
       ];
     });
-
     return [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+  }
+
+  // 가장 가까운 위협 source와 방향 분석
+  analyzeClosestThreat(
+    dirDistanceWithSource: DirectionalDistanceWithSource
+  ): DirectionalThreatAnalysis {
+    const threats = {
+      front: {
+        source: dirDistanceWithSource.front.source,
+        distance: dirDistanceWithSource.front.distance,
+      },
+      left: {
+        source: dirDistanceWithSource.left.source,
+        distance: dirDistanceWithSource.left.distance,
+      },
+      right: {
+        source: dirDistanceWithSource.right.source,
+        distance: dirDistanceWithSource.right.distance,
+      },
+      frontLeft: {
+        source: dirDistanceWithSource.frontLeft.source,
+        distance: dirDistanceWithSource.frontLeft.distance,
+      },
+      frontRight: {
+        source: dirDistanceWithSource.frontRight.source,
+        distance: dirDistanceWithSource.frontRight.distance,
+      },
+    };
+
+    let closestThreat: ClosestThreatAnalysis = {
+      source: DistanceSource.Unknown,
+      direction: "front",
+      distance: Infinity,
+      severity: "low",
+      recommendedAction: "No immediate action required",
+    };
+
+    Object.entries(threats).forEach(([direction, threat]) => {
+      if (threat.distance < closestThreat.distance) {
+        closestThreat = {
+          source: threat.source,
+          direction: direction as any,
+          distance: threat.distance,
+          severity: this.calculateThreatSeverity(
+            threat.distance,
+            threat.source
+          ),
+          recommendedAction: this.getRecommendedAction(
+            threat.distance,
+            threat.source,
+            direction as any
+          ),
+        };
+      }
+    });
+
+    const safestDirection = Object.entries(threats).reduce(
+      (safest, [direction, threat]) => {
+        const [, safestThreat] = safest;
+        return threat.distance > safestThreat.distance
+          ? [direction, threat]
+          : safest;
+      }
+    )[0] as any;
+
+    const recommendedStrategy = this.getRecommendedStrategy(
+      closestThreat,
+      safestDirection,
+      threats
+    );
+
+    return {
+      closestThreat,
+      threats,
+      safestDirection,
+      recommendedStrategy,
+    };
+  }
+
+  private calculateThreatSeverity(
+    distance: number,
+    source: DistanceSource
+  ): "low" | "medium" | "high" | "critical" {
+    let baseThreshold = 50;
+
+    switch (source) {
+      case DistanceSource.Wall:
+        baseThreshold = 30;
+        break;
+      case DistanceSource.Horse:
+        baseThreshold = 40;
+        break;
+      case DistanceSource.Speed:
+        baseThreshold = 60;
+        break;
+      case DistanceSource.Corner:
+        baseThreshold = 35;
+        break;
+      default:
+        baseThreshold = 50;
+    }
+
+    if (distance < baseThreshold * 0.3) return "critical";
+    if (distance < baseThreshold * 0.6) return "high";
+    if (distance < baseThreshold) return "medium";
+    return "low";
+  }
+
+  private getRecommendedAction(
+    distance: number,
+    source: DistanceSource,
+    direction: string
+  ): string {
+    const severity = this.calculateThreatSeverity(distance, source);
+    const sourceText =
+      source === DistanceSource.Wall
+        ? "wall"
+        : source === DistanceSource.Horse
+        ? "horse"
+        : source === DistanceSource.Corner
+        ? "corner"
+        : "obstacle";
+
+    switch (severity) {
+      case "critical":
+        return `🚨 EMERGENCY: Immediate ${direction} avoidance required! ${sourceText} at ${distance.toFixed(
+          1
+        )}m`;
+      case "high":
+        return `⚠️ HIGH RISK: Strong ${direction} avoidance recommended. ${sourceText} at ${distance.toFixed(
+          1
+        )}m`;
+      case "medium":
+        return `🔸 MODERATE: Consider ${direction} avoidance. ${sourceText} at ${distance.toFixed(
+          1
+        )}m`;
+      case "low":
+        return `✅ LOW RISK: Monitor ${sourceText} at ${distance.toFixed(1)}m`;
+      default:
+        return "No action required";
+    }
+  }
+
+  private getRecommendedStrategy(
+    closestThreat: ClosestThreatAnalysis,
+    safestDirection: string,
+    threats: any
+  ): string {
+    const { source, direction, distance, severity } = closestThreat;
+
+    if (severity === "critical") {
+      return `🚨 EMERGENCY STRATEGY: Immediate evasion to ${safestDirection} direction (${threats[
+        safestDirection
+      ].distance.toFixed(1)}m clear)`;
+    }
+
+    if (severity === "high") {
+      return `⚠️ AVOIDANCE STRATEGY: Move towards ${safestDirection} direction to maintain ${threats[
+        safestDirection
+      ].distance.toFixed(1)}m safety margin`;
+    }
+
+    if (severity === "medium") {
+      return `🔸 MONITORING STRATEGY: Keep ${safestDirection} direction as escape route (${threats[
+        safestDirection
+      ].distance.toFixed(1)}m available)`;
+    }
+
+    return `✅ CONTINUE STRATEGY: Current path safe, ${safestDirection} direction optimal (${threats[
+      safestDirection
+    ].distance.toFixed(1)}m clear)`;
+  }
+
+  // 위협 분석 결과를 콘솔에 출력
+  displayThreatAnalysis(
+    analysis: DirectionalThreatAnalysis,
+    horseName: string
+  ): void {
+    if (!this.options.verbose) return;
+
+    console.log(`\n🎯 THREAT ANALYSIS for ${horseName}:`);
+    console.log(
+      `   🚨 Closest Threat: ${
+        analysis.closestThreat.source
+      } at ${analysis.closestThreat.distance.toFixed(1)}m (${
+        analysis.closestThreat.direction
+      })`
+    );
+    console.log(
+      `   📊 Severity: ${analysis.closestThreat.severity.toUpperCase()}`
+    );
+    console.log(
+      `   🎯 Recommended Action: ${analysis.closestThreat.recommendedAction}`
+    );
+    console.log(
+      `   🛡️ Safest Direction: ${analysis.safestDirection} (${analysis.threats[
+        analysis.safestDirection
+      ].distance.toFixed(1)}m clear)`
+    );
+    console.log(`   📋 Strategy: ${analysis.recommendedStrategy}`);
+
+    console.log(`   🔍 All Threats:`);
+    Object.entries(analysis.threats).forEach(([direction, threat]) => {
+      const emoji =
+        threat.distance < 20 ? "🚨" : threat.distance < 40 ? "⚠️" : "✅";
+      console.log(
+        `      ${emoji} ${direction}: ${
+          threat.source
+        } at ${threat.distance.toFixed(1)}m`
+      );
+    });
+  }
+
+  generateThreatAnalysisSummary(raceHorses: RaceHorse[]): void {
+    if (!this.options.verbose) {
+      return;
+    }
+    console.log(`\n🔬 COMPREHENSIVE THREAT ANALYSIS SUMMARY:`);
+    console.log(`=`.repeat(50));
+    raceHorses.forEach((horse, index) => {
+      const dirDistanceWithSource = horse.raceAnalysis.dirDistanceWithSource;
+      if (dirDistanceWithSource) {
+        const analysis = this.analyzeClosestThreat(dirDistanceWithSource);
+
+        console.log(`\n${index + 1}. ${horse.name}:`);
+        console.log(
+          `   🎯 Primary Threat: ${analysis.closestThreat.source} (${
+            analysis.closestThreat.direction
+          }, ${analysis.closestThreat.distance.toFixed(1)}m)`
+        );
+        console.log(
+          `   📊 Risk Level: ${analysis.closestThreat.severity.toUpperCase()}`
+        );
+        console.log(`   🛡️ Best Escape: ${analysis.safestDirection} direction`);
+
+        // 위험도별 통계
+        const criticalThreats = Object.values(analysis.threats).filter(
+          (t) =>
+            this.calculateThreatSeverity(t.distance, t.source) === "critical"
+        ).length;
+        const highThreats = Object.values(analysis.threats).filter(
+          (t) => this.calculateThreatSeverity(t.distance, t.source) === "high"
+        ).length;
+
+        if (criticalThreats > 0) {
+          console.log(`   🚨 CRITICAL situations: ${criticalThreats}`);
+        }
+        if (highThreats > 0) {
+          console.log(`   ⚠️ HIGH RISK situations: ${highThreats}`);
+        }
+      } else {
+        console.log(
+          `\n${index + 1}. ${horse.name}: No threat analysis data available`
+        );
+      }
+    });
+  }
+
+  // 응급 상황 감지
+  private isEmergencyDetected(horse: RaceHorse): boolean {
+    if (!horse.raceAnalysis || !horse.raceAnalysis.dirDistanceWithSource) {
+      return false;
+    }
+
+    const dirDistance = horse.raceAnalysis.dirDistanceWithSource;
+    const minDistance = Math.min(
+      dirDistance.front.distance,
+      dirDistance.left.distance,
+      dirDistance.right.distance,
+      dirDistance.frontLeft.distance,
+      dirDistance.frontRight.distance
+    );
+
+    return minDistance < 15;
+  }
+
+  private performRealTimeThreatAnalysis(horse: RaceHorse, turn: number): void {
+    if (!horse.raceAnalysis || !horse.raceAnalysis.dirDistanceWithSource) {
+      return;
+    }
+
+    const analysis = this.analyzeClosestThreat(
+      horse.raceAnalysis.dirDistanceWithSource
+    );
+
+    if (
+      analysis.closestThreat.severity === "critical" ||
+      analysis.closestThreat.severity === "high"
+    ) {
+      if (this.options.verbose) {
+        console.log(`\n🚨 REAL-TIME THREAT ALERT (Turn ${turn}):`);
+        console.log(`   🐎 Horse: ${horse.name}`);
+        console.log(
+          `   ⚠️ Threat: ${
+            analysis.closestThreat.source
+          } at ${analysis.closestThreat.distance.toFixed(1)}m (${
+            analysis.closestThreat.direction
+          })`
+        );
+        console.log(
+          `   📊 Severity: ${analysis.closestThreat.severity.toUpperCase()}`
+        );
+        console.log(
+          `   🛡️ Recommended: ${analysis.closestThreat.recommendedAction}`
+        );
+      }
+
+      this.recordEvent(
+        turn,
+        horse.horseId.toString(),
+        "collision_avoidance",
+        `Real-time threat detected: ${
+          analysis.closestThreat.source
+        } at ${analysis.closestThreat.distance.toFixed(1)}m (${
+          analysis.closestThreat.severity
+        })`,
+        { x: horse.x, y: horse.y }
+      );
+    }
+  }
+
+  public analyzeHorseThreat(
+    horse: RaceHorse
+  ): DirectionalThreatAnalysis | null {
+    if (!horse.raceAnalysis || !horse.raceAnalysis.dirDistanceWithSource) {
+      return null;
+    }
+
+    return this.analyzeClosestThreat(horse.raceAnalysis.dirDistanceWithSource);
+  }
+
+  public analyzeAllHorsesThreats(
+    raceHorses: RaceHorse[]
+  ): Map<string, DirectionalThreatAnalysis> {
+    const threatAnalysisMap = new Map<string, DirectionalThreatAnalysis>();
+
+    raceHorses.forEach((horse) => {
+      const analysis = this.analyzeHorseThreat(horse);
+      if (analysis) {
+        threatAnalysisMap.set(horse.name, analysis);
+      }
+    });
+
+    return threatAnalysisMap;
+  }
+
+  public getThreatStatistics(raceHorses: RaceHorse[]): {
+    totalThreats: number;
+    criticalThreats: number;
+    highRiskThreats: number;
+    mostDangerousSource: DistanceSource;
+    averageClosestDistance: number;
+  } {
+    const allAnalyses = Array.from(
+      this.analyzeAllHorsesThreats(raceHorses).values()
+    );
+
+    if (allAnalyses.length === 0) {
+      return {
+        totalThreats: 0,
+        criticalThreats: 0,
+        highRiskThreats: 0,
+        mostDangerousSource: DistanceSource.Unknown,
+        averageClosestDistance: 0,
+      };
+    }
+
+    const criticalThreats = allAnalyses.filter(
+      (a) => a.closestThreat.severity === "critical"
+    ).length;
+    const highRiskThreats = allAnalyses.filter(
+      (a) => a.closestThreat.severity === "high"
+    ).length;
+
+    const sourceCounts = new Map<DistanceSource, number>();
+    allAnalyses.forEach((analysis) => {
+      const source = analysis.closestThreat.source;
+      sourceCounts.set(source, (sourceCounts.get(source) || 0) + 1);
+    });
+
+    const mostDangerousSource = Array.from(sourceCounts.entries()).reduce(
+      (a, b) => (a[1] > b[1] ? a : b)
+    )[0];
+
+    const averageClosestDistance =
+      allAnalyses.reduce(
+        (sum, analysis) => sum + analysis.closestThreat.distance,
+        0
+      ) / allAnalyses.length;
+
+    return {
+      totalThreats: allAnalyses.length,
+      criticalThreats,
+      highRiskThreats,
+      mostDangerousSource,
+      averageClosestDistance,
+    };
   }
 }
