@@ -120,20 +120,20 @@ export class RaceStrategyPlan {
   }
 
   private calculateLaneSafety(lane: Lane): number {
-    const directionalRisk = this.raceAnalysis.directionalRisk;
+    const dirDistance = this.raceAnalysis.dirDistanceWithSource;
     const nearbyHorses = this.raceEnv.nearbyHorses;
     const currentLane = this.raceEnv.trackInfo.currentLane;
     let baseSafety = 1.0;
     if (lane === Lane.Inner) {
-      baseSafety -= directionalRisk.left * 0.8;
-      baseSafety -= directionalRisk.frontLeft * 0.6;
+      baseSafety -= dirDistance.left.distance * 0.8;
+      baseSafety -= dirDistance.frontLeft.distance * 0.6;
       if (nearbyHorses.left) {
         const distance = nearbyHorses.distances[nearbyHorses.left.horseId];
         if (distance < 25) baseSafety -= 0.3;
       }
     } else if (lane === Lane.Outer) {
-      baseSafety -= directionalRisk.right * 0.8;
-      baseSafety -= directionalRisk.frontRight * 0.6;
+      baseSafety -= dirDistance.right.distance * 0.8;
+      baseSafety -= dirDistance.frontRight.distance * 0.6;
       if (nearbyHorses.right) {
         const distance = nearbyHorses.distances[nearbyHorses.right.horseId];
         if (distance < 25) {
@@ -141,8 +141,9 @@ export class RaceStrategyPlan {
         }
       }
     } else {
-      baseSafety -= directionalRisk.front * 0.4;
-      baseSafety -= (directionalRisk.left + directionalRisk.right) * 0.25;
+      baseSafety -= dirDistance.front.distance * 0.4;
+      baseSafety -=
+        (dirDistance.left.distance + dirDistance.right.distance) * 0.25;
       let sideHorseCount = 0;
       if (nearbyHorses.left) {
         sideHorseCount++;
@@ -351,10 +352,10 @@ export class RaceStrategyPlan {
     const currentSpeed = this.raceEnv.selfStatus.speed;
     const speedRatio = currentSpeed / this.horse.maxSpeed;
     baseCost *= 1 + speedRatio * 0.4;
-    const directionalRisk = this.raceAnalysis.directionalRisk;
+    const dirDistance = this.raceAnalysis.dirDistanceWithSource;
     const nearbyHorses = this.raceEnv.nearbyHorses;
     if (to === Lane.Inner) {
-      baseCost += directionalRisk.left * 0.35;
+      baseCost += dirDistance.left.distance * 0.35;
       if (nearbyHorses.left) {
         const distance = nearbyHorses.distances[nearbyHorses.left.horseId];
         if (distance < 20) {
@@ -365,7 +366,7 @@ export class RaceStrategyPlan {
       }
     }
     if (to === Lane.Outer) {
-      baseCost += directionalRisk.right * 0.35;
+      baseCost += dirDistance.right.distance * 0.35;
       if (nearbyHorses.right) {
         const distance = nearbyHorses.distances[nearbyHorses.right.horseId];
         if (distance < 20) {

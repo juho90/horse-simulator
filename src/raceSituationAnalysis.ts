@@ -1,4 +1,10 @@
-import { DirectionalRisk, RiskAnalysisDetail } from "./directionalRisk";
+import {
+  DirectionalDistance,
+  DirectionalDistanceUtils,
+  DirectionalDistanceWithSource,
+  DistanceAnalysisDetail,
+  DistanceSource,
+} from "./directionalDistance";
 import { DrivingMode } from "./drivingMode";
 import { Lane, RacePhase } from "./laneEvaluation";
 import { RaceEnvironment } from "./raceEnvironment";
@@ -11,66 +17,72 @@ export interface Opportunities {
 }
 
 export class RaceSituationAnalysis {
+  dirDistanceWithSource: DirectionalDistanceWithSource;
+  isBlocked: boolean;
   racePhase: RacePhase;
-  riskLevel: number;
   opportunities: Opportunities;
   drivingMode: DrivingMode;
-  directionalRisk: DirectionalRisk;
-  riskAnalysisDetail: RiskAnalysisDetail;
-
-  private performanceTracker = {
-    calculationCount: 0,
-    cacheHits: 0,
-    averageCalculationTime: 0,
-    totalCalculationTime: 0,
-  };
-  private lastRiskCalculationTurn: number = -1;
-  private cachedDirectionalRisk: DirectionalRisk | null = null;
 
   constructor(private horse: RaceHorse, private raceEnv: RaceEnvironment) {
-    this.racePhase = RacePhase.Early;
-    this.riskLevel = 0;
+    this.dirDistanceWithSource = {
+      front: { source: DistanceSource.Unknown, distance: Infinity },
+      left: { source: DistanceSource.Unknown, distance: Infinity },
+      right: { source: DistanceSource.Unknown, distance: Infinity },
+      frontLeft: { source: DistanceSource.Unknown, distance: Infinity },
+      frontRight: {
+        source: DistanceSource.Unknown,
+        distance: Infinity,
+      },
+      minValue: { source: DistanceSource.Unknown, distance: Infinity },
+    };
+    this.isBlocked = false;
+    this.drivingMode = DrivingMode.MaintainingPace;
     this.opportunities = {
       canOvertake: false,
       canMoveInner: false,
       canMoveOuter: false,
     };
-    this.drivingMode = DrivingMode.MaintainingPace;
-    this.directionalRisk = {
-      front: 0,
-      left: 0,
-      right: 0,
-      frontLeft: 0,
-      frontRight: 0,
-      overall: 0,
-    };
-    this.riskAnalysisDetail = {
-      wallRisk: this.directionalRisk,
-      horseRisk: this.directionalRisk,
-      speedRisk: this.directionalRisk,
-      cornerRisk: this.directionalRisk,
-      combined: this.directionalRisk,
-    };
+    this.racePhase = RacePhase.Early;
   }
 
   update(): void {
+    const distanceAnalysisDetail = this.analyzeDirectionalDetails();
+    this.dirDistanceWithSource =
+      DirectionalDistanceUtils.combineDirectionalDistance(
+        distanceAnalysisDetail
+      );
+    this.isBlocked = this.calculateBlockedState();
     this.racePhase = this.determineRacePhase();
-    this.riskLevel = this.calculateRiskLevel();
     this.opportunities = this.identifyOpportunities();
     this.drivingMode = this.determineRecommendedState();
-    this.riskAnalysisDetail = this.analyzeDirectionalRisks();
-    this.directionalRisk = this.riskAnalysisDetail.combined;
   }
 
-  updateAnalysis(currentTurn: number): void {
-    this.riskAnalysisDetail = this.analyzeDirectionalRisks();
-    this.directionalRisk = this.riskAnalysisDetail.combined;
-    this.riskLevel = this.calculateOverallRisk(
-      Object.values(this.directionalRisk)
+  private calculateBlockedState(): boolean {
+    const ESCAPE_THRESHOLD = 20;
+    const CRITICAL_THRESHOLD = 10;
+    const distances = [
+      this.dirDistanceWithSource.front.distance,
+      this.dirDistanceWithSource.left.distance,
+      this.dirDistanceWithSource.right.distance,
+      this.dirDistanceWithSource.frontLeft.distance,
+      this.dirDistanceWithSource.frontRight.distance,
+    ];
+    const realDistances = distances.filter((d) => d !== Infinity && d > 0);
+    if (realDistances.length === 0) {
+      return false;
+    }
+    const frontDistance = this.dirDistanceWithSource.front.distance;
+    const leftDistance = this.dirDistanceWithSource.left.distance;
+    const rightDistance = this.dirDistanceWithSource.right.distance;
+    const frontBlocked = frontDistance < ESCAPE_THRESHOLD;
+    const leftBlocked = leftDistance < ESCAPE_THRESHOLD;
+    const rightBlocked = rightDistance < ESCAPE_THRESHOLD;
+    const sidesBlocked = leftBlocked && rightBlocked;
+    const allDirectionsCritical = realDistances.every(
+      (d) => d < CRITICAL_THRESHOLD
     );
-    this.opportunities = this.identifyOpportunities();
-    this.racePhase = this.determineRacePhase();
-    this.drivingMode = this.determineRecommendedState();
+    const blocked = (frontBlocked && sidesBlocked) || allDirectionsCritical;
+    return blocked;
   }
 
   private determineRacePhase(): RacePhase {
@@ -84,42 +96,6 @@ export class RaceSituationAnalysis {
     } else {
       return RacePhase.Final;
     }
-  }
-
-  private calculateRiskLevel(): number {
-    const startTime = performance.now();
-    let totalRisk = 0;
-    totalRisk += this.directionalRisk.front * 1.5;
-    totalRisk += this.directionalRisk.left * 1.0;
-    totalRisk += this.directionalRisk.right * 1.0;
-    totalRisk += this.directionalRisk.frontLeft * 1.2;
-    totalRisk += this.directionalRisk.frontRight * 1.2;
-    const endTime = performance.now();
-    this.updatePerformanceTracker(endTime - startTime);
-    return Math.min(1.0, totalRisk / 5);
-  }
-
-  private updatePerformanceTracker(calculationTime: number): void {
-    this.performanceTracker.calculationCount++;
-    this.performanceTracker.totalCalculationTime += calculationTime;
-    this.performanceTracker.averageCalculationTime =
-      this.performanceTracker.totalCalculationTime /
-      this.performanceTracker.calculationCount;
-  }
-
-  private calculateOverallRisk(riskValues: number[]): number {
-    if (riskValues.length === 0) return 0;
-    return riskValues.reduce((sum, risk) => sum + risk, 0) / riskValues.length;
-  }
-
-  private calculateMinDistance(): number {
-    let minDistance = Infinity;
-    for (const raycast of this.raceEnv.trackInfo.raycasts) {
-      if (raycast.hitDistance < minDistance) {
-        minDistance = raycast.hitDistance;
-      }
-    }
-    return minDistance === Infinity ? 50 : minDistance;
   }
 
   private identifyOpportunities(): Opportunities {
@@ -165,7 +141,9 @@ export class RaceSituationAnalysis {
   }
 
   private isEmergencySituation(): boolean {
-    return this.riskLevel > 0.8 || this.directionalRisk.front > 0.9;
+    // 블럭된 상태이거나 전방 거리가 매우 가까운 경우
+    const frontDistance = this.dirDistanceWithSource.front.distance;
+    return this.isBlocked || frontDistance < 5;
   }
 
   private getEmergencyState(): DrivingMode {
@@ -178,7 +156,7 @@ export class RaceSituationAnalysis {
   private shouldConsiderOvertaking(): boolean {
     return (
       this.opportunities.canOvertake &&
-      this.riskLevel < 0.5 &&
+      !this.isBlocked && // 블럭되지 않은 상태에서만 추월 고려
       this.horse.stamina > this.horse.maxStamina * 0.3
     );
   }
@@ -197,91 +175,32 @@ export class RaceSituationAnalysis {
     );
   }
 
-  analyzeDirectionalRisks(): RiskAnalysisDetail {
-    const currentTurn = this.raceEnv.selfStatus.currentRank;
-    if (
-      this.lastRiskCalculationTurn === currentTurn &&
-      this.cachedDirectionalRisk
-    ) {
-      this.performanceTracker.cacheHits++;
-      return {
-        wallRisk: this.cachedDirectionalRisk,
-        horseRisk: this.cachedDirectionalRisk,
-        speedRisk: this.cachedDirectionalRisk,
-        cornerRisk: this.cachedDirectionalRisk,
-        combined: this.cachedDirectionalRisk,
-      };
-    }
-    const wallRisk = this.analyzeWallRisk();
-    const horseRisk = this.analyzeHorseProximityRisk();
-    const speedRisk = this.analyzeSpeedRisk();
-    const cornerRisk = this.analyzeCornerRisk();
-    const combined: DirectionalRisk = {
-      front: Math.max(
-        wallRisk.front,
-        horseRisk.front,
-        speedRisk.front,
-        cornerRisk.front
-      ),
-      left: Math.max(
-        wallRisk.left,
-        horseRisk.left,
-        speedRisk.left,
-        cornerRisk.left
-      ),
-      right: Math.max(
-        wallRisk.right,
-        horseRisk.right,
-        speedRisk.right,
-        cornerRisk.right
-      ),
-      frontLeft: Math.max(
-        wallRisk.frontLeft,
-        horseRisk.frontLeft,
-        speedRisk.frontLeft,
-        cornerRisk.frontLeft
-      ),
-      frontRight: Math.max(
-        wallRisk.frontRight,
-        horseRisk.frontRight,
-        speedRisk.frontRight,
-        cornerRisk.frontRight
-      ),
-      overall: 0,
-    };
-    combined.overall =
-      (combined.front +
-        combined.left +
-        combined.right +
-        combined.frontLeft +
-        combined.frontRight) /
-      5;
-    this.lastRiskCalculationTurn = currentTurn;
-    this.cachedDirectionalRisk = combined;
+  analyzeDirectionalDetails(): DistanceAnalysisDetail {
+    const wallDistance = this.analyzeWallDistance();
+    const horseDistance = this.analyzeHorseDistance();
+    const speedAdjustedDistance = this.analyzeSpeedDistance();
+    const cornerDistance = this.analyzeCornerDistance();
     return {
-      wallRisk,
-      horseRisk,
-      speedRisk,
-      cornerRisk,
-      combined,
+      wallDistance,
+      horseDistance,
+      speedAdjustedDistance,
+      cornerDistance,
     };
   }
 
-  private analyzeWallRisk(): DirectionalRisk {
+  private analyzeWallDistance(): DirectionalDistance {
     const closestRaycasts = this.raceEnv.closestRaycasts;
     if (!closestRaycasts || closestRaycasts.length === 0) {
       return {
-        front: 0,
-        left: 0,
-        right: 0,
-        frontLeft: 0,
-        frontRight: 0,
-        overall: 0,
+        frontDistance: Infinity,
+        leftDistance: Infinity,
+        rightDistance: Infinity,
+        frontLeftDistance: Infinity,
+        frontRightDistance: Infinity,
+        minDistance: Infinity,
       };
     }
     const currentHeading = this.horse.raceHeading;
-    const criticalDistance = 20;
-    const warningDistance = 35;
     const leftRaycast = closestRaycasts.find(
       (raycast) =>
         Math.abs(raycast.rayAngle - (currentHeading - Math.PI / 2)) < 0.2
@@ -293,131 +212,118 @@ export class RaceSituationAnalysis {
     const frontRaycast = closestRaycasts.find(
       (raycast) => Math.abs(raycast.rayAngle - currentHeading) < 0.2
     );
-    const calculateRisk = (distance: number) => {
-      if (distance < criticalDistance) {
-        return 1.0 - distance / criticalDistance;
-      } else if (distance < warningDistance) {
-        return (
-          0.3 *
-          (1.0 -
-            (distance - criticalDistance) /
-              (warningDistance - criticalDistance))
-        );
-      }
-      return 0;
-    };
-    const frontRisk = frontRaycast
-      ? calculateRisk(frontRaycast.hitDistance)
-      : 0;
-    const leftRisk = leftRaycast ? calculateRisk(leftRaycast.hitDistance) : 0;
-    const rightRisk = rightRaycast
-      ? calculateRisk(rightRaycast.hitDistance)
-      : 0;
+    const frontDistance = frontRaycast ? frontRaycast.hitDistance : Infinity;
+    const leftDistance = leftRaycast ? leftRaycast.hitDistance : Infinity;
+    const rightDistance = rightRaycast ? rightRaycast.hitDistance : Infinity;
+    const frontLeftDistance = Math.min(frontDistance, leftDistance);
+    const frontRightDistance = Math.min(frontDistance, rightDistance);
+    const minDistance = Math.min(
+      frontDistance,
+      leftDistance,
+      rightDistance,
+      frontLeftDistance,
+      frontRightDistance
+    );
     return {
-      front: frontRisk,
-      left: leftRisk,
-      right: rightRisk,
-      frontLeft: Math.max(frontRisk, leftRisk) * 0.8,
-      frontRight: Math.max(frontRisk, rightRisk) * 0.8,
-      overall: (frontRisk + leftRisk + rightRisk) / 3,
+      frontDistance,
+      leftDistance,
+      rightDistance,
+      frontLeftDistance,
+      frontRightDistance,
+      minDistance,
     };
   }
 
-  private analyzeHorseProximityRisk(): DirectionalRisk {
+  private analyzeHorseDistance(): DirectionalDistance {
     const nearbyHorses = this.raceEnv.nearbyHorses;
     const distances = this.raceEnv.nearbyHorses.distances;
-    let frontRisk = 0;
-    let leftRisk = 0;
-    let rightRisk = 0;
+    let frontDistance = Infinity;
+    let leftDistance = Infinity;
+    let rightDistance = Infinity;
     if (nearbyHorses.front) {
-      const distance = distances[nearbyHorses.front.horseId];
-      if (distance < 30) {
-        frontRisk = Math.max(0, 1.0 - distance / 30);
-      }
+      frontDistance = distances[nearbyHorses.front.horseId];
     }
     if (nearbyHorses.left) {
-      const distance = distances[nearbyHorses.left.horseId];
-      if (distance < 25) {
-        leftRisk = Math.max(0, 1.0 - distance / 25);
-      }
+      leftDistance = distances[nearbyHorses.left.horseId];
     }
     if (nearbyHorses.right) {
-      const distance = distances[nearbyHorses.right.horseId];
-      if (distance < 25) {
-        rightRisk = Math.max(0, 1.0 - distance / 25);
-      }
+      rightDistance = distances[nearbyHorses.right.horseId];
     }
+    const frontLeftDistance = Math.min(frontDistance, leftDistance);
+    const frontRightDistance = Math.min(frontDistance, rightDistance);
+    const minDistance = Math.min(frontDistance, leftDistance, rightDistance);
     return {
-      front: frontRisk,
-      left: leftRisk,
-      right: rightRisk,
-      frontLeft: Math.max(frontRisk, leftRisk) * 0.8,
-      frontRight: Math.max(frontRisk, rightRisk) * 0.8,
-      overall: (frontRisk + leftRisk + rightRisk) / 3,
+      frontDistance,
+      leftDistance,
+      rightDistance,
+      frontLeftDistance,
+      frontRightDistance,
+      minDistance,
     };
   }
 
-  private analyzeSpeedRisk(): DirectionalRisk {
+  private analyzeSpeedDistance(): DirectionalDistance {
     const currentSpeed = this.raceEnv.selfStatus.speed;
     const maxSpeed = this.horse.maxSpeed;
     const speedRatio = currentSpeed / maxSpeed;
-    let baseRisk = 0;
-    if (speedRatio > 0.9) {
-      baseRisk = (speedRatio - 0.9) / 0.1;
-    }
+    const baseRequiredDistance = 20;
+    const speedMultiplier = 1 + speedRatio * 5;
     const stamina = this.raceEnv.selfStatus.stamina;
     const staminaRatio = stamina / this.horse.maxStamina;
+    let staminaMultiplier = 1.0;
     if (staminaRatio < 0.2) {
-      baseRisk *= 1.5;
+      staminaMultiplier = 1.5;
     } else if (staminaRatio < 0.5) {
-      baseRisk *= 1.2;
+      staminaMultiplier = 1.2;
     }
+    const requiredSafeDistance =
+      baseRequiredDistance * speedMultiplier * staminaMultiplier;
     return {
-      front: baseRisk * 0.2,
-      left: baseRisk,
-      right: baseRisk,
-      frontLeft: baseRisk * 0.6,
-      frontRight: baseRisk * 0.6,
-      overall: baseRisk * 0.7,
+      frontDistance: requiredSafeDistance * 1.5,
+      leftDistance: requiredSafeDistance,
+      rightDistance: requiredSafeDistance,
+      frontLeftDistance: requiredSafeDistance * 1.2,
+      frontRightDistance: requiredSafeDistance * 1.2,
+      minDistance: requiredSafeDistance,
     };
   }
 
-  private analyzeCornerRisk(): DirectionalRisk {
+  private analyzeCornerDistance(): DirectionalDistance {
     const cornerApproach = this.raceEnv.trackInfo.cornerApproach;
     if (Math.abs(cornerApproach) < 0.1) {
       return {
-        front: 0,
-        left: 0,
-        right: 0,
-        frontLeft: 0,
-        frontRight: 0,
-        overall: 0,
+        frontDistance: Infinity,
+        leftDistance: Infinity,
+        rightDistance: Infinity,
+        frontLeftDistance: Infinity,
+        frontRightDistance: Infinity,
+        minDistance: Infinity,
       };
     }
     const intensity = Math.abs(cornerApproach);
     const currentSpeed = this.raceEnv.selfStatus.speed;
-    const speedFactor = Math.min(
-      1.0,
-      currentSpeed / (this.horse.maxSpeed * 0.7)
-    );
-    const baseRisk = intensity * speedFactor * 0.6;
+    const maxSpeed = this.horse.maxSpeed;
+    const speedFactor = currentSpeed / maxSpeed;
+    const baseCornerSafeDistance = 30;
+    const requiredDistance =
+      baseCornerSafeDistance * (1 + intensity * 2) * (1 + speedFactor);
     if (cornerApproach > 0) {
       return {
-        front: baseRisk * 0.3,
-        left: baseRisk,
-        right: baseRisk * 0.2,
-        frontLeft: baseRisk * 0.8,
-        frontRight: baseRisk * 0.4,
-        overall: baseRisk * 0.6,
+        frontDistance: requiredDistance * 0.8,
+        leftDistance: requiredDistance * 1.5,
+        rightDistance: requiredDistance * 0.7,
+        frontLeftDistance: requiredDistance * 1.3,
+        frontRightDistance: requiredDistance * 0.6,
+        minDistance: requiredDistance * 0.6,
       };
     } else {
       return {
-        front: baseRisk * 0.3,
-        left: baseRisk * 0.2,
-        right: baseRisk,
-        frontLeft: baseRisk * 0.4,
-        frontRight: baseRisk * 0.8,
-        overall: baseRisk * 0.6,
+        frontDistance: requiredDistance * 0.8,
+        leftDistance: requiredDistance * 0.7,
+        rightDistance: requiredDistance * 1.5,
+        frontLeftDistance: requiredDistance * 0.6,
+        frontRightDistance: requiredDistance * 1.3,
+        minDistance: requiredDistance * 0.6,
       };
     }
   }

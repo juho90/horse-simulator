@@ -35,8 +35,10 @@ interface PerformanceMetrics {
   raceDistance: number;
   finished: boolean;
   finishTime?: number;
-  directionDistortions: number; // 새로 추가: 방향 왜곡 횟수
-  avgDirectionDistortion: number; // 새로 추가: 평균 방향 왜곡률
+  directionDistortions: number; // 방향 왜곡 횟수
+  avgDirectionDistortion: number; // 평균 방향 왜곡률
+  guardrailViolations: number; // 새로 추가: 가드레일 침범 횟수
+  avgGuardrailDistance: number; // 새로 추가: 평균 가드레일 침범 거리
 }
 
 // 레이스 이벤트
@@ -204,11 +206,6 @@ export class PerformanceAnalysis {
 
       logs.push({ turn, horseStates });
       turn++;
-
-      // 실시간 출력 (자동)
-      if (this.options.verbose && turn % this.options.realTimeInterval! === 0) {
-        this.displayLiveUpdate(turn, raceHorses);
-      }
     }
 
     this.currentRaceData!.logs = logs;
@@ -582,31 +579,6 @@ export class PerformanceAnalysis {
   }
 
   /**
-   * 실시간 업데이트 표시
-   */
-  private displayLiveUpdate(turn: number, raceHorses: RaceHorse[]): void {
-    const activeHorses = raceHorses
-      .filter((h) => !h.finished)
-      .sort((a, b) => b.raceDistance - a.raceDistance)
-      .slice(0, 3);
-
-    console.log(`📊 Turn ${turn} - Performance Update:`);
-
-    activeHorses.forEach((horse, index) => {
-      const metrics = this.getCurrentMetrics(horse);
-      const position = index + 1;
-      const efficiency = (metrics.staminaEfficiency * 100).toFixed(1);
-      const mode = horse.raceAI.getCurrentMode();
-
-      console.log(
-        `   ${position}. ${horse.name}: ${horse.raceDistance.toFixed(
-          0
-        )}m | Seg:${horse.segmentIndex} | ${efficiency}% eff | ${mode} mode`
-      );
-    });
-  }
-
-  /**
    * 레이스 결과 분석
    */
   private analyzeRaceResults(logs: RaceLog[]): void {
@@ -718,11 +690,49 @@ export class PerformanceAnalysis {
       recommendations.push("⚠️ 완주율 낮음 - 절반 이상의 말이 완주하지 못함");
     }
 
+    // 🚧 가드레일 침범 분석 (더 엄격한 기준)
+    const guardrailViolations = this.currentRaceData.events.filter(
+      (e) => e.eventType === "guardrail_violation"
+    ).length;
+
+    if (guardrailViolations > 10) {
+      // 기존 20에서 더 엄격하게
+      recommendations.push(
+        "🚧 CRITICAL: 가드레일 침범이 매우 빈번 - 트랙 경계 감지 및 회피 로직 강화 필요"
+      );
+    } else if (guardrailViolations > 5) {
+      // 기존 10에서 더 엄격하게
+      recommendations.push(
+        "🚧 가드레일 침범 다수 발생 - AI 방향 제어 정확도 개선 권장"
+      );
+    } else if (guardrailViolations > 2) {
+      // 기존 5에서 더 엄격하게
+      recommendations.push("🚧 가드레일 침범 발생 - 안전 마진 증가 고려");
+    } else if (guardrailViolations > 0) {
+      // 새로 추가
+      recommendations.push("🚧 가드레일 침범 감지됨 - 예방적 안전 조치 권장");
+    }
+
+    // 트랙 이탈 분석 (더 엄격하게)
+    const offTrackEvents = this.currentRaceData.events.filter(
+      (e) => e.eventType === "off_track"
+    ).length;
+
+    if (offTrackEvents > 2) {
+      // 기존 5에서 더 엄격하게
+      recommendations.push(
+        "⚠️ 심각한 트랙 이탈 발생 - 긴급 트랙 복귀 로직 추가 필요"
+      );
+    } else if (offTrackEvents > 0) {
+      // 새로 추가
+      recommendations.push("⚠️ 트랙 이탈 감지됨 - 트랙 경계 인식 개선 필요");
+    }
+
     // 충돌 회피 분석
     const totalCollisions = this.currentRaceData.events.filter(
       (e) => e.eventType === "collision_avoidance"
     ).length;
-    if (totalCollisions > 10) {
+    if (totalCollisions > 15) {
       recommendations.push(
         "충돌 회피 전략 개선 필요 - 너무 많은 충돌 상황 발생"
       );
@@ -737,6 +747,17 @@ export class PerformanceAnalysis {
     ).length;
     if (overtakeAttempts > 0 && overtakeSuccesses / overtakeAttempts < 0.3) {
       recommendations.push("추월 성공률이 낮음 - 추월 전략 재검토 필요");
+    }
+
+    // 방향 왜곡 분석
+    const directionDistortions = this.currentRaceData.events.filter(
+      (e) => e.eventType === "direction_distortion"
+    ).length;
+
+    if (directionDistortions > 15) {
+      recommendations.push(
+        "🔄 방향 제어 불안정 - 코너링 및 직선 주행 알고리즘 최적화 필요"
+      );
     }
 
     // 스태미나 효율성 분석
@@ -791,9 +812,12 @@ export class PerformanceAnalysis {
     console.log(`   🏁 Finishes: ${eventCounts.finish}`);
     console.log(`   ⚠️ Off Track: ${eventCounts.off_track}`);
     console.log(
-      `   � Guardrail Violations: ${eventCounts.guardrail_violation}`
+      `   🚧 Guardrail Violations: ${eventCounts.guardrail_violation}`
     );
-    console.log(`   �📍 Segment Updates: ${eventCounts.segment_progress}`);
+    console.log(
+      `   🔄 Direction Distortions: ${eventCounts.direction_distortion}`
+    );
+    console.log(`   📍 Segment Updates: ${eventCounts.segment_progress}`);
   }
 
   // 유틸리티 메서드들
@@ -840,6 +864,8 @@ export class PerformanceAnalysis {
       finished: horse.finished,
       directionDistortions: 0,
       avgDirectionDistortion: 0,
+      guardrailViolations: 0, // 새로 추가
+      avgGuardrailDistance: 0, // 새로 추가
     };
   }
 
@@ -869,6 +895,25 @@ export class PerformanceAnalysis {
         totalDistortion / directionDistortionEvents.length;
     }
 
+    // 🚧 가드레일 침범 이벤트 분석
+    const guardrailViolationEvents = horseEvents.filter(
+      (e) => e.eventType === "guardrail_violation"
+    );
+
+    // 평균 가드레일 침범 거리 계산
+    let avgGuardrailDistance = 0;
+    if (guardrailViolationEvents.length > 0) {
+      const totalViolationDistance = guardrailViolationEvents.reduce(
+        (sum, event) => {
+          const match = event.description.match(/Distance: (\d+\.?\d*)m/);
+          return sum + (match ? parseFloat(match[1]) : 0);
+        },
+        0
+      );
+      avgGuardrailDistance =
+        totalViolationDistance / guardrailViolationEvents.length;
+    }
+
     return {
       horseId: horse.horseId.toString(),
       horseName: horse.name,
@@ -895,6 +940,8 @@ export class PerformanceAnalysis {
       finishTime: this.finishTimes.get(horse.horseId.toString()),
       directionDistortions: directionDistortionEvents.length,
       avgDirectionDistortion: avgDirectionDistortion,
+      guardrailViolations: guardrailViolationEvents.length, // 새로 추가
+      avgGuardrailDistance: avgGuardrailDistance, // 새로 추가
     };
   }
 
@@ -1039,21 +1086,35 @@ export class PerformanceAnalysis {
       "Overtake Attempts",
       "Overtake Successes",
       "Race Distance",
+      "Guardrail Violations", // 새로 추가
+      "Direction Distortions", // 새로 추가
+      "Avg Direction Distortion", // 새로 추가
     ];
 
-    const rows = this.currentRaceData.performance.map((metrics) => [
-      metrics.horseName,
-      metrics.horseId,
-      metrics.finalPosition,
-      metrics.averageSpeed.toFixed(2),
-      metrics.maxSpeed.toFixed(2),
-      (metrics.staminaEfficiency * 100).toFixed(1) + "%",
-      metrics.modeTransitions,
-      metrics.collisionAvoidances,
-      metrics.overtakeAttempts,
-      metrics.overtakeSuccesses,
-      metrics.raceDistance.toFixed(0),
-    ]);
+    const rows = this.currentRaceData.performance.map((metrics) => {
+      // 가드레일 침범 횟수 계산
+      const guardrailViolations = this.currentRaceData!.events.filter(
+        (e) =>
+          e.horseId === metrics.horseId && e.eventType === "guardrail_violation"
+      ).length;
+
+      return [
+        metrics.horseName,
+        metrics.horseId,
+        metrics.finalPosition,
+        metrics.averageSpeed.toFixed(2),
+        metrics.maxSpeed.toFixed(2),
+        (metrics.staminaEfficiency * 100).toFixed(1) + "%",
+        metrics.modeTransitions,
+        metrics.collisionAvoidances,
+        metrics.overtakeAttempts,
+        metrics.overtakeSuccesses,
+        metrics.raceDistance.toFixed(0),
+        guardrailViolations, // 새로 추가
+        metrics.directionDistortions, // 새로 추가
+        metrics.avgDirectionDistortion.toFixed(1) + "°", // 새로 추가
+      ];
+    });
 
     return [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
   }
