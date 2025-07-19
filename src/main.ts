@@ -1,6 +1,6 @@
 import * as path from "path";
 import { createSampleHorses } from "./horse";
-import { PerformanceAnalysis } from "./performanceMonitor";
+import { PerformanceMonitor } from "./performanceMonitor";
 import { displayRaceResults, displayTrackInfo } from "./raceLog";
 import { runRaceSimulator } from "./raceSimulator";
 import { createTrack } from "./raceTrack";
@@ -10,7 +10,7 @@ async function runAnalysisMode() {
   const segmentCount = Math.floor(Math.random() * 12) + 6;
   const track = createTrack(segmentCount);
   const horses = createSampleHorses();
-  const monitor = new PerformanceAnalysis();
+  const monitor = new PerformanceMonitor();
   await monitor.runRaceWithAnalysis(track, horses);
 }
 

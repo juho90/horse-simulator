@@ -28,7 +28,7 @@ export class RaceHorse {
   lap: number = 0;
   finished: boolean = false;
 
-  raceEnvironment: RaceEnvironment;
+  raceEnv: RaceEnvironment;
   raceAnalysis: RaceSituationAnalysis;
   raceStrategyPlan: RaceStrategyPlan;
   raceAI: RaceAI;
@@ -68,16 +68,16 @@ export class RaceHorse {
     this.raceHeading = startDir;
     this.raceDistance = 0;
 
-    this.raceEnvironment = new RaceEnvironment(this);
-    this.raceAnalysis = new RaceSituationAnalysis(this, this.raceEnvironment);
+    this.raceEnv = new RaceEnvironment(this);
+    this.raceAnalysis = new RaceSituationAnalysis(this, this.raceEnv);
     this.raceStrategyPlan = new RaceStrategyPlan(
       this,
-      this.raceEnvironment,
+      this.raceEnv,
       this.raceAnalysis
     );
     this.raceAI = new RaceAI(
       this,
-      this.raceEnvironment,
+      this.raceEnv,
       this.raceAnalysis,
       this.raceStrategyPlan
     );
@@ -93,7 +93,7 @@ export class RaceHorse {
   }
 
   moveOnTrack(turn: number, otherHorses: RaceHorse[]): void {
-    this.raceEnvironment.update(otherHorses);
+    this.raceEnv.update(otherHorses);
     this.raceAnalysis.update();
     this.raceStrategyPlan.update();
     const aiDecision = this.raceAI.update(turn);
@@ -136,8 +136,8 @@ export class RaceHorse {
   }
 
   updateEnvironment(otherHorses: RaceHorse[]): RaceEnvironment {
-    this.raceEnvironment.update(otherHorses);
-    return this.raceEnvironment;
+    this.raceEnv.update(otherHorses);
+    return this.raceEnv;
   }
 
   updateAnalyzeSituation(): RaceSituationAnalysis {

@@ -196,10 +196,10 @@ export function runRaceSimulator(track: RaceTrack, horses: Horse[]): RaceLog[] {
           accel: horse.accel,
           stamina: horse.stamina,
           dist: horse.raceDistance,
-          closestHitPoints: horse.raceEnvironment.closestRaycasts?.map(
+          closestHitPoints: horse.raceEnv.closestRaycasts?.map(
             (r) => r.hitPoint
           ),
-          farthestHitPoint: horse.raceEnvironment.farthestRaycast?.hitPoint,
+          farthestHitPoint: horse.raceEnv.farthestRaycast?.hitPoint,
         };
       }
     } catch (error) {
