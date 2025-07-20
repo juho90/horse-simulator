@@ -18,10 +18,8 @@ enum ThreatLevel {
 
 interface RaceEvent {
   turn: number;
-  horseId: string;
+  horseName: string;
   description: string;
-  position: { x: number; y: number };
-  speed: number;
   threatLevel: ThreatLevel;
 }
 
@@ -42,8 +40,11 @@ export class PerformanceMonitor {
   private guardrailViolationEvents: RaceEvent[] = [];
   private directionDistortionEvents: RaceEvent[] = [];
   private situationAnalysisEvents: RaceEvent[] = [];
+  private horseTurnStates: Record<number, Record<string, HorseTurnState>> = {};
 
-  constructor() {}
+  findHorseTurnStates(turn: number, horseName: string): HorseTurnState | null {
+    return this.horseTurnStates[turn]?.[horseName] ?? null;
+  }
 
   async runRaceWithAnalysis(
     track: RaceTrack,
@@ -57,7 +58,6 @@ export class PerformanceMonitor {
     this.guardrailViolationEvents = [];
     this.directionDistortionEvents = [];
     this.situationAnalysisEvents = [];
-
     const logs = await this.runSimulationWithMonitoring(track, horses);
     const report = this.generateSituationReport();
     await this.saveSituationReport(report);
@@ -76,43 +76,26 @@ export class PerformanceMonitor {
     const maxTurns = 3000;
     while (raceHorses.some((h) => !h.finished) && turn < maxTurns) {
       const horseStates: HorseTurnState[] = [];
+      const horseTurnStatesPerTurn: Record<string, HorseTurnState> = {};
+      this.horseTurnStates[turn] = horseTurnStatesPerTurn;
       try {
         for (let index = 0; index < raceHorses.length; index++) {
           const horse = raceHorses[index];
-          if (!horse.finished) {
-            const prevMode = horse.raceAI.getCurrentMode();
-            horse.moveOnTrack(turn, raceHorses);
-            const currentMode = horse.raceAI.getCurrentMode();
-            if (track.isGoal(horse)) {
-              horse.finished = true;
-            }
-            if (prevMode !== currentMode) {
-              this.modeChangeEvents.push({
-                turn,
-                horseId: horse.horseId.toString(),
-                description: `Mode changed from ${prevMode} to ${currentMode}`,
-                position: { x: horse.x, y: horse.y },
-                speed: horse.speed,
-                threatLevel: ThreatLevel.NONE,
-              });
-            }
-            this.detectEvents(horse, turn, track);
-            if (horse.finished) {
-              this.finishEvents.push({
-                turn,
-                horseId: horse.horseId.toString(),
-                description: `Finished the race at turn ${turn}`,
-                position: { x: horse.x, y: horse.y },
-                speed: horse.speed,
-                threatLevel: ThreatLevel.NONE,
-              });
-            }
+          if (horse.finished) {
+            break;
+          }
+          const prevMode = horse.raceAI.getCurrentMode();
+          horse.moveOnTrack(turn, raceHorses);
+          const currentMode = horse.raceAI.getCurrentMode();
+          if (track.isGoal(horse)) {
+            horse.finished = true;
           }
           horseStates[index] = {
             id: horse.horseId,
             name: horse.name,
             x: horse.x,
             y: horse.y,
+            heading: horse.raceHeading,
             speed: horse.speed,
             accel: horse.accel,
             stamina: horse.stamina,
@@ -122,6 +105,24 @@ export class PerformanceMonitor {
             ),
             farthestHitPoint: horse.raceEnv.farthestRaycast?.hitPoint,
           };
+          horseTurnStatesPerTurn[horse.name] = horseStates[index];
+          if (prevMode !== currentMode) {
+            this.modeChangeEvents.push({
+              turn,
+              horseName: horse.horseId.toString(),
+              description: `Mode changed from ${prevMode} to ${currentMode}`,
+              threatLevel: ThreatLevel.NONE,
+            });
+          }
+          this.detectEvents(horse, turn, track);
+          if (horse.finished) {
+            this.finishEvents.push({
+              turn,
+              horseName: horse.horseId.toString(),
+              description: `Finished the race at turn ${turn}`,
+              threatLevel: ThreatLevel.NONE,
+            });
+          }
         }
       } catch (error) {
         raceHorses.forEach((h) => (h.finished = true));
@@ -136,27 +137,25 @@ export class PerformanceMonitor {
     if (turn > 0) {
       this.segmentProgressEvents.push({
         turn,
-        horseId: horse.horseId.toString(),
+        horseName: horse.horseId.toString(),
         description: `Segment: ${
           horse.segmentIndex
         }, Distance: ${horse.raceDistance.toFixed(
           1
         )}m, Position: (${horse.x.toFixed(1)}, ${horse.y.toFixed(1)})`,
-        position: { x: horse.x, y: horse.y },
-        speed: horse.speed,
         threatLevel: ThreatLevel.NONE,
       });
     }
-    this.analyzeCollisions(horse, horse.raceEnv.nearbyHorses, turn);
-    this.analyzeSituationalDecision(horse, horse.raceEnv.nearbyHorses, turn);
-    this.detectGuardrailViolations(horse, track, turn);
-    this.detectDirectionDistortion(horse, track, turn);
+    this.analyzeCollisions(turn, horse, horse.raceEnv.nearbyHorses);
+    this.analyzeSituationalDecision(turn, horse, horse.raceEnv.nearbyHorses);
+    this.detectGuardrailViolations(turn, horse, track);
+    this.detectDirectionDistortion(turn, horse, track);
   }
 
   private analyzeCollisions(
+    turn: number,
     horse: RaceHorse,
-    nearbyHorses: NearbyHorse,
-    turn: number
+    nearbyHorses: NearbyHorse
   ): void {
     const nearbyHorseArray = [
       { direction: DirectionType.FRONT, horse: nearbyHorses.front },
@@ -195,10 +194,8 @@ export class PerformanceMonitor {
       const avgCriticalDistance = (criticalDistance / criticalCount).toFixed(1);
       this.collisionAvoidanceEvents.push({
         turn,
-        horseId: horse.horseId.toString(),
+        horseName: horse.horseId.toString(),
         description: `🚨 CRITICAL COLLISION RISK: ${criticalCount} horses within ${avgCriticalDistance}m - Emergency evasion required`,
-        position: { x: horse.x, y: horse.y },
-        speed: horse.speed,
         threatLevel: ThreatLevel.CRITICAL,
       });
     }
@@ -206,10 +203,8 @@ export class PerformanceMonitor {
       const directionStr = highDirections.join(", ");
       this.collisionAvoidanceEvents.push({
         turn,
-        horseId: horse.horseId.toString(),
+        horseName: horse.horseId.toString(),
         description: `⚠️ HIGH COLLISION RISK: ${highCount} horses threatening from [${directionStr}] - Caution advised`,
-        position: { x: horse.x, y: horse.y },
-        speed: horse.speed,
         threatLevel: ThreatLevel.HIGH,
       });
     }
@@ -217,19 +212,17 @@ export class PerformanceMonitor {
       const avgNearbyDistance = (nearbyDistance / nearbyCount).toFixed(1);
       this.collisionAvoidanceEvents.push({
         turn,
-        horseId: horse.horseId.toString(),
+        horseName: horse.horseId.toString(),
         description: `🚦 TRAFFIC CONGESTION: ${nearbyCount} horses clustered (avg: ${avgNearbyDistance}m)`,
-        position: { x: horse.x, y: horse.y },
-        speed: horse.speed,
         threatLevel: ThreatLevel.MEDIUM,
       });
     }
   }
 
   private analyzeSituationalDecision(
+    turn: number,
     horse: RaceHorse,
-    nearbyHorses: NearbyHorse,
-    turn: number
+    nearbyHorses: NearbyHorse
   ): void {
     const nearbyHorseArray = [
       { direction: DirectionType.FRONT, horse: nearbyHorses.front },
@@ -275,27 +268,46 @@ export class PerformanceMonitor {
         });
       }
     }
+    const directionChange = this.analyzeDirectionChange(
+      turn,
+      horse.name,
+      horse.raceHeading
+    );
+    const speedChange = this.analyzeSpeedChange(turn, horse.name, horse.speed);
+    const accelerationChange = this.analyzeAccelerationChange(
+      turn,
+      horse.name,
+      horse.accel
+    );
     const threatLevel = this.analyzeThreatLevel(
       nearbyHorseDistances,
       nearbyWallDistances
     );
-    const decisionMade = this.analyzeHorseDecision(
-      horse,
-      nearbyHorseDirections
+    const decisionSpeedMade = this.analyzeHorseDecisionSpeed(
+      turn,
+      horse.name,
+      horse.speed
+    );
+    const decisionDirectionMade = this.analyzeHorseDecisionDirection(
+      turn,
+      horse.name,
+      horse.raceHeading
     );
     const situationDescription = this.generateSituationDescription(
       horse,
       nearbyHorseDistances,
       nearbyWallDistances,
       threatLevel,
-      decisionMade
+      decisionSpeedMade,
+      decisionDirectionMade,
+      directionChange,
+      speedChange,
+      accelerationChange
     );
     this.situationAnalysisEvents.push({
       turn,
-      horseId: horse.name,
+      horseName: horse.name,
       description: situationDescription,
-      position: { x: horse.x, y: horse.y },
-      speed: horse.speed,
       threatLevel: threatLevel,
     });
   }
@@ -347,35 +359,127 @@ export class PerformanceMonitor {
     return ThreatLevel.NONE;
   }
 
-  private analyzeHorseDecision(
-    horse: RaceHorse,
-    nearbyHorseDirections: DirectionType[]
+  private analyzeDirectionChange(
+    turn: number,
+    horseName: string,
+    currentHeading: number
   ): string {
-    if (horse.speed < 3) {
+    const previousStates = this.findHorseTurnStates(turn - 1, horseName);
+    if (!previousStates) {
+      return "";
+    }
+    const previousHeading = previousStates.heading;
+    let angleDiff = currentHeading - previousHeading;
+    if (angleDiff > Math.PI) {
+      angleDiff = angleDiff - 2 * Math.PI;
+    } else if (angleDiff < -Math.PI) {
+      angleDiff = angleDiff + 2 * Math.PI;
+    }
+    const angleDegrees = angleDiff * (180 / Math.PI);
+    if (Math.abs(angleDegrees) < 5) {
+      return "직진 유지";
+    } else if (angleDegrees > 0) {
+      return `우회전 ${Math.abs(angleDegrees).toFixed(0)}°`;
+    } else {
+      return `좌회전 ${Math.abs(angleDegrees).toFixed(0)}°`;
+    }
+  }
+
+  private analyzeSpeedChange(
+    turn: number,
+    horseName: string,
+    currentSpeed: number
+  ): string {
+    const previousStates = this.findHorseTurnStates(turn - 1, horseName);
+    if (!previousStates) {
+      return "";
+    }
+    const speedDiff = currentSpeed - previousStates.speed;
+    if (Math.abs(speedDiff) < 0.5) {
+      return "속도 유지";
+    } else if (speedDiff > 3) {
+      return `급가속 +${speedDiff.toFixed(1)}km/h`;
+    } else if (speedDiff > 1) {
+      return `가속 +${speedDiff.toFixed(1)}km/h`;
+    } else if (speedDiff < -3) {
+      return `급감속 ${speedDiff.toFixed(1)}km/h`;
+    } else if (speedDiff < -1) {
+      return `감속 ${speedDiff.toFixed(1)}km/h`;
+    } else if (speedDiff > 0) {
+      return `소폭 가속 +${speedDiff.toFixed(1)}km/h`;
+    } else {
+      return `소폭 감속 ${speedDiff.toFixed(1)}km/h`;
+    }
+  }
+
+  private analyzeAccelerationChange(
+    turn: number,
+    horseName: string,
+    currentAccel: number
+  ): string {
+    const previousStates = this.findHorseTurnStates(turn - 1, horseName);
+    if (!previousStates) {
+      return "";
+    }
+    const accelDiff = currentAccel - previousStates.accel;
+    if (Math.abs(accelDiff) < 0.1) {
+      return "";
+    } else if (accelDiff > 0.5) {
+      return `가속 강화`;
+    } else if (accelDiff < -0.5) {
+      return `제동 강화`;
+    } else if (accelDiff > 0) {
+      return `가속력 증가`;
+    } else {
+      return `가속력 감소`;
+    }
+  }
+
+  private analyzeHorseDecisionSpeed(
+    turn: number,
+    horseName: string,
+    currentSpeed: number
+  ): string {
+    const previousStates = this.findHorseTurnStates(turn - 1, horseName);
+    if (!previousStates) {
+      return "직진 유지";
+    }
+    const speedDiff = currentSpeed - previousStates.speed;
+    if (speedDiff < -3) {
       return "급감속";
-    }
-    if (horse.speed < 8) {
+    } else if (speedDiff < -1) {
       return "감속";
-    }
-    if (horse.speed > 15) {
+    } else if (speedDiff > 3) {
       return "가속";
     }
-    let leftCount = 0;
-    let rightCount = 0;
-    for (const direction of nearbyHorseDirections) {
-      if (direction === DirectionType.LEFT) {
-        leftCount++;
-      } else if (direction === DirectionType.RIGHT) {
-        rightCount++;
+    return "속도 유지";
+  }
+
+  private analyzeHorseDecisionDirection(
+    turn: number,
+    horseName: string,
+    currentHeading: number
+  ): string {
+    const previousStates = this.findHorseTurnStates(turn - 1, horseName);
+    if (!previousStates) {
+      return "변화 없음";
+    }
+    const previousHeading = previousStates.heading;
+    let angleDiff = currentHeading - previousHeading;
+    if (angleDiff > Math.PI) {
+      angleDiff = angleDiff - 2 * Math.PI;
+    } else if (angleDiff < -Math.PI) {
+      angleDiff = angleDiff + 2 * Math.PI;
+    }
+    const angleDegrees = angleDiff * (180 / Math.PI);
+    if (5 <= Math.abs(angleDegrees)) {
+      if (angleDegrees > 0) {
+        return "우회전 시도";
+      } else {
+        return "좌회전 시도";
       }
     }
-    if (leftCount > rightCount) {
-      return "우회전 시도";
-    }
-    if (rightCount > leftCount) {
-      return "좌회전 시도";
-    }
-    return "직진 유지";
+    return "변화 없음";
   }
 
   private analyzeDecisionOutcome(speed: number): string {
@@ -403,7 +507,11 @@ export class PerformanceMonitor {
       distance: number;
     }[],
     threatLevel: string,
-    decisionMade: string
+    decisionSpeedMade: string,
+    decisionDirectionMade: string,
+    directionChange: string,
+    speedChange: string,
+    accelerationChange: string
   ): string {
     let story = "";
     const threatOpenings = {
@@ -469,16 +577,36 @@ export class PerformanceMonitor {
         story += ` 벽도 ${directionStr} ${minWall.toFixed(0)}m로 가까워서`;
       }
     }
-    const decisionMap: { [key: string]: string } = {
+    const decisionDirectionMap: { [key: string]: string } = {
+      "좌회전 시도": "왼쪽으로 회전했고",
+      "우회전 시도": "오른쪽으로 회전했고",
+      "변화 없음": "방향 유지했고",
+    };
+    const directionAction =
+      decisionDirectionMap[decisionDirectionMade] || decisionDirectionMade;
+    story += ` ${directionAction},`;
+    const decisionSpeedMap: { [key: string]: string } = {
       감속: "속도를 줄였다",
       가속: "속도를 높였다",
       급감속: "급하게 멈췄다",
-      "좌회전 시도": "왼쪽으로 피하려 했다",
-      "우회전 시도": "오른쪽으로 피하려 했다",
       "직진 유지": "그대로 직진했다",
     };
-    const action = decisionMap[decisionMade] || decisionMade;
-    story += ` ${action}.`;
+    const speedAction =
+      decisionSpeedMap[decisionSpeedMade] || decisionSpeedMade;
+    story += ` ${speedAction}.`;
+    const changes: string[] = [];
+    if (directionChange && directionChange !== "직진 유지") {
+      changes.push(directionChange);
+    }
+    if (speedChange && speedChange !== "속도 유지") {
+      changes.push(speedChange);
+    }
+    if (accelerationChange) {
+      changes.push(accelerationChange);
+    }
+    if (changes.length > 0) {
+      story += ` (${changes.join(", ")})`;
+    }
     story += ` (현재속도: ${horse.speed.toFixed(1)}km/h)`;
     return story;
   }
@@ -509,9 +637,9 @@ export class PerformanceMonitor {
   }
 
   private detectGuardrailViolations(
+    turn: number,
     horse: RaceHorse,
-    track: RaceTrack,
-    turn: number
+    track: RaceTrack
   ): void {
     if (!track.segments || track.segments.length === 0) {
       return;
@@ -568,23 +696,19 @@ export class PerformanceMonitor {
       if (violationType && violationDistance > 1) {
         this.guardrailViolationEvents.push({
           turn,
-          horseId: horse.horseId.toString(),
+          horseName: horse.horseId.toString(),
           description: `🚧 ${violationType?.toUpperCase()} guardrail violation! Distance: ${violationDistance.toFixed(
             1
           )}m from ${violationType} boundary (Segment: ${horse.segmentIndex})`,
-          position: { x: horse.x, y: horse.y },
-          speed: horse.speed,
           threatLevel: ThreatLevel.HIGH,
         });
         if (violationDistance > 5) {
           this.offTrackEvents.push({
             turn,
-            horseId: horse.horseId.toString(),
+            horseName: horse.horseId.toString(),
             description: `⚠️ Severely off track! ${violationDistance.toFixed(
               1
             )}m from ${violationType} guardrail`,
-            position: { x: horse.x, y: horse.y },
-            speed: horse.speed,
             threatLevel: ThreatLevel.CRITICAL,
           });
         }
@@ -593,9 +717,9 @@ export class PerformanceMonitor {
   }
 
   private detectDirectionDistortion(
+    turn: number,
     horse: RaceHorse,
-    track: RaceTrack,
-    turn: number
+    track: RaceTrack
   ): void {
     if (!track.segments || track.segments.length === 0) {
       return;
@@ -636,14 +760,12 @@ export class PerformanceMonitor {
         const distortionPercent = (distortionAngle / 180) * 100;
         this.directionDistortionEvents.push({
           turn,
-          horseId: horse.horseId.toString(),
+          horseName: horse.horseId.toString(),
           description: `🔄 Direction distortion: ${distortionAngle.toFixed(
             1
           )}° (${distortionPercent.toFixed(1)}%) from optimal path (Segment: ${
             horse.segmentIndex
           })`,
-          position: { x: horse.x, y: horse.y },
-          speed: horse.speed,
           threatLevel: ThreatLevel.MEDIUM,
         });
       }
@@ -659,22 +781,26 @@ export class PerformanceMonitor {
     }
     report += `Total Situations Analyzed: ${this.situationAnalysisEvents.length}\n\n`;
     const horseNames = new Set(
-      this.situationAnalysisEvents.map((e) => e.horseId)
+      this.situationAnalysisEvents.map((e) => e.horseName)
     );
     for (const horseName of horseNames) {
       const horseSituations = this.situationAnalysisEvents
-        .filter((e) => e.horseId === horseName)
+        .filter((e) => e.horseName === horseName)
         .slice(0, 100);
       if (horseSituations.length > 0) {
         report += `\n🏇 ${horseName}의 실제 상황들:\n`;
         report += "-".repeat(40) + "\n";
         let index = 0;
         for (const situation of horseSituations) {
+          const turnStates = this.findHorseTurnStates(
+            situation.turn,
+            horseName
+          );
           report += `${index + 1}. 📍 Turn ${situation.turn} - ${
             situation.threatLevel
           }\n`;
           report += `   ${situation.description}\n`;
-          const outcome = this.analyzeDecisionOutcome(situation.speed);
+          const outcome = this.analyzeDecisionOutcome(turnStates?.speed ?? 0);
           let outcomeEmoji = "";
           if (outcome.includes("원활")) {
             outcomeEmoji = "🚀";
@@ -707,6 +833,30 @@ export class PerformanceMonitor {
     report += `  🚨 Critical Situations: ${criticalSituations}\n`;
     report += `  ⚠️ High Risk Situations: ${highSituations}\n`;
     report += `  📊 Medium Risk Situations: ${mediumSituations}\n`;
+
+    if (this.guardrailViolationEvents.length > 0) {
+      report += `\n🚧 GUARDRAIL VIOLATION SUMMARY\n`;
+      report += "-".repeat(50) + "\n";
+      report += `Total Violations: ${this.guardrailViolationEvents.length}\n\n`;
+      const violationsByHorse = new Map<string, RaceEvent[]>();
+      for (const violation of this.guardrailViolationEvents) {
+        if (!violationsByHorse.has(violation.horseName)) {
+          violationsByHorse.set(violation.horseName, []);
+        }
+        violationsByHorse.get(violation.horseName)!.push(violation);
+      }
+      for (const [horseName, violations] of violationsByHorse) {
+        report += `🏇 ${horseName}: ${violations.length}회 위반\n`;
+        for (let i = 0; i < Math.min(5, violations.length); i++) {
+          const violation = violations[i];
+          report += `  📍 Turn ${violation.turn}: ${violation.description}\n`;
+        }
+        if (violations.length > 5) {
+          report += `  ... 총 ${violations.length - 5}개 추가 위반\n`;
+        }
+        report += "\n";
+      }
+    }
     return report;
   }
 

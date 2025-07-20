@@ -10,6 +10,7 @@ export interface HorseTurnState {
   name: string;
   x: number;
   y: number;
+  heading: number;
   speed: number;
   accel: number;
   stamina: number;

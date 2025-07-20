@@ -192,6 +192,7 @@ export function runRaceSimulator(track: RaceTrack, horses: Horse[]): RaceLog[] {
           name: horse.name,
           x: horse.x,
           y: horse.y,
+          heading: horse.raceHeading,
           speed: horse.speed,
           accel: horse.accel,
           stamina: horse.stamina,
