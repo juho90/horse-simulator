@@ -10,18 +10,20 @@ export enum RelativePosition {
   Back = "back",
 }
 
+export interface NearbyHorse {
+  front: RaceHorse | null;
+  left: RaceHorse | null;
+  right: RaceHorse | null;
+  distances: { [horseId: number]: number };
+}
+
 export class RaceEnvironment {
   trackInfo: {
     raycasts: RaycastResult[];
     cornerApproach: number;
     currentLane: Lane;
   };
-  nearbyHorses: {
-    front: RaceHorse | null;
-    left: RaceHorse | null;
-    right: RaceHorse | null;
-    distances: { [horseId: number]: number };
-  };
+  nearbyHorses: NearbyHorse;
   selfStatus: {
     speed: number;
     stamina: number;
@@ -47,13 +49,13 @@ export class RaceEnvironment {
     this.selfStatus = this.collectSelfStatus(otherHorses);
   }
 
-  private findNearbyHorses(otherHorses: RaceHorse[]) {
-    const nearby: {
-      front: RaceHorse | null;
-      left: RaceHorse | null;
-      right: RaceHorse | null;
-      distances: { [horseId: number]: number };
-    } = { front: null, left: null, right: null, distances: {} };
+  private findNearbyHorses(otherHorses: RaceHorse[]): NearbyHorse {
+    const nearby: NearbyHorse = {
+      front: null,
+      left: null,
+      right: null,
+      distances: {},
+    };
     for (const other of otherHorses) {
       if (other.horseId === this.horse.horseId) {
         continue;

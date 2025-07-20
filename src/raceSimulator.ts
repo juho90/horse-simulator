@@ -210,7 +210,7 @@ export function runRaceSimulator(track: RaceTrack, horses: Horse[]): RaceLog[] {
         horseStates = horseStates.slice(0, index - 1);
       }
     }
-    logs.push({ turn, horseStates } as RaceLog);
+    logs.push({ turn, horseStates });
     turn++;
   }
   return logs;
