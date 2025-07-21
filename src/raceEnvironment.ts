@@ -18,35 +18,41 @@ export interface NearbyHorse {
 }
 
 export class RaceEnvironment {
-  trackInfo: {
-    raycasts: RaycastResult[];
-    cornerApproach: number;
-    currentLane: Lane;
-  };
-  nearbyHorses: NearbyHorse;
-  selfStatus: {
-    speed: number;
-    stamina: number;
-    raceProgress: number;
-    currentRank: number;
-  };
   closestRaycasts: RaycastResult[] | null = null;
   farthestRaycast: RaycastResult | null = null;
+  nearbyHorses: NearbyHorse;
+  raceProgress: number;
+  currentRank: number;
+  currentLane: Lane;
 
   constructor(private horse: RaceHorse) {
     this.nearbyHorses = { front: null, left: null, right: null, distances: {} };
-    this.trackInfo = {
-      raycasts: [],
-      cornerApproach: 0,
-      currentLane: Lane.Middle,
-    };
-    this.selfStatus = { speed: 0, stamina: 0, raceProgress: 0, currentRank: 1 };
+    this.raceProgress = 0;
+    this.currentRank = 1;
+    this.currentLane = Lane.Middle;
   }
 
   update(otherHorses: RaceHorse[]): void {
+    this.updateRaycast();
     this.nearbyHorses = this.findNearbyHorses(otherHorses);
-    this.trackInfo = this.collectTrackInfo();
-    this.selfStatus = this.collectSelfStatus(otherHorses);
+    this.raceProgress = this.calculateRaceProgress();
+    this.currentRank = this.calculateCurrentRank(otherHorses);
+    this.currentLane = this.getCurrentLane();
+  }
+
+  private updateRaycast(): void {
+    const nextSegmentIndex =
+      (this.horse.segmentIndex + 1) % this.horse.segments.length;
+    const nextSegment = this.horse.segments[nextSegmentIndex];
+    const { closestRaycasts, farthestRaycast } = raycastBoundary(
+      this.horse.x,
+      this.horse.y,
+      this.horse.raceHeading,
+      this.horse.segment,
+      nextSegment
+    );
+    this.closestRaycasts = closestRaycasts;
+    this.farthestRaycast = farthestRaycast;
   }
 
   private findNearbyHorses(otherHorses: RaceHorse[]): NearbyHorse {
@@ -104,32 +110,23 @@ export class RaceEnvironment {
     return RelativePosition.Right;
   }
 
-  private collectTrackInfo() {
-    this.updateRaycast();
-    return {
-      raycasts: this.closestRaycasts || [],
-      cornerApproach: this.calculateCornerApproach(),
-      currentLane: this.getCurrentLane(),
-    };
-  }
-
-  private updateRaycast(): void {
-    const nextSegmentIndex =
-      (this.horse.segmentIndex + 1) % this.horse.segments.length;
-    const nextSegment = this.horse.segments[nextSegmentIndex];
-    const { closestRaycasts, farthestRaycast } = raycastBoundary(
-      this.horse.x,
-      this.horse.y,
-      this.horse.raceHeading,
-      this.horse.segment,
-      nextSegment
+  private calculateRaceProgress(): number {
+    const totalDistance = this.horse.segments.reduce(
+      (sum, seg) => sum + seg.length,
+      0
     );
-    this.closestRaycasts = closestRaycasts;
-    this.farthestRaycast = farthestRaycast;
+    return Math.min(1, this.horse.raceDistance / totalDistance);
   }
 
-  private calculateCornerApproach(): number {
-    return this.horse.segment.getTangentDirectionAt(this.horse.x, this.horse.y);
+  private calculateCurrentRank(otherHorses: RaceHorse[]): number {
+    let rank = 1;
+    const myDistance = this.horse.raceDistance;
+    for (const other of otherHorses) {
+      if (other.raceDistance > myDistance) {
+        rank++;
+      }
+    }
+    return rank;
   }
 
   private getCurrentLane(): Lane {
@@ -167,33 +164,5 @@ export class RaceEnvironment {
       return Lane.Outer;
     }
     return Lane.Middle;
-  }
-
-  private collectSelfStatus(otherHorses: RaceHorse[]) {
-    return {
-      speed: this.horse.speed,
-      stamina: this.horse.stamina,
-      raceProgress: this.calculateRaceProgress(),
-      currentRank: this.calculateCurrentRank(otherHorses),
-    };
-  }
-
-  private calculateRaceProgress(): number {
-    const totalDistance = this.horse.segments.reduce(
-      (sum, seg) => sum + seg.length,
-      0
-    );
-    return Math.min(1, this.horse.raceDistance / totalDistance);
-  }
-
-  private calculateCurrentRank(otherHorses: RaceHorse[]): number {
-    let rank = 1;
-    const myDistance = this.horse.raceDistance;
-    for (const other of otherHorses) {
-      if (other.raceDistance > myDistance) {
-        rank++;
-      }
-    }
-    return rank;
   }
 }

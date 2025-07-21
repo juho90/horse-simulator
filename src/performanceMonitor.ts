@@ -1,5 +1,5 @@
 import * as fs from "fs";
-import { DistanceSource } from "./directionalDistance";
+import { DirectionType, DistanceSource } from "./directionalDistance";
 import { Horse } from "./horse";
 import { NearbyHorse } from "./raceEnvironment";
 import { RaceHorse } from "./raceHorse";
@@ -21,14 +21,6 @@ interface RaceEvent {
   horseName: string;
   description: string;
   threatLevel: ThreatLevel;
-}
-
-enum DirectionType {
-  FRONT = "front",
-  LEFT = "left",
-  RIGHT = "right",
-  FRONT_LEFT = "frontLeft",
-  FRONT_RIGHT = "frontRight",
 }
 
 export class PerformanceMonitor {
@@ -847,12 +839,12 @@ export class PerformanceMonitor {
       }
       for (const [horseName, violations] of violationsByHorse) {
         report += `🏇 ${horseName}: ${violations.length}회 위반\n`;
-        for (let i = 0; i < Math.min(5, violations.length); i++) {
+        for (let i = 0; i < Math.min(100, violations.length); i++) {
           const violation = violations[i];
           report += `  📍 Turn ${violation.turn}: ${violation.description}\n`;
         }
-        if (violations.length > 5) {
-          report += `  ... 총 ${violations.length - 5}개 추가 위반\n`;
+        if (violations.length > 100) {
+          report += `  ... 총 ${violations.length - 100}개 추가 위반\n`;
         }
         report += "\n";
       }

@@ -3,7 +3,6 @@ import { RaceAI } from "./raceAI";
 import { RaceEnvironment } from "./raceEnvironment";
 import { RaceSegment } from "./raceSegment";
 import { RaceSituationAnalysis } from "./raceSituationAnalysis";
-import { RaceStrategyPlan } from "./raceStrategyPlan";
 
 export class RaceHorse {
   horseId: number;
@@ -30,7 +29,6 @@ export class RaceHorse {
 
   raceEnv: RaceEnvironment;
   raceAnalysis: RaceSituationAnalysis;
-  raceStrategyPlan: RaceStrategyPlan;
   raceAI: RaceAI;
 
   constructor(horse: Horse, segments: RaceSegment[], gate: number) {
@@ -70,17 +68,7 @@ export class RaceHorse {
 
     this.raceEnv = new RaceEnvironment(this);
     this.raceAnalysis = new RaceSituationAnalysis(this, this.raceEnv);
-    this.raceStrategyPlan = new RaceStrategyPlan(
-      this,
-      this.raceEnv,
-      this.raceAnalysis
-    );
-    this.raceAI = new RaceAI(
-      this,
-      this.raceEnv,
-      this.raceAnalysis,
-      this.raceStrategyPlan
-    );
+    this.raceAI = new RaceAI(this, this.raceEnv, this.raceAnalysis);
   }
 
   moveNextSegment() {
@@ -95,7 +83,6 @@ export class RaceHorse {
   moveOnTrack(turn: number, otherHorses: RaceHorse[]): void {
     this.raceEnv.update(otherHorses);
     this.raceAnalysis.update();
-    this.raceStrategyPlan.update();
     const aiDecision = this.raceAI.update(turn);
     this.speed = Math.min(
       this.speed + aiDecision.targetAccel,
@@ -143,10 +130,5 @@ export class RaceHorse {
   updateAnalyzeSituation(): RaceSituationAnalysis {
     this.raceAnalysis.update();
     return this.raceAnalysis;
-  }
-
-  updatePlanStrategy(): RaceStrategyPlan {
-    this.raceStrategyPlan.update();
-    return this.raceStrategyPlan;
   }
 }

@@ -86,7 +86,7 @@ export class RaceSituationAnalysis {
   }
 
   private determineRacePhase(): RacePhase {
-    const progress = this.raceEnv.selfStatus.raceProgress;
+    const progress = this.raceEnv.raceProgress;
     if (progress < 0.25) {
       return RacePhase.Early;
     } else if (progress < 0.65) {
@@ -110,13 +110,13 @@ export class RaceSituationAnalysis {
         ] > 20)
     );
     const canMoveInner =
-      this.raceEnv.trackInfo.currentLane !== Lane.Inner &&
+      this.raceEnv.currentLane !== Lane.Inner &&
       (!this.raceEnv.nearbyHorses.left ||
         this.raceEnv.nearbyHorses.distances[
           this.raceEnv.nearbyHorses.left.horseId
         ] > 25);
     const canMoveOuter =
-      this.raceEnv.trackInfo.currentLane !== Lane.Outer &&
+      this.raceEnv.currentLane !== Lane.Outer &&
       (!this.raceEnv.nearbyHorses.right ||
         this.raceEnv.nearbyHorses.distances[
           this.raceEnv.nearbyHorses.right.horseId
@@ -263,12 +263,12 @@ export class RaceSituationAnalysis {
   }
 
   private analyzeSpeedDistance(): DirectionalDistance {
-    const currentSpeed = this.raceEnv.selfStatus.speed;
+    const currentSpeed = this.horse.speed;
     const maxSpeed = this.horse.maxSpeed;
     const speedRatio = currentSpeed / maxSpeed;
     const baseRequiredDistance = 20;
     const speedMultiplier = 1 + speedRatio * 5;
-    const stamina = this.raceEnv.selfStatus.stamina;
+    const stamina = this.horse.stamina;
     const staminaRatio = stamina / this.horse.maxStamina;
     let staminaMultiplier = 1.0;
     if (staminaRatio < 0.2) {
@@ -289,7 +289,10 @@ export class RaceSituationAnalysis {
   }
 
   private analyzeCornerDistance(): DirectionalDistance {
-    const cornerApproach = this.raceEnv.trackInfo.cornerApproach;
+    const cornerApproach = this.horse.segment.getTangentDirectionAt(
+      this.horse.x,
+      this.horse.y
+    );
     if (Math.abs(cornerApproach) < 0.1) {
       return {
         frontDistance: Infinity,
@@ -301,7 +304,7 @@ export class RaceSituationAnalysis {
       };
     }
     const intensity = Math.abs(cornerApproach);
-    const currentSpeed = this.raceEnv.selfStatus.speed;
+    const currentSpeed = this.horse.speed;
     const maxSpeed = this.horse.maxSpeed;
     const speedFactor = currentSpeed / maxSpeed;
     const baseCornerSafeDistance = 30;

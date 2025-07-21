@@ -1,3 +1,11 @@
+export enum DirectionType {
+  FRONT = "front",
+  LEFT = "left",
+  RIGHT = "right",
+  FRONT_LEFT = "frontLeft",
+  FRONT_RIGHT = "frontRight",
+}
+
 export interface DirectionalDistance {
   frontDistance: number;
   leftDistance: number;
