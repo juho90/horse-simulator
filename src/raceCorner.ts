@@ -61,15 +61,11 @@ export class RaceCorner extends RaceSegment {
 
   getTangentDirectionAt(x: number, y: number): number {
     const angle = Math.atan2(y - this.center.y, x - this.center.x);
-    if (this.angle >= 0) {
-      return angle + Math.PI / 2;
-    } else {
-      return angle - Math.PI / 2;
-    }
+    return NormalizeAngle(angle + Math.PI / 2);
   }
 
   getEndTangentDirection(): number {
-    return this.endAngle + Math.PI / 2;
+    return NormalizeAngle(this.endAngle + Math.PI / 2);
   }
 
   isInside(x: number, y: number, tolerance: number): boolean {

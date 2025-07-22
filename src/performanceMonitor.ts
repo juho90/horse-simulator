@@ -4,7 +4,7 @@ import { convertHorsesForRace, Horse } from "./horse";
 import { NearbyHorse } from "./raceEnvironment";
 import { RaceHorse } from "./raceHorse";
 import { HorseTurnState, RaceLog } from "./raceLog";
-import { Distance } from "./raceMath";
+import { Distance, NormalizeAngle } from "./raceMath";
 import { TRACK_WIDTH } from "./raceSimulator";
 import { convertTrackForRace, RaceTrack } from "./raceTrack";
 
@@ -271,6 +271,12 @@ export class PerformanceMonitor {
       horse.name,
       horse.accel
     );
+    const specDescription = this.generateSpecDescription(
+      horse,
+      directionChange,
+      speedChange,
+      accelerationChange
+    );
     const threatLevel = this.analyzeThreatLevel(
       nearbyHorseDistances,
       nearbyWallDistances
@@ -291,15 +297,12 @@ export class PerformanceMonitor {
       nearbyWallDistances,
       threatLevel,
       decisionSpeedMade,
-      decisionDirectionMade,
-      directionChange,
-      speedChange,
-      accelerationChange
+      decisionDirectionMade
     );
     this.situationAnalysisEvents.push({
       turn,
       horseName: horse.name,
-      description: situationDescription,
+      description: specDescription + "\n" + situationDescription,
       threatLevel: threatLevel,
     });
   }
@@ -361,12 +364,7 @@ export class PerformanceMonitor {
       return "";
     }
     const previousHeading = previousStates.heading;
-    let angleDiff = currentHeading - previousHeading;
-    if (angleDiff > Math.PI) {
-      angleDiff = angleDiff - 2 * Math.PI;
-    } else if (angleDiff < -Math.PI) {
-      angleDiff = angleDiff + 2 * Math.PI;
-    }
+    const angleDiff = NormalizeAngle(currentHeading - previousHeading);
     const angleDegrees = angleDiff * (180 / Math.PI);
     if (Math.abs(angleDegrees) < 5) {
       return "직진 유지";
@@ -457,12 +455,7 @@ export class PerformanceMonitor {
       return "변화 없음";
     }
     const previousHeading = previousStates.heading;
-    let angleDiff = currentHeading - previousHeading;
-    if (angleDiff > Math.PI) {
-      angleDiff = angleDiff - 2 * Math.PI;
-    } else if (angleDiff < -Math.PI) {
-      angleDiff = angleDiff + 2 * Math.PI;
-    }
+    const angleDiff = NormalizeAngle(currentHeading - previousHeading);
     const angleDegrees = angleDiff * (180 / Math.PI);
     if (5 <= Math.abs(angleDegrees)) {
       if (angleDegrees > 0) {
@@ -487,6 +480,42 @@ export class PerformanceMonitor {
     return "보통 진행";
   }
 
+  private generateSpecDescription(
+    horse: RaceHorse,
+    directionChange: string,
+    speedChange: string,
+    accelerationChange: string
+  ): string {
+    let story = "";
+    const headingDeg = ((horse.raceHeading * 180) / Math.PI).toFixed(1);
+    const segmentIndex = horse.segmentIndex;
+    const segmentDirection = (
+      (horse.segment.getTangentDirectionAt(horse.x, horse.y) * 180) /
+      Math.PI
+    ).toFixed(1);
+    story += `▶️ 주행방향: ${headingDeg}°, 세그먼트: ${segmentIndex}, 세그먼트방향: ${segmentDirection}°\n`;
+    const speed = horse.speed.toFixed(2);
+    const maxSpeed = horse.maxSpeed.toFixed(2);
+    story += `   ▶ 속도: ${speed} / ${maxSpeed}\n`;
+    const accel = horse.accel.toFixed(2);
+    const maxAccel = horse.maxAccel.toFixed(2);
+    story += `   ▶ 가속도: ${accel} / ${maxAccel}\n`;
+    const stamina = horse.stamina.toFixed(2);
+    const maxStamina = horse.maxStamina.toFixed(2);
+    story += `   ▶ 스태미나: ${stamina} / ${maxStamina}\n`;
+    story += `   ▶ 좌표: ${horse.x.toFixed(2)}, ${horse.y.toFixed(2)}\n`;
+    if (directionChange && directionChange !== "직진 유지") {
+      story += `   - 방향 변화: ${directionChange}\n`;
+    }
+    if (speedChange && speedChange !== "속도 유지") {
+      story += `   - 속도 변화: ${speedChange}\n`;
+    }
+    if (accelerationChange) {
+      story += `   - 가속 변화: ${accelerationChange}\n`;
+    }
+    return story.trimEnd();
+  }
+
   private generateSituationDescription(
     horse: RaceHorse,
     nearbyHorseDistances: {
@@ -500,12 +529,9 @@ export class PerformanceMonitor {
     }[],
     threatLevel: string,
     decisionSpeedMade: string,
-    decisionDirectionMade: string,
-    directionChange: string,
-    speedChange: string,
-    accelerationChange: string
+    decisionDirectionMade: string
   ): string {
-    let story = "";
+    let story = "   ";
     const threatOpenings = {
       critical: "🚨 위급상황!",
       high: "⚠️ 주의상황:",
@@ -555,7 +581,7 @@ export class PerformanceMonitor {
           minDirection = wall.direction;
         }
       }
-      if (minWall < 30) {
+      if (minWall < horse.speed) {
         let directionStr = "";
         if (minDirection === DirectionType.FRONT) {
           directionStr = "앞에";
@@ -586,19 +612,6 @@ export class PerformanceMonitor {
     const speedAction =
       decisionSpeedMap[decisionSpeedMade] || decisionSpeedMade;
     story += ` ${speedAction}.`;
-    const changes: string[] = [];
-    if (directionChange && directionChange !== "직진 유지") {
-      changes.push(directionChange);
-    }
-    if (speedChange && speedChange !== "속도 유지") {
-      changes.push(speedChange);
-    }
-    if (accelerationChange) {
-      changes.push(accelerationChange);
-    }
-    if (changes.length > 0) {
-      story += ` (${changes.join(", ")})`;
-    }
     story += ` (현재속도: ${horse.speed.toFixed(1)}km/h)`;
     return story;
   }

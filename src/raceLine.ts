@@ -1,5 +1,5 @@
 import { RaceCorner } from "./raceCorner";
-import { EPSILON, Vector2D } from "./raceMath";
+import { EPSILON, NormalizeAngle, Vector2D } from "./raceMath";
 import { BoundingBox, RaceSegment } from "./raceSegment";
 
 export class RaceLine extends RaceSegment {
@@ -32,11 +32,19 @@ export class RaceLine extends RaceSegment {
   }
 
   getTangentDirectionAt(x: number, y: number): number {
-    return Math.atan2(this.end.y - this.start.y, this.end.x - this.start.x);
+    const angle = Math.atan2(
+      this.end.y - this.start.y,
+      this.end.x - this.start.x
+    );
+    return NormalizeAngle(angle);
   }
 
   getEndTangentDirection(): number {
-    return Math.atan2(this.end.y - this.start.y, this.end.x - this.start.x);
+    const angle = Math.atan2(
+      this.end.y - this.start.y,
+      this.end.x - this.start.x
+    );
+    return NormalizeAngle(angle);
   }
 
   isInner(x: number, y: number): boolean {
