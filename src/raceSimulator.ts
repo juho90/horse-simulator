@@ -5,13 +5,18 @@ import { Vector2D } from "./raceMath";
 import { RaceSegment } from "./raceSegment";
 import { RaceTrack } from "./raceTrack";
 
+export enum GuardrailType {
+  Inner = "inner",
+  Outer = "outer",
+}
+
 export interface RaycastResult {
   segment: RaceSegment;
   hitPoint: Vector2D;
   hitDistance: number;
   rayDir: Vector2D;
   rayAngle: number;
-  angle: number;
+  guardrailType: GuardrailType;
 }
 
 export function raycastBoundarys(
@@ -35,7 +40,7 @@ export function raycastBoundarys(
         hitDistance: distance,
         rayDir: rayDir,
         rayAngle: angle,
-        angle: angle,
+        guardrailType: GuardrailType.Inner,
       } as RaycastResult;
       closestRaycasts.push(closestRaycast);
     }
@@ -49,7 +54,7 @@ export function raycastBoundarys(
           hitDistance: dist,
           rayDir: rayDir,
           rayAngle: angle,
-          angle: angle,
+          guardrailType: GuardrailType.Outer,
         } as RaycastResult;
         closestRaycasts.push(closestRaycast);
       }
@@ -80,7 +85,7 @@ export function raycastFarBoundary(
           hitDistance: dist,
           rayDir: rayDir,
           rayAngle: angle,
-          angle: angle,
+          guardrailType: GuardrailType.Inner,
         };
       }
     }
@@ -95,7 +100,7 @@ export function raycastFarBoundary(
             hitDistance: dist,
             rayDir: rayDir,
             rayAngle: angle,
-            angle: angle,
+            guardrailType: GuardrailType.Outer,
           };
         }
       }

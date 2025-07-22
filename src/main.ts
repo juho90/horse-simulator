@@ -11,7 +11,17 @@ async function runAnalysisMode() {
   const track = createTrack(segmentCount);
   const horses = createSampleHorses();
   const monitor = new PerformanceMonitor();
+  monitor.saveInitialRaceState(track, horses);
   await monitor.runRaceWithAnalysis(track, horses);
+}
+
+async function runAnalysisReMode() {
+  const monitor = new PerformanceMonitor();
+  const { track, horses } = await monitor.loadInitialRaceState();
+  const logs = runRaceSimulator(track, horses);
+  const htmlString = generateRaceWebGLHtml(track, logs);
+  const outPath = path.resolve(__dirname, "../race-result-replay.html");
+  testRaceWebGL(outPath, htmlString);
 }
 
 function runSimulateMode() {
@@ -30,6 +40,8 @@ async function main() {
   const args = process.argv.slice(2);
   if (args.includes("--analysis") || args.includes("-a")) {
     await runAnalysisMode();
+  } else if (args.includes("--replay") || args.includes("-ar")) {
+    await runAnalysisReMode();
   } else {
     runSimulateMode();
   }

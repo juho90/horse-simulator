@@ -1,12 +1,12 @@
 import * as fs from "fs";
 import { DirectionType, DistanceSource } from "./directionalDistance";
-import { Horse } from "./horse";
+import { convertHorsesForRace, Horse } from "./horse";
 import { NearbyHorse } from "./raceEnvironment";
 import { RaceHorse } from "./raceHorse";
 import { HorseTurnState, RaceLog } from "./raceLog";
 import { Distance } from "./raceMath";
 import { TRACK_WIDTH } from "./raceSimulator";
-import { RaceTrack } from "./raceTrack";
+import { convertTrackForRace, RaceTrack } from "./raceTrack";
 
 enum ThreatLevel {
   NONE = "none",
@@ -778,7 +778,7 @@ export class PerformanceMonitor {
     for (const horseName of horseNames) {
       const horseSituations = this.situationAnalysisEvents
         .filter((e) => e.horseName === horseName)
-        .slice(0, 100);
+        .slice(0, 300);
       if (horseSituations.length > 0) {
         report += `\n🏇 ${horseName}의 실제 상황들:\n`;
         report += "-".repeat(40) + "\n";
@@ -839,12 +839,12 @@ export class PerformanceMonitor {
       }
       for (const [horseName, violations] of violationsByHorse) {
         report += `🏇 ${horseName}: ${violations.length}회 위반\n`;
-        for (let i = 0; i < Math.min(100, violations.length); i++) {
+        for (let i = 0; i < Math.min(300, violations.length); i++) {
           const violation = violations[i];
           report += `  📍 Turn ${violation.turn}: ${violation.description}\n`;
         }
-        if (violations.length > 100) {
-          report += `  ... 총 ${violations.length - 100}개 추가 위반\n`;
+        if (violations.length > 300) {
+          report += `  ... 총 ${violations.length - 300}개 추가 위반\n`;
         }
         report += "\n";
       }
@@ -860,5 +860,34 @@ export class PerformanceMonitor {
     } catch (error) {
       console.error("리포트 저장 실패:", error);
     }
+  }
+
+  async saveInitialRaceState(
+    track: RaceTrack,
+    horses: Horse[],
+    filename = "race-initial-state.json"
+  ): Promise<void> {
+    const initialState = {
+      track,
+      horses,
+    };
+    await fs.promises.writeFile(
+      filename,
+      JSON.stringify(initialState, null, 2),
+      "utf-8"
+    );
+  }
+
+  async loadInitialRaceState(
+    filename = "race-initial-state.json"
+  ): Promise<{ track: RaceTrack; horses: Horse[] }> {
+    const data = await fs.promises.readFile(filename, "utf-8");
+    const initialState = JSON.parse(data);
+    const track = convertTrackForRace(initialState.track);
+    const horses = convertHorsesForRace(initialState.horses);
+    return {
+      track,
+      horses,
+    };
   }
 }

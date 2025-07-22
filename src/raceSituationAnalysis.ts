@@ -2,87 +2,46 @@ import {
   DirectionalDistance,
   DirectionalDistanceUtils,
   DirectionalDistanceWithSource,
-  DistanceAnalysisDetail,
+  DirectionType,
   DistanceSource,
+  DistanceValue,
 } from "./directionalDistance";
 import { DrivingMode } from "./drivingMode";
 import { Lane, RacePhase } from "./laneEvaluation";
 import { RaceEnvironment } from "./raceEnvironment";
 import { RaceHorse } from "./raceHorse";
 
-export interface Opportunities {
-  canOvertake: boolean;
-  canMoveInner: boolean;
-  canMoveOuter: boolean;
-}
-
 export class RaceSituationAnalysis {
+  wallDistance: DirectionalDistance;
+  horseDistance: DirectionalDistance;
+  speedAdjustedDistance: DirectionalDistance;
+  cornerDistance: DirectionalDistance;
   dirDistanceWithSource: DirectionalDistanceWithSource;
-  isBlocked: boolean;
   racePhase: RacePhase;
-  opportunities: Opportunities;
-  drivingMode: DrivingMode;
+  openDirections: DirectionType[] = [];
+  enableDrivingModes: DrivingMode[];
 
   constructor(private horse: RaceHorse, private raceEnv: RaceEnvironment) {
-    this.dirDistanceWithSource = {
-      front: { source: DistanceSource.Unknown, distance: Infinity },
-      left: { source: DistanceSource.Unknown, distance: Infinity },
-      right: { source: DistanceSource.Unknown, distance: Infinity },
-      frontLeft: { source: DistanceSource.Unknown, distance: Infinity },
-      frontRight: {
-        source: DistanceSource.Unknown,
-        distance: Infinity,
-      },
-      minValue: { source: DistanceSource.Unknown, distance: Infinity },
-    };
-    this.isBlocked = false;
-    this.drivingMode = DrivingMode.MaintainingPace;
-    this.opportunities = {
-      canOvertake: false,
-      canMoveInner: false,
-      canMoveOuter: false,
-    };
+    this.wallDistance =
+      DirectionalDistanceUtils.createDefaultDirectionalDistance();
+    this.horseDistance =
+      DirectionalDistanceUtils.createDefaultDirectionalDistance();
+    this.speedAdjustedDistance =
+      DirectionalDistanceUtils.createDefaultDirectionalDistance();
+    this.cornerDistance =
+      DirectionalDistanceUtils.createDefaultDirectionalDistance();
+    this.dirDistanceWithSource =
+      DirectionalDistanceUtils.createDefaultDirectionalDistanceWithSource();
     this.racePhase = RacePhase.Early;
+    this.openDirections = [];
+    this.enableDrivingModes = [DrivingMode.MaintainingPace];
   }
 
   update(): void {
-    const distanceAnalysisDetail = this.analyzeDirectionalDetails();
-    this.dirDistanceWithSource =
-      DirectionalDistanceUtils.combineDirectionalDistance(
-        distanceAnalysisDetail
-      );
-    this.isBlocked = this.calculateBlockedState();
+    this.updateDirectionalDistance();
     this.racePhase = this.determineRacePhase();
-    this.opportunities = this.identifyOpportunities();
-    this.drivingMode = this.determineRecommendedState();
-  }
-
-  private calculateBlockedState(): boolean {
-    const ESCAPE_THRESHOLD = 20;
-    const CRITICAL_THRESHOLD = 10;
-    const distances = [
-      this.dirDistanceWithSource.front.distance,
-      this.dirDistanceWithSource.left.distance,
-      this.dirDistanceWithSource.right.distance,
-      this.dirDistanceWithSource.frontLeft.distance,
-      this.dirDistanceWithSource.frontRight.distance,
-    ];
-    const realDistances = distances.filter((d) => d !== Infinity && d > 0);
-    if (realDistances.length === 0) {
-      return false;
-    }
-    const frontDistance = this.dirDistanceWithSource.front.distance;
-    const leftDistance = this.dirDistanceWithSource.left.distance;
-    const rightDistance = this.dirDistanceWithSource.right.distance;
-    const frontBlocked = frontDistance < ESCAPE_THRESHOLD;
-    const leftBlocked = leftDistance < ESCAPE_THRESHOLD;
-    const rightBlocked = rightDistance < ESCAPE_THRESHOLD;
-    const sidesBlocked = leftBlocked && rightBlocked;
-    const allDirectionsCritical = realDistances.every(
-      (d) => d < CRITICAL_THRESHOLD
-    );
-    const blocked = (frontBlocked && sidesBlocked) || allDirectionsCritical;
-    return blocked;
+    this.openDirections = this.calculateOpenDirections();
+    this.updateSituation();
   }
 
   private determineRacePhase(): RacePhase {
@@ -98,7 +57,39 @@ export class RaceSituationAnalysis {
     }
   }
 
-  private identifyOpportunities(): Opportunities {
+  private calculateOpenDirections(): DirectionType[] {
+    const directionMap = [
+      {
+        direction: DirectionType.FRONT,
+        distance: this.dirDistanceWithSource.front.distance,
+      },
+      {
+        direction: DirectionType.LEFT,
+        distance: this.dirDistanceWithSource.left.distance,
+      },
+      {
+        direction: DirectionType.RIGHT,
+        distance: this.dirDistanceWithSource.right.distance,
+      },
+      {
+        direction: DirectionType.FRONT_LEFT,
+        distance: this.dirDistanceWithSource.frontLeft.distance,
+      },
+      {
+        direction: DirectionType.FRONT_RIGHT,
+        distance: this.dirDistanceWithSource.frontRight.distance,
+      },
+    ];
+    const openDirections: DirectionType[] = [];
+    for (const dir of directionMap) {
+      if (dir.distance > this.horse.speed) {
+        openDirections.push(dir.direction);
+      }
+    }
+    return openDirections;
+  }
+
+  private updateSituation(): void {
     const canOvertake = !!(
       this.raceEnv.nearbyHorses.front &&
       this.raceEnv.nearbyHorses.distances[
@@ -121,70 +112,153 @@ export class RaceSituationAnalysis {
         this.raceEnv.nearbyHorses.distances[
           this.raceEnv.nearbyHorses.right.horseId
         ] > 25);
-    return { canOvertake, canMoveInner, canMoveOuter };
-  }
-
-  private determineRecommendedState(): DrivingMode {
-    if (this.isEmergencySituation()) {
-      return this.getEmergencyState();
-    }
-    if (this.shouldConsiderOvertaking()) {
-      return DrivingMode.Overtaking;
-    }
-    if (this.isInFinalStretch()) {
-      return DrivingMode.LastSpurt;
-    }
-    if (this.shouldBlockCompetitor()) {
-      return DrivingMode.Blocked;
-    }
-    return DrivingMode.MaintainingPace;
-  }
-
-  private isEmergencySituation(): boolean {
-    // 블럭된 상태이거나 전방 거리가 매우 가까운 경우
+    const isBlocked = this.openDirections.length === 0;
     const frontDistance = this.dirDistanceWithSource.front.distance;
-    return this.isBlocked || frontDistance < 5;
-  }
-
-  private getEmergencyState(): DrivingMode {
-    if (this.opportunities.canMoveInner || this.opportunities.canMoveOuter) {
-      return DrivingMode.Overtaking;
-    }
-    return DrivingMode.Blocked;
-  }
-
-  private shouldConsiderOvertaking(): boolean {
-    return (
-      this.opportunities.canOvertake &&
-      !this.isBlocked && // 블럭되지 않은 상태에서만 추월 고려
-      this.horse.stamina > this.horse.maxStamina * 0.3
-    );
-  }
-
-  private isInFinalStretch(): boolean {
-    return (
+    const isEmergency =
+      isBlocked && (canMoveInner || canMoveOuter || frontDistance < 5);
+    const isOvertaking =
+      canOvertake &&
+      !isBlocked &&
+      this.horse.stamina > this.horse.maxStamina * 0.3;
+    const isFinalStretch =
       this.racePhase === RacePhase.Final &&
-      this.horse.stamina > this.horse.maxStamina * 0.2
-    );
-  }
-
-  private shouldBlockCompetitor(): boolean {
+      this.horse.stamina > this.horse.maxStamina * 0.2;
     const nearbyHorses = this.raceEnv.nearbyHorses;
-    return (
-      !!(nearbyHorses.left || nearbyHorses.right) && this.racePhase === "final"
-    );
+    const shouldBlock =
+      !!(nearbyHorses.left || nearbyHorses.right) && this.racePhase === "final";
+    const enableDrivingModes = [DrivingMode.MaintainingPace];
+    if (isEmergency) {
+      enableDrivingModes.push(DrivingMode.Positioning);
+    } else if (isOvertaking) {
+      enableDrivingModes.push(DrivingMode.Overtaking);
+    } else if (isFinalStretch) {
+      enableDrivingModes.push(DrivingMode.LastSpurt);
+    } else if (shouldBlock) {
+      enableDrivingModes.push(DrivingMode.Positioning);
+    }
+    this.enableDrivingModes = enableDrivingModes;
   }
 
-  analyzeDirectionalDetails(): DistanceAnalysisDetail {
-    const wallDistance = this.analyzeWallDistance();
-    const horseDistance = this.analyzeHorseDistance();
-    const speedAdjustedDistance = this.analyzeSpeedDistance();
-    const cornerDistance = this.analyzeCornerDistance();
-    return {
-      wallDistance,
-      horseDistance,
-      speedAdjustedDistance,
-      cornerDistance,
+  private updateDirectionalDistance() {
+    this.wallDistance = this.analyzeWallDistance();
+    this.horseDistance = this.analyzeHorseDistance();
+    this.speedAdjustedDistance = this.analyzeSpeedDistance();
+    this.cornerDistance = this.analyzeCornerDistance();
+    const frontDistance = RaceSituationAnalysis.minDistance([
+      {
+        source: DistanceSource.Wall,
+        distance: this.wallDistance.frontDistance,
+      },
+      {
+        source: DistanceSource.Horse,
+        distance: this.horseDistance.frontDistance,
+      },
+      {
+        source: DistanceSource.Speed,
+        distance: this.speedAdjustedDistance.frontDistance,
+      },
+      {
+        source: DistanceSource.Corner,
+        distance: this.cornerDistance.frontDistance,
+      },
+    ]);
+    const leftDistance = RaceSituationAnalysis.minDistance([
+      {
+        source: DistanceSource.Wall,
+        distance: this.wallDistance.leftDistance,
+      },
+      {
+        source: DistanceSource.Horse,
+        distance: this.horseDistance.leftDistance,
+      },
+      {
+        source: DistanceSource.Speed,
+        distance: this.speedAdjustedDistance.leftDistance,
+      },
+      {
+        source: DistanceSource.Corner,
+        distance: this.cornerDistance.leftDistance,
+      },
+    ]);
+    const rightDistance = RaceSituationAnalysis.minDistance([
+      {
+        source: DistanceSource.Wall,
+        distance: this.wallDistance.rightDistance,
+      },
+      {
+        source: DistanceSource.Horse,
+        distance: this.horseDistance.rightDistance,
+      },
+      {
+        source: DistanceSource.Speed,
+        distance: this.speedAdjustedDistance.rightDistance,
+      },
+      {
+        source: DistanceSource.Corner,
+        distance: this.cornerDistance.rightDistance,
+      },
+    ]);
+    const frontLeftDistance = RaceSituationAnalysis.minDistance([
+      {
+        source: DistanceSource.Wall,
+        distance: this.wallDistance.frontLeftDistance,
+      },
+      {
+        source: DistanceSource.Horse,
+        distance: this.horseDistance.frontLeftDistance,
+      },
+      {
+        source: DistanceSource.Speed,
+        distance: this.speedAdjustedDistance.frontLeftDistance,
+      },
+      {
+        source: DistanceSource.Corner,
+        distance: this.cornerDistance.frontLeftDistance,
+      },
+    ]);
+    const frontRightDistance = RaceSituationAnalysis.minDistance([
+      {
+        source: DistanceSource.Wall,
+        distance: this.wallDistance.frontRightDistance,
+      },
+      {
+        source: DistanceSource.Horse,
+        distance: this.horseDistance.frontRightDistance,
+      },
+      {
+        source: DistanceSource.Speed,
+        distance: this.speedAdjustedDistance.frontRightDistance,
+      },
+      {
+        source: DistanceSource.Corner,
+        distance: this.cornerDistance.frontRightDistance,
+      },
+    ]);
+    const minDistance = RaceSituationAnalysis.minDistance([
+      {
+        source: DistanceSource.Wall,
+        distance: this.wallDistance.minDistance,
+      },
+      {
+        source: DistanceSource.Horse,
+        distance: this.horseDistance.minDistance,
+      },
+      {
+        source: DistanceSource.Speed,
+        distance: this.speedAdjustedDistance.minDistance,
+      },
+      {
+        source: DistanceSource.Corner,
+        distance: this.cornerDistance.minDistance,
+      },
+    ]);
+    this.dirDistanceWithSource = {
+      front: frontDistance,
+      left: leftDistance,
+      right: rightDistance,
+      frontLeft: frontLeftDistance,
+      frontRight: frontRightDistance,
+      minValue: minDistance,
     };
   }
 
@@ -329,5 +403,17 @@ export class RaceSituationAnalysis {
         minDistance: requiredDistance * 0.6,
       };
     }
+  }
+
+  static minDistance(values: DistanceValue[]): DistanceValue {
+    let source: DistanceSource = DistanceSource.Unknown;
+    let distance = Infinity;
+    for (const value of values) {
+      if (value.distance < distance) {
+        distance = value.distance;
+        source = value.source;
+      }
+    }
+    return { source, distance };
   }
 }
