@@ -106,7 +106,7 @@ export class PerformanceMonitor {
               threatLevel: ThreatLevel.NONE,
             });
           }
-          this.detectEvents(horse, turn, track);
+          this.detectEvents(turn, track, horse);
           if (horse.finished) {
             this.finishEvents.push({
               turn,
@@ -125,7 +125,7 @@ export class PerformanceMonitor {
     return logs;
   }
 
-  private detectEvents(horse: RaceHorse, turn: number, track: RaceTrack): void {
+  private detectEvents(turn: number, track: RaceTrack, horse: RaceHorse): void {
     if (turn > 0) {
       this.segmentProgressEvents.push({
         turn,
@@ -139,7 +139,12 @@ export class PerformanceMonitor {
       });
     }
     this.analyzeCollisions(turn, horse, horse.raceEnv.nearbyHorses);
-    this.analyzeSituationalDecision(turn, horse, horse.raceEnv.nearbyHorses);
+    this.analyzeSituationalDecision(
+      turn,
+      track,
+      horse,
+      horse.raceEnv.nearbyHorses
+    );
     this.detectGuardrailViolations(turn, horse, track);
     this.detectDirectionDistortion(turn, horse, track);
   }
@@ -213,6 +218,7 @@ export class PerformanceMonitor {
 
   private analyzeSituationalDecision(
     turn: number,
+    track: RaceTrack,
     horse: RaceHorse,
     nearbyHorses: NearbyHorse
   ): void {
@@ -272,6 +278,7 @@ export class PerformanceMonitor {
       horse.accel
     );
     const specDescription = this.generateSpecDescription(
+      track,
       horse,
       directionChange,
       speedChange,
@@ -481,6 +488,7 @@ export class PerformanceMonitor {
   }
 
   private generateSpecDescription(
+    track: RaceTrack,
     horse: RaceHorse,
     directionChange: string,
     speedChange: string,
@@ -503,6 +511,16 @@ export class PerformanceMonitor {
     const stamina = horse.stamina.toFixed(2);
     const maxStamina = horse.maxStamina.toFixed(2);
     story += `   ▶ 스태미나: ${stamina} / ${maxStamina}\n`;
+    const raceProgress = track.getRaceProgress(
+      horse.lap,
+      horse.segmentIndex,
+      horse.x,
+      horse.y
+    );
+    const raceLength = (track.raceLength * raceProgress).toFixed(2);
+    const totalLength = track.raceLength.toFixed(2);
+    const raceDistance = horse.raceDistance.toFixed(2);
+    story += `   ▶ 주행거리: ${raceDistance}, 완주율 ${raceLength} / ${totalLength}\n`;
     story += `   ▶ 좌표: ${horse.x.toFixed(2)}, ${horse.y.toFixed(2)}\n`;
     if (directionChange && directionChange !== "직진 유지") {
       story += `   - 방향 변화: ${directionChange}\n`;

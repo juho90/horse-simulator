@@ -1,6 +1,7 @@
 import { DirectionType } from "./directionalDistance";
 import { NearbyHorse, RaceEnvironment } from "./raceEnvironment";
 import { RaceHorse } from "./raceHorse";
+import { NormalizeAngle } from "./raceMath";
 import { RaceSituationAnalysis } from "./raceSituationAnalysis";
 
 const PREDICT_TIME = 0.3;
@@ -19,26 +20,28 @@ export function nextGenAvoidance(
 ): number {
   const trackDirection = horse.segment.getTangentDirectionAt(horse.x, horse.y);
   const dirDistances = raceAnalysis.dirDistanceWithSource;
-  if (!dirDistances) return trackDirection;
+  if (!dirDistances) {
+    return trackDirection;
+  }
 
   // 가드레일/트랙 경계 근접 시 무조건 반대 방향으로 강제 조향
   if (dirDistances.left.distance < 2.5) {
     // 왼쪽 레일이 매우 가까우면 강하게 오른쪽으로 조향
-    return Math.min(
-      MAX_STEER_RAD,
+    const angle = NormalizeAngle(
       trackDirection + LANE_ANGLE - horse.raceHeading
     );
+    return Math.min(MAX_STEER_RAD, angle);
   }
   if (dirDistances.right.distance < 2.5) {
     // 오른쪽 레일이 매우 가까우면 강하게 왼쪽으로 조향
-    return Math.max(
-      -MAX_STEER_RAD,
+    const angle = NormalizeAngle(
       trackDirection - LANE_ANGLE - horse.raceHeading
     );
+    return Math.max(-MAX_STEER_RAD, angle);
   }
 
   // 그 외에는 트랙 방향 유지
-  const headingDiff = normalizeAngle(trackDirection - horse.raceHeading);
+  const headingDiff = NormalizeAngle(trackDirection - horse.raceHeading);
   return Math.max(-MAX_STEER_RAD, Math.min(headingDiff, MAX_STEER_RAD));
 }
 
@@ -75,14 +78,4 @@ function isImminentCollision(
     }
   }
   return false;
-}
-
-function normalizeAngle(angle: number): number {
-  while (angle > Math.PI) {
-    angle -= 2 * Math.PI;
-  }
-  while (angle < -Math.PI) {
-    angle += 2 * Math.PI;
-  }
-  return angle;
 }

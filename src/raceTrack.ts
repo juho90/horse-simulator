@@ -68,6 +68,29 @@ export class RaceTrack {
     return this.segments[this.segments.length - 1];
   }
 
+  getTrackProgress(segmentIndex: number, x: number, y: number): number {
+    let totalLength = 0;
+    for (let i = 0; i < segmentIndex; i++) {
+      totalLength += this.segments[i].length;
+    }
+    const segment = this.segments[segmentIndex];
+    const segmentProgress = segment.getProgress(x, y);
+    totalLength += segment.length * segmentProgress;
+    return totalLength / this.trackLength;
+  }
+
+  getRaceProgress(
+    lap: number,
+    segmentIndex: number,
+    x: number,
+    y: number
+  ): number {
+    const trackProgress = this.getTrackProgress(segmentIndex, x, y);
+    const totalLength =
+      lap * this.trackLength + trackProgress * this.trackLength;
+    return totalLength / this.raceLength;
+  }
+
   getGoalPosition(): { x: number; y: number } {
     const goalSegment = this.segments[this.goalSegmentIndex];
     if (goalSegment.type === "line") {

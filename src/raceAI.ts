@@ -1,6 +1,6 @@
 import { DirectionType } from "./directionalDistance";
 import { DrivingMode } from "./drivingMode";
-import { Lane, LaneChange } from "./laneEvaluation";
+import { LaneChange } from "./laneEvaluation";
 import { RaceEnvironment } from "./raceEnvironment";
 import { RaceHorse } from "./raceHorse";
 import { RaceSituationAnalysis } from "./raceSituationAnalysis";
@@ -52,134 +52,128 @@ export class RaceAI {
   }
 
   private makeDecision(): AIDecision {
-    const drivingModes = this.raceAnalysis.enableDrivingModes;
     const open = this.raceAnalysis.openDirections;
     const wall = this.raceAnalysis.wallDistance;
     const horseDist = this.raceAnalysis.horseDistance;
+    const dirWithSource = this.raceAnalysis.dirDistanceWithSource;
     const speed = this.horse.speed;
-    const minOpenDist = Math.max(2.0, speed);
-    let currentMode = DrivingMode.MaintainingPace;
-    if (
-      drivingModes.includes(DrivingMode.LastSpurt) &&
-      this.raceEnv.raceProgress > 0.85 &&
-      this.horse.stamina > this.horse.maxStamina * 0.2
-    ) {
-      currentMode = DrivingMode.LastSpurt;
-    } else if (
-      drivingModes.includes(DrivingMode.Overtaking) &&
-      this.raceEnv.nearbyHorses.front &&
-      horseDist.frontDistance < 10 &&
-      this.horse.speed > this.horse.maxSpeed * 0.7
-    ) {
-      currentMode = DrivingMode.Overtaking;
-    } else if (
-      drivingModes.includes(DrivingMode.Positioning) &&
-      (horseDist.leftDistance > 5 || horseDist.rightDistance > 5)
-    ) {
-      currentMode = DrivingMode.Positioning;
-    } else if (drivingModes.includes(DrivingMode.Conserving)) {
-      currentMode = DrivingMode.Conserving;
-    }
-
+    // 각도 0~2π 보정 함수
+    const normalize = (a: number) =>
+      ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    // 트랙 진행방향(최적 라인)
     const trackDirection = this.horse.segment.getTangentDirectionAt(
       this.horse.x,
       this.horse.y
     );
-    let targetDirection = trackDirection;
-    const dirWithSource = this.raceAnalysis.dirDistanceWithSource;
-    const dirList: [DirectionType, number][] = [
-      [DirectionType.FRONT, dirWithSource.front.distance],
-      [DirectionType.LEFT, dirWithSource.left.distance],
-      [DirectionType.RIGHT, dirWithSource.right.distance],
-      [DirectionType.FRONT_LEFT, dirWithSource.frontLeft.distance],
-      [DirectionType.FRONT_RIGHT, dirWithSource.frontRight.distance],
+    // openDirections(거리 > speed)만 후보
+    const allDirs: DirectionType[] = [
+      DirectionType.FRONT,
+      DirectionType.LEFT,
+      DirectionType.RIGHT,
+      DirectionType.FRONT_LEFT,
+      DirectionType.FRONT_RIGHT,
     ];
-    let danger = dirList.reduce((a, b) => (a[1] < b[1] ? a : b));
-    let escapeDirs = dirList.filter(
-      ([d, dist]) => open.includes(d) && dist >= minOpenDist
+    // 정면 벽이 가까우면 FRONT 후보 제외
+    const openDirs = allDirs.filter((dir) => {
+      if (!open.includes(dir)) return false;
+      if (dir === DirectionType.FRONT && wall.frontDistance <= speed)
+        return false;
+      return true;
+    });
+    // 각 후보 방향별 위험 체크(벽/말과의 거리)
+    const safeDirs = openDirs.filter((dir) => {
+      const wallDist = (() => {
+        if (dir === DirectionType.FRONT) return wall.frontDistance;
+        if (dir === DirectionType.LEFT) return wall.leftDistance;
+        if (dir === DirectionType.RIGHT) return wall.rightDistance;
+        if (dir === DirectionType.FRONT_LEFT)
+          return Math.min(wall.frontDistance, wall.leftDistance);
+        if (dir === DirectionType.FRONT_RIGHT)
+          return Math.min(wall.frontDistance, wall.rightDistance);
+        return Infinity;
+      })();
+      const horseDistVal = (() => {
+        if (dir === DirectionType.FRONT) return horseDist.frontDistance;
+        if (dir === DirectionType.LEFT) return horseDist.leftDistance;
+        if (dir === DirectionType.RIGHT) return horseDist.rightDistance;
+        if (dir === DirectionType.FRONT_LEFT)
+          return Math.min(horseDist.frontDistance, horseDist.leftDistance);
+        if (dir === DirectionType.FRONT_RIGHT)
+          return Math.min(horseDist.frontDistance, horseDist.rightDistance);
+        return Infinity;
+      })();
+      // 벽/말과의 거리 모두 speed 이상이어야 안전
+      return wallDist > speed && horseDistVal > speed;
+    });
+    // 모든 방향이 막히면 즉시 정지
+    if (safeDirs.length === 0) {
+      return {
+        targetSpeed: 0,
+        targetDirection: this.horse.raceHeading,
+        targetAccel: -this.horse.maxAccel,
+        laneChange: LaneChange.Stay,
+        currentMode: DrivingMode.MaintainingPace,
+      };
+    }
+    // 트랙 진행방향과 각도 차이가 가장 작은 방향 선택(최단거리)
+    let bestDir = safeDirs[0];
+    let minDiff = Math.abs(
+      normalize(this.getDirectionAngle(safeDirs[0], trackDirection))
     );
-    if (danger[1] < minOpenDist && escapeDirs.length > 0) {
-      let best = escapeDirs.reduce((a, b) => {
-        const aDiff = Math.abs(this.getDirectionAngle(a[0], trackDirection));
-        const bDiff = Math.abs(this.getDirectionAngle(b[0], trackDirection));
-        return aDiff < bDiff ? a : b;
-      });
-      targetDirection =
-        this.getDirectionAngle(best[0], trackDirection) + trackDirection;
-    } else if (danger[1] < minOpenDist && escapeDirs.length === 0) {
-      targetDirection = trackDirection;
+    for (const dir of safeDirs) {
+      const diff = Math.abs(
+        normalize(this.getDirectionAngle(dir, trackDirection))
+      );
+      if (diff < minDiff) {
+        bestDir = dir;
+        minDiff = diff;
+      }
     }
-    let headingDiff = targetDirection - this.horse.raceHeading;
-    if (headingDiff > 0.12) headingDiff = 0.12;
-    if (headingDiff < -0.12) headingDiff = -0.12;
-    if (wall.leftDistance < 1.2 && headingDiff < 0) headingDiff = 0;
-    if (wall.rightDistance < 1.2 && headingDiff > 0) headingDiff = 0;
-    targetDirection = this.horse.raceHeading + headingDiff;
-
-    let laneChange = LaneChange.Stay;
-    const minLaneChangeDist = Math.max(2.0, speed * 1.2);
-    const isInner = this.raceEnv.currentLane === Lane.Inner;
-    const isOuter = this.raceEnv.currentLane === Lane.Outer;
-    const horses = this.raceEnv.nearbyHorses;
-    let preferInner = false;
-    let preferOuter = false;
-    if (
-      open.includes(DirectionType.LEFT) &&
-      !isInner &&
-      !horses.left &&
-      wall.leftDistance > minLaneChangeDist &&
-      wall.leftDistance > 2.5 &&
-      horseDist.leftDistance > minOpenDist &&
-      wall.frontDistance > minOpenDist
-    ) {
-      preferInner = true;
-    }
-    if (
-      open.includes(DirectionType.RIGHT) &&
-      !isOuter &&
-      !horses.right &&
-      wall.rightDistance > minLaneChangeDist &&
-      wall.rightDistance > 2.5 &&
-      horseDist.rightDistance > minOpenDist &&
-      wall.frontDistance > minOpenDist
-    ) {
-      preferOuter = true;
-    }
-    if (
-      wall.leftDistance < 1.2 &&
-      open.includes(DirectionType.RIGHT) &&
-      !isOuter
-    ) {
-      preferOuter = true;
-    }
-    if (
-      wall.rightDistance < 1.2 &&
-      open.includes(DirectionType.LEFT) &&
-      !isInner
-    ) {
-      preferInner = true;
-    }
-    if (preferInner) laneChange = LaneChange.Inner;
-    else if (preferOuter) laneChange = LaneChange.Outer;
-
-    let speedMultiplier = 0.8;
-    if (currentMode === DrivingMode.LastSpurt) speedMultiplier = 1.0;
-    if (currentMode === DrivingMode.Overtaking) speedMultiplier = 0.95;
-    if (currentMode === DrivingMode.Positioning) speedMultiplier = 0.85;
-    if (currentMode === DrivingMode.Conserving) speedMultiplier = 0.7;
-    const targetSpeed = this.horse.maxSpeed * speedMultiplier;
-    const targetAccel = Math.max(
+    const bestDirAngle = normalize(
+      this.getDirectionAngle(bestDir, trackDirection) + trackDirection
+    );
+    // 속도/가속 결정: 위험 없으면 최대, 위험 있으면 감속
+    let targetSpeed = this.horse.maxSpeed;
+    let targetAccel = Math.max(
       -this.horse.maxAccel,
       Math.min(this.horse.maxAccel, (targetSpeed - this.horse.speed) * 0.1)
     );
+    // 벽/말과의 거리 여유가 적으면 감속
+    const bestWallDist = (() => {
+      if (bestDir === DirectionType.FRONT) return wall.frontDistance;
+      if (bestDir === DirectionType.LEFT) return wall.leftDistance;
+      if (bestDir === DirectionType.RIGHT) return wall.rightDistance;
+      if (bestDir === DirectionType.FRONT_LEFT)
+        return Math.min(wall.frontDistance, wall.leftDistance);
+      if (bestDir === DirectionType.FRONT_RIGHT)
+        return Math.min(wall.frontDistance, wall.rightDistance);
+      return Infinity;
+    })();
+    const bestHorseDist = (() => {
+      if (bestDir === DirectionType.FRONT) return horseDist.frontDistance;
+      if (bestDir === DirectionType.LEFT) return horseDist.leftDistance;
+      if (bestDir === DirectionType.RIGHT) return horseDist.rightDistance;
+      if (bestDir === DirectionType.FRONT_LEFT)
+        return Math.min(horseDist.frontDistance, horseDist.leftDistance);
+      if (bestDir === DirectionType.FRONT_RIGHT)
+        return Math.min(horseDist.frontDistance, horseDist.rightDistance);
+      return Infinity;
+    })();
+    if (bestWallDist < speed * 2 || bestHorseDist < speed * 2) {
+      targetSpeed = Math.min(targetSpeed, this.horse.speed * 0.7);
+      targetAccel = -Math.abs(this.horse.maxAccel * 0.5);
+    }
+    // 차선 변경: openDirections에 포함되고, 벽/말과의 거리 여유가 충분할 때만
+    let laneChange = LaneChange.Stay;
+    if (bestDir === DirectionType.LEFT) laneChange = LaneChange.Inner;
+    if (bestDir === DirectionType.RIGHT) laneChange = LaneChange.Outer;
     return {
       targetSpeed,
-      targetDirection,
+      targetDirection: bestDirAngle,
       targetAccel,
       laneChange,
-      currentMode,
+      currentMode: DrivingMode.MaintainingPace,
     };
-    // ...existing code...
   }
   private getDirectionAngle(dir: DirectionType, track: number): number {
     if (dir === DirectionType.FRONT) return 0;

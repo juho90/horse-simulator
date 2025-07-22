@@ -24,11 +24,14 @@ export class RaceLine extends RaceSegment {
   getProgress(x: number, y: number): number {
     const directionX = this.end.x - this.start.x;
     const directionY = this.end.y - this.start.y;
+    const len2 = directionX * directionX + directionY * directionY;
+    if (len2 === 0) {
+      return 0;
+    }
     const positionX = x - this.start.x;
     const positionY = y - this.start.y;
-    const projectedDistance =
-      (positionX * directionX + positionY * directionY) / this.length;
-    return Math.max(0, Math.min(1, projectedDistance));
+    const t = (positionX * directionX + positionY * directionY) / len2;
+    return Math.max(0, Math.min(1, t));
   }
 
   getTangentDirectionAt(x: number, y: number): number {
