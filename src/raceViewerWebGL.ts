@@ -147,15 +147,6 @@ export function generateRaceWebGLHtml(
               ctx.restore();
             });
           }
-          if (horse.farthestHitPoint) {
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(horse.farthestHitPoint.x - ${minX}, horse.farthestHitPoint.y - ${minY}, 2, 0, 2 * Math.PI);
-            ctx.fillStyle = '#ff2d2d';
-            ctx.globalAlpha = 0.7;
-            ctx.fill();
-            ctx.restore();
-          }
         });
       }
     } 
@@ -190,17 +181,6 @@ export function generateRaceWebGLHtml(
             ctx.fill();
             ctx.restore();
           });
-        }
-        if (horse.farthestHitPoint) {
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(horse.farthestHitPoint.x - ${minX}, horse.farthestHitPoint.y - ${minY}, 2, 0, 2 * Math.PI);
-          ctx.fillStyle = '#ff6b6b';
-          ctx.globalAlpha = 1.0;
-          ctx.shadowColor = '#ff6b6b';
-          ctx.shadowBlur = 10;
-          ctx.fill();
-          ctx.restore();
         }
       });
     }

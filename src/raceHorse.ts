@@ -51,18 +51,17 @@ export class RaceHorse {
 
     this.gate = gate;
 
-    const startDir = this.segment.getTangentDirectionAt(
-      this.segment.start.x,
-      this.segment.start.y
-    );
+    const gateOffset = (this.gate + 1) * 17;
     const ortho = this.segment.orthoVectorAt(
       this.segment.start.x,
       this.segment.start.y
     );
-    const gateOffset = (this.gate + 1) * 17;
     this.x = this.segment.start.x + ortho.x * gateOffset;
     this.y = this.segment.start.y + ortho.y * gateOffset;
-
+    const startDir = this.segment.getTangentDirectionAt(
+      this.segment.start.x,
+      this.segment.start.y
+    );
     this.raceHeading = startDir;
     this.raceDistance = 0;
 

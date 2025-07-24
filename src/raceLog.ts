@@ -16,7 +16,6 @@ export interface HorseTurnState {
   stamina: number;
   dist: number;
   closestHitPoints?: Vector2D[];
-  farthestHitPoint?: Vector2D;
 }
 
 export interface RaceLog {

@@ -19,7 +19,7 @@ export function nextGenAvoidance(
   raceAnalysis: RaceSituationAnalysis
 ): number {
   const trackDirection = horse.segment.getTangentDirectionAt(horse.x, horse.y);
-  const dirDistances = raceAnalysis.dirDistanceWithSource;
+  const dirDistances = raceAnalysis.distanceWithSources;
   if (!dirDistances) {
     return trackDirection;
   }

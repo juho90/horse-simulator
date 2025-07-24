@@ -1,10 +1,5 @@
 import { RaceLine } from "./raceLine";
-import {
-  IntersectCircleLineNear,
-  IsAngleBetween,
-  NormalizeAngle,
-  Vector2D,
-} from "./raceMath";
+import { IntersectCircleLineNear, NormalizeAngle, Vector2D } from "./raceMath";
 import { BoundingBox, RaceSegment } from "./raceSegment";
 
 export class RaceCorner extends RaceSegment {
@@ -100,9 +95,8 @@ export class RaceCorner extends RaceSegment {
 
   isEndAt(x: number, y: number): boolean {
     const angle = Math.atan2(y - this.center.y, x - this.center.x);
-    const norm = (angle - this.startAngle + 2 * Math.PI) % (2 * Math.PI);
-    const span =
-      (this.endAngle - this.startAngle + 2 * Math.PI) % (2 * Math.PI);
+    const norm = NormalizeAngle(angle - this.startAngle);
+    const span = NormalizeAngle(this.endAngle - this.startAngle);
     return norm >= span - 0.05;
   }
 
@@ -120,19 +114,14 @@ export class RaceCorner extends RaceSegment {
     trackWidth: number
   ): Vector2D | null {
     const radius = this.radius + trackWidth;
-    const point = IntersectCircleLineNear(
+    return IntersectCircleLineNear(
       this.center,
       radius,
       rayPoint,
-      rayDir
+      rayDir,
+      this.startAngle,
+      this.endAngle
     );
-    if (point) {
-      if (!IsAngleBetween(point, this.center, this.startAngle, this.endAngle)) {
-        return null;
-      }
-      return point;
-    }
-    return null;
   }
 
   courseEffect(x: number, y: number, speed: number): Vector2D {

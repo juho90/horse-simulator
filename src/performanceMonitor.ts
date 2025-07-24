@@ -1,11 +1,10 @@
 import * as fs from "fs";
 import { DirectionType, DistanceSource } from "./directionalDistance";
 import { convertHorsesForRace, Horse } from "./horse";
-import { NearbyHorse } from "./raceEnvironment";
 import { RaceHorse } from "./raceHorse";
 import { HorseTurnState, RaceLog } from "./raceLog";
-import { Distance, NormalizeAngle } from "./raceMath";
-import { TRACK_WIDTH } from "./raceSimulator";
+import { Distance, NormalizeAngle, Vector2D } from "./raceMath";
+import { TRACK_WIDTH } from "./raceSegment";
 import { convertTrackForRace, RaceTrack } from "./raceTrack";
 
 enum ThreatLevel {
@@ -82,6 +81,15 @@ export class PerformanceMonitor {
           if (track.isGoal(horse)) {
             horse.finished = true;
           }
+          const closestHitPoints: Vector2D[] = [];
+          if (horse.raceEnv.closestRaycasts) {
+            for (const raycast of horse.raceEnv.closestRaycasts) {
+              if (!raycast.hitPoint) {
+                continue;
+              }
+              closestHitPoints.push(raycast.hitPoint);
+            }
+          }
           horseStates[index] = {
             id: horse.horseId,
             name: horse.name,
@@ -92,10 +100,7 @@ export class PerformanceMonitor {
             accel: horse.accel,
             stamina: horse.stamina,
             dist: horse.raceDistance,
-            closestHitPoints: horse.raceEnv.closestRaycasts?.map(
-              (r) => r.hitPoint
-            ),
-            farthestHitPoint: horse.raceEnv.farthestRaycast?.hitPoint,
+            closestHitPoints: closestHitPoints,
           };
           horseTurnStatesPerTurn[horse.name] = horseStates[index];
           if (prevMode !== currentMode) {
@@ -125,7 +130,7 @@ export class PerformanceMonitor {
     return logs;
   }
 
-  private detectEvents(turn: number, track: RaceTrack, horse: RaceHorse): void {
+  private detectEvents(turn: number, track: RaceTrack, horse: RaceHorse) {
     if (turn > 0) {
       this.segmentProgressEvents.push({
         turn,
@@ -138,27 +143,13 @@ export class PerformanceMonitor {
         threatLevel: ThreatLevel.NONE,
       });
     }
-    this.analyzeCollisions(turn, horse, horse.raceEnv.nearbyHorses);
-    this.analyzeSituationalDecision(
-      turn,
-      track,
-      horse,
-      horse.raceEnv.nearbyHorses
-    );
+    this.analyzeCollisions(turn, horse);
+    this.analyzeSituationalDecision(turn, track, horse);
     this.detectGuardrailViolations(turn, horse, track);
     this.detectDirectionDistortion(turn, horse, track);
   }
 
-  private analyzeCollisions(
-    turn: number,
-    horse: RaceHorse,
-    nearbyHorses: NearbyHorse
-  ): void {
-    const nearbyHorseArray = [
-      { direction: DirectionType.FRONT, horse: nearbyHorses.front },
-      { direction: DirectionType.LEFT, horse: nearbyHorses.left },
-      { direction: DirectionType.RIGHT, horse: nearbyHorses.right },
-    ];
+  private analyzeCollisions(turn: number, horse: RaceHorse) {
     let criticalDistance = 0;
     let criticalCount = 0;
     const highDirections: DirectionType[] = [];
@@ -166,21 +157,22 @@ export class PerformanceMonitor {
     let highCount = 0;
     let nearbyDistance = 0;
     let nearbyCount = 0;
-    for (const nearbyHorse of nearbyHorseArray) {
-      if (!nearbyHorse.horse) {
+    const horseDistances = horse.raceAnalysis.horseDistances;
+    for (const [direction, horseDistance] of Object.entries(horseDistances)) {
+      if (!horseDistance || !horseDistance.horse) {
         continue;
       }
-      const distance = Distance(horse, nearbyHorse.horse);
+      const distance = Distance(horse, horseDistance.horse);
       const threatLevel = this.calculateDistanceThreatLevel(
         distance,
-        nearbyHorse.direction
+        direction as DirectionType
       );
       if (threatLevel === ThreatLevel.CRITICAL) {
         criticalDistance += distance;
         criticalCount++;
       }
       if (threatLevel === ThreatLevel.HIGH) {
-        highDirections.push(nearbyHorse.direction);
+        highDirections.push(direction as DirectionType);
         highDistance += distance;
         highCount++;
       }
@@ -219,38 +211,33 @@ export class PerformanceMonitor {
   private analyzeSituationalDecision(
     turn: number,
     track: RaceTrack,
-    horse: RaceHorse,
-    nearbyHorses: NearbyHorse
+    horse: RaceHorse
   ): void {
-    const nearbyHorseArray = [
-      { direction: DirectionType.FRONT, horse: nearbyHorses.front },
-      { direction: DirectionType.LEFT, horse: nearbyHorses.left },
-      { direction: DirectionType.RIGHT, horse: nearbyHorses.right },
-    ];
     const nearbyHorseDistances: {
       direction: DirectionType;
       name: string;
       distance: number;
     }[] = [];
     const nearbyHorseDirections: DirectionType[] = [];
-    for (const nearbyHorse of nearbyHorseArray) {
-      if (!nearbyHorse.horse) {
+    const horseDistances = horse.raceAnalysis.horseDistances;
+    for (const [direction, horseDistance] of Object.entries(horseDistances)) {
+      if (!horseDistance || !horseDistance.horse) {
         continue;
       }
-      const distance = Distance(horse, nearbyHorse.horse);
+      const distance = Distance(horse, horseDistance.horse);
       nearbyHorseDistances.push({
-        direction: nearbyHorse.direction,
-        name: nearbyHorse.horse.name,
+        direction: direction as DirectionType,
+        name: horseDistance.horse.name,
         distance: distance,
       });
-      nearbyHorseDirections.push(nearbyHorse.direction);
+      nearbyHorseDirections.push(direction as DirectionType);
     }
     const nearbyWallDistances: {
       direction: DirectionType;
       distance: number;
     }[] = [];
-    if (horse.raceAnalysis.dirDistanceWithSource) {
-      const dirDistWithSource = horse.raceAnalysis.dirDistanceWithSource;
+    if (horse.raceAnalysis.distanceWithSources) {
+      const dirDistWithSource = horse.raceAnalysis.distanceWithSources;
       const dirDists = [
         { direction: DirectionType.FRONT, value: dirDistWithSource.front },
         { direction: DirectionType.LEFT, value: dirDistWithSource.left },
