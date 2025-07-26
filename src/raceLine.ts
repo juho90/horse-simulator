@@ -1,5 +1,6 @@
+import { addDirectionToAngle, DirectionType } from "./directionalDistance";
 import { RaceCorner } from "./raceCorner";
-import { EPSILON, NormalizeAngle, Vector2D } from "./raceMath";
+import { Distance, EPSILON, NormalizeTheta, Vector2D } from "./raceMath";
 import { BoundingBox, RaceSegment } from "./raceSegment";
 
 export class RaceLine extends RaceSegment {
@@ -9,7 +10,7 @@ export class RaceLine extends RaceSegment {
   }
 
   calculateLength(): number {
-    return Math.hypot(this.end.x - this.start.x, this.end.y - this.start.y);
+    return Distance(this.end, this.start);
   }
 
   getBounds(): BoundingBox {
@@ -34,20 +35,29 @@ export class RaceLine extends RaceSegment {
     return Math.max(0, Math.min(1, t));
   }
 
+  getProgressAt(x: number, y: number): Vector2D {
+    const progress = this.getProgress(x, y);
+    return {
+      x: this.start.x + (this.end.x - this.start.x) * progress,
+      y: this.start.y + (this.end.y - this.start.y) * progress,
+    };
+  }
+
   getTangentDirectionAt(x: number, y: number): number {
-    const angle = Math.atan2(
-      this.end.y - this.start.y,
-      this.end.x - this.start.x
-    );
-    return NormalizeAngle(angle);
+    return NormalizeTheta(this.start, this.end);
   }
 
   getEndTangentDirection(): number {
-    const angle = Math.atan2(
-      this.end.y - this.start.y,
-      this.end.x - this.start.x
-    );
-    return NormalizeAngle(angle);
+    return NormalizeTheta(this.start, this.end);
+  }
+
+  getOrthoVectorAt(x: number, y: number): Vector2D {
+    const dir = this.getTangentDirectionAt(x, y);
+    const angle = addDirectionToAngle(dir, DirectionType.LEFT);
+    return {
+      x: Math.cos(angle),
+      y: Math.sin(angle),
+    };
   }
 
   isInner(x: number, y: number): boolean {
@@ -61,7 +71,7 @@ export class RaceLine extends RaceSegment {
     const tClamped = Math.max(0, Math.min(1, t));
     const projX = this.start.x + dx * tClamped;
     const projY = this.start.y + dy * tClamped;
-    const ortho = this.orthoVectorAt(x, y);
+    const ortho = this.getOrthoVectorAt(x, y);
     const rel = (x - projX) * ortho.x + (y - projY) * ortho.y;
     return rel > 0;
   }
@@ -77,14 +87,6 @@ export class RaceLine extends RaceSegment {
     return t >= 1;
   }
 
-  orthoVectorAt(x: number, y: number): Vector2D {
-    const dir = this.getTangentDirectionAt(x, y);
-    return {
-      x: Math.cos(dir - Math.PI / 2),
-      y: Math.sin(dir - Math.PI / 2),
-    };
-  }
-
   raycastBoundary(
     rayPoint: Vector2D,
     rayDir: Vector2D,
@@ -97,11 +99,7 @@ export class RaceLine extends RaceSegment {
     let offsetX = 0;
     let offsetY = 0;
     if (0 < trackWidth) {
-      const segAngle = Math.atan2(y2 - y1, x2 - x1);
-      const ortho = {
-        x: Math.cos(segAngle - Math.PI / 2),
-        y: Math.sin(segAngle - Math.PI / 2),
-      };
+      const ortho = this.getOrthoVectorAt(x1, y1);
       offsetX = ortho.x * trackWidth;
       offsetY = ortho.y * trackWidth;
     }

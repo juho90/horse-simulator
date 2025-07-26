@@ -2,6 +2,7 @@ import * as child_process from "child_process";
 import * as fs from "fs";
 import { RaceCorner } from "./raceCorner";
 import { RaceLog } from "./raceLog";
+import { LerpAngle } from "./raceMath";
 import { RaceTrack } from "./raceTrack";
 
 export function generateRaceWebGLHtml(
@@ -60,11 +61,9 @@ export function generateRaceWebGLHtml(
       });
     } else if (segment.type === "corner") {
       const corner = segment as RaceCorner;
-      const res = 32;
+      const res = 16;
       for (let i = 0; i <= res; i++) {
-        const t = i / res;
-        const theta =
-          corner.startAngle + (corner.endAngle - corner.startAngle) * t;
+        const theta = LerpAngle(corner.startAngle, corner.endAngle, i / res);
         centerLinePoints.push({
           x: corner.center.x + corner.radius * Math.cos(theta),
           y: corner.center.y + corner.radius * Math.sin(theta),
@@ -130,7 +129,7 @@ export function generateRaceWebGLHtml(
       ctx.stroke();
       ctx.fillStyle = '#fff';
       ctx.fillText('GOAL', goalPosition.x, goalPosition.y - 18); 
-    } 
+    }
     function drawBoundaryPoints() {
       for (let t = 0; t < logs.length; t++) {
         const horses = logs[t].horseStates;
@@ -149,7 +148,7 @@ export function generateRaceWebGLHtml(
           }
         });
       }
-    } 
+    }
     function drawHorses(turnIdx) {
       const log = logs[turnIdx];
       const horses = log.horseStates;

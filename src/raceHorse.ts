@@ -52,7 +52,7 @@ export class RaceHorse {
     this.gate = gate;
 
     const gateOffset = (this.gate + 1) * 17;
-    const ortho = this.segment.orthoVectorAt(
+    const ortho = this.segment.getOrthoVectorAt(
       this.segment.start.x,
       this.segment.start.y
     );

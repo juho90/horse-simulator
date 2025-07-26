@@ -1,3 +1,8 @@
+import {
+  addDirectionToAngle,
+  DIRECTIONS,
+  DirectionType,
+} from "./directionalDistance";
 import { Distance, EPSILON, NormalizeAngle, Vector2D } from "./raceMath";
 
 export type BoundingBox = {
@@ -26,11 +31,12 @@ export abstract class RaceSegment {
 
   abstract getBounds(): BoundingBox;
   abstract getProgress(x: number, y: number): number;
+  abstract getProgressAt(x: number, y: number): Vector2D;
   abstract getTangentDirectionAt(x: number, y: number): number;
   abstract getEndTangentDirection(): number;
+  abstract getOrthoVectorAt(x: number, y: number): Vector2D;
   abstract isInner(x: number, y: number): boolean;
   abstract isEndAt(x: number, y: number): boolean;
-  abstract orthoVectorAt(x: number, y: number): Vector2D;
   abstract raycastBoundary(
     rayPoint: Vector2D,
     rayDir: Vector2D,
@@ -59,16 +65,17 @@ export function raycastBoundarys(
   heading: number,
   segment: RaceSegment,
   trackWidth: number,
-  directions: number[]
+  directions: DirectionType[]
 ): RaycastResult[] {
+  const point = { x, y };
   const closestRaycasts: RaycastResult[] = [];
-  for (const offset of directions) {
-    const angle = NormalizeAngle(heading + offset);
+  for (const direction of directions) {
+    const angle = addDirectionToAngle(heading, direction);
     const rayDir = { x: Math.cos(angle), y: Math.sin(angle) };
-    const innerPoint = segment.raycastBoundary({ x, y }, rayDir, 0);
+    const innerPoint = segment.raycastBoundary(point, rayDir, 0);
     let innerDistance = Infinity;
     if (innerPoint) {
-      innerDistance = Distance(innerPoint, { x, y });
+      innerDistance = Distance(innerPoint, point);
     }
     const closestRaycast = {
       segment,
@@ -80,10 +87,10 @@ export function raycastBoundarys(
     } as RaycastResult;
     closestRaycasts.push(closestRaycast);
     if (0 < trackWidth) {
-      const outerPoint = segment.raycastBoundary({ x, y }, rayDir, trackWidth);
+      const outerPoint = segment.raycastBoundary(point, rayDir, trackWidth);
       let outerDistance = Infinity;
       if (outerPoint) {
-        outerDistance = Distance(outerPoint, { x, y });
+        outerDistance = Distance(outerPoint, point);
       }
       const closestRaycast = {
         segment,
@@ -154,14 +161,6 @@ export function raycastFarBoundary(
 }
 
 export const TRACK_WIDTH = 200;
-
-export const DIRECTIONS = [
-  0,
-  Math.PI / 2,
-  -Math.PI / 2,
-  Math.PI / 4,
-  -Math.PI / 4,
-];
 
 export function raycastBoundary(
   x: number,

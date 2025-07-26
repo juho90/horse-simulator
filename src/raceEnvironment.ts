@@ -1,20 +1,23 @@
-import { Lane } from "./laneEvaluation";
 import { RaceHorse } from "./raceHorse";
-import { raycastBoundary, RaycastResult } from "./raceSegment";
+import { Distance } from "./raceMath";
+import { raycastBoundary, RaycastResult, TRACK_WIDTH } from "./raceSegment";
+
+export const FIRST_LANE = 1;
+export const LAST_LANE = 17;
 
 export class RaceEnvironment {
   closestRaycasts: RaycastResult[];
   otherHorses: RaceHorse[];
   raceProgress: number;
   currentRank: number;
-  currentLane: Lane;
+  currentCourseLane: number;
 
   constructor(private horse: RaceHorse) {
     this.closestRaycasts = [];
     this.otherHorses = [];
     this.raceProgress = 0;
     this.currentRank = 1;
-    this.currentLane = Lane.Middle;
+    this.currentCourseLane = this.calculateCourseCurrentLane();
   }
 
   update(otherHorses: RaceHorse[]): void {
@@ -22,7 +25,7 @@ export class RaceEnvironment {
     this.updateRaycast();
     this.raceProgress = this.calculateRaceProgress();
     this.currentRank = this.calculateCurrentRank(otherHorses);
-    this.currentLane = this.getCurrentLane();
+    this.currentCourseLane = this.calculateCourseCurrentLane();
   }
 
   private updateRaycast(): void {
@@ -58,40 +61,21 @@ export class RaceEnvironment {
     return rank;
   }
 
-  private getCurrentLane(): Lane {
-    if (this.closestRaycasts && this.closestRaycasts.length > 0) {
-      const leftRaycast = this.closestRaycasts.find(
-        (raycast) =>
-          Math.abs(raycast.rayAngle - (this.horse.raceHeading - Math.PI / 2)) <
-          0.1
-      );
-      const rightRaycast = this.closestRaycasts.find(
-        (raycast) =>
-          Math.abs(raycast.rayAngle - (this.horse.raceHeading + Math.PI / 2)) <
-          0.1
-      );
-      if (leftRaycast && rightRaycast) {
-        const leftDistance = leftRaycast.hitDistance;
-        const rightDistance = rightRaycast.hitDistance;
-        const totalWidth = leftDistance + rightDistance;
-        const positionRatio = leftDistance / totalWidth;
-        if (positionRatio <= 0.33) {
-          return Lane.Inner;
-        } else if (positionRatio >= 0.67) {
-          return Lane.Outer;
-        } else {
-          return Lane.Middle;
-        }
-      }
-    }
-    const distanceFromInner = Math.abs(this.horse.gate - 0);
-    const distanceFromOuter = Math.abs(this.horse.gate - 7);
-    if (distanceFromInner <= 2) {
-      return Lane.Inner;
-    }
-    if (distanceFromOuter <= 2) {
-      return Lane.Outer;
-    }
-    return Lane.Middle;
+  private calculateCourseCurrentLane(): number {
+    const segment = this.horse.segment;
+    const progressAt = segment.getProgressAt(this.horse.x, this.horse.y);
+    const ortho = segment.getOrthoVectorAt(progressAt.x, progressAt.y);
+    const trackWidthAt = {
+      x: progressAt.x + ortho.x * TRACK_WIDTH,
+      y: progressAt.y + ortho.y * TRACK_WIDTH,
+    };
+    const leftDistance = Distance(this.horse, progressAt);
+    const rightDistance = Distance(this.horse, trackWidthAt);
+    const totalWidth = leftDistance + rightDistance;
+    const positionRatio = leftDistance / totalWidth;
+    return Math.max(
+      FIRST_LANE,
+      Math.min(LAST_LANE, Math.round(positionRatio * LAST_LANE))
+    );
   }
 }

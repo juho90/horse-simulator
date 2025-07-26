@@ -1,18 +1,18 @@
-import { DirectionType } from "./directionalDistance";
+import { convertAngleToDirection, DirectionType } from "./directionalDistance";
 
 export type Vector2D = { x: number; y: number };
 
 export const EPSILON = 1e-10;
 
-export function Distance(a: Vector2D, b: Vector2D): number {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
+export function Distance(from: Vector2D, to: Vector2D): number {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-export function NormalVector(a: Vector2D, b: Vector2D): Vector2D {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
+export function NormalVector(from: Vector2D, to: Vector2D): Vector2D {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
   const len = Math.hypot(dx, dy);
   return { x: dy / len, y: -dx / len };
 }
@@ -21,19 +21,26 @@ export function NormalizeAngle(a: number) {
   return (a + 2 * Math.PI) % (2 * Math.PI);
 }
 
-export function NormalizeTheta(a: Vector2D, b: Vector2D): number {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
+export function DiffAngle(from: number, to: number) {
+  const diff = NormalizeAngle(from - to);
+  if (diff > Math.PI) {
+    return diff - 2 * Math.PI;
+  }
+  return diff;
+}
+
+export function NormalizeTheta(from: Vector2D, to: Vector2D): number {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
   return NormalizeAngle(Math.atan2(dy, dx));
 }
 
-export function Lerp(a: Vector2D, b: Vector2D, t: number): Vector2D {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+export function Lerp(from: Vector2D, to: Vector2D, t: number): Vector2D {
+  return { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
 }
 
-export function LerpAngle(a: number, b: number, t: number): number {
-  const diff = Math.atan2(Math.sin(b - a), Math.cos(b - a));
-  return a + diff * t;
+export function LerpAngle(from: number, to: number, t: number): number {
+  return from + DiffAngle(to, from) * t;
 }
 
 export function ProjectOnSegment(
@@ -112,7 +119,7 @@ export function IsAngleBetween(
   const theta = NormalizeTheta(center, point);
   const start = NormalizeAngle(startAngle);
   const end = NormalizeAngle(endAngle);
-  if (start <= end) {
+  if (end > start) {
     return start <= theta && theta <= end;
   } else {
     return start <= theta || theta <= end;
@@ -124,24 +131,7 @@ export function CalculateDirection(
   to: { x: number; y: number },
   heading: number
 ): { direction: DirectionType | null; angle: number } {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const angle = Math.atan2(dy, dx);
-  const relativeAngle = NormalizeAngle(angle - heading);
-  if (relativeAngle >= (7 * Math.PI) / 4 || relativeAngle < Math.PI / 4) {
-    return { direction: DirectionType.FRONT, angle: relativeAngle };
-  }
-  if (relativeAngle < (3 * Math.PI) / 4) {
-    return { direction: DirectionType.FRONT_LEFT, angle: relativeAngle };
-  }
-  if (relativeAngle < (5 * Math.PI) / 4) {
-    return { direction: DirectionType.LEFT, angle: relativeAngle };
-  }
-  if (relativeAngle < (7 * Math.PI) / 4) {
-    return { direction: DirectionType.FRONT_RIGHT, angle: relativeAngle };
-  }
-  if (relativeAngle < 2 * Math.PI) {
-    return { direction: DirectionType.RIGHT, angle: relativeAngle };
-  }
-  return { direction: null, angle: relativeAngle };
+  const angle = NormalizeAngle(NormalizeTheta(from, to) - heading);
+  const direction = convertAngleToDirection(angle);
+  return { direction, angle: angle };
 }

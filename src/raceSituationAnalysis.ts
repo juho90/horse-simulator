@@ -9,9 +9,15 @@ import {
   WallDistanceValue,
 } from "./directionalDistance";
 import { DrivingMode } from "./drivingMode";
-import { Lane, RacePhase } from "./laneEvaluation";
-import { RaceEnvironment } from "./raceEnvironment";
+import { FIRST_LANE, LAST_LANE, RaceEnvironment } from "./raceEnvironment";
 import { RaceHorse } from "./raceHorse";
+
+export enum RacePhase {
+  Early = "early",
+  Middle = "middle",
+  Late = "late",
+  Final = "final",
+}
 
 export class RaceSituationAnalysis {
   wallDistances: Record<DirectionType, WallDistanceValue>;
@@ -19,7 +25,6 @@ export class RaceSituationAnalysis {
   distanceWithSources: Record<DirectionType, DistanceValue>;
   racePhase: RacePhase;
   enableDirections: DirectionType[];
-  enableLanes: Lane[];
   enableDrivingModes: DrivingMode[];
 
   constructor(private horse: RaceHorse, private raceEnv: RaceEnvironment) {
@@ -34,7 +39,6 @@ export class RaceSituationAnalysis {
     this.distanceWithSources = createDefaultDistanceWithSources();
     this.racePhase = RacePhase.Early;
     this.enableDirections = [];
-    this.enableLanes = [];
     this.enableDrivingModes = [DrivingMode.MaintainingPace];
   }
 
@@ -96,10 +100,10 @@ export class RaceSituationAnalysis {
       this.horseDistances[DirectionType.LEFT].distance > 20
     );
     const canMoveInner =
-      this.raceEnv.currentLane !== Lane.Inner &&
+      this.raceEnv.currentCourseLane !== FIRST_LANE &&
       this.horseDistances[DirectionType.LEFT].distance > 25;
     const canMoveOuter =
-      this.raceEnv.currentLane !== Lane.Outer &&
+      this.raceEnv.currentCourseLane !== LAST_LANE &&
       this.horseDistances[DirectionType.RIGHT].distance > 25;
     const isBlocked = this.enableDirections.length === 0;
     const frontDistance =
@@ -142,7 +146,6 @@ export class RaceSituationAnalysis {
     );
     this.distanceWithSources = this.analyzeDistanceWithSources();
     const enableDirections = new Set<DirectionType>();
-    const enableLanes = new Set<Lane>();
     for (const [direction, wallDistance] of Object.entries(
       this.wallDistances
     )) {
@@ -150,21 +153,6 @@ export class RaceSituationAnalysis {
         continue;
       }
       enableDirections.add(direction as DirectionType);
-      switch (direction) {
-        case DirectionType.FRONT:
-          enableLanes.add(Lane.Middle);
-          break;
-        case DirectionType.LEFT:
-        case DirectionType.FRONT_LEFT:
-          enableLanes.add(Lane.Inner);
-          break;
-        case DirectionType.RIGHT:
-        case DirectionType.FRONT_RIGHT:
-          enableLanes.add(Lane.Outer);
-          break;
-        default:
-          break;
-      }
     }
     for (const [direction, horseDistance] of Object.entries(
       this.horseDistances
@@ -173,74 +161,68 @@ export class RaceSituationAnalysis {
         continue;
       }
       enableDirections.add(direction as DirectionType);
-      switch (direction) {
-        case DirectionType.FRONT:
-          enableLanes.add(Lane.Middle);
-          break;
-        case DirectionType.LEFT:
-        case DirectionType.FRONT_LEFT:
-          enableLanes.add(Lane.Inner);
-          break;
-        case DirectionType.RIGHT:
-        case DirectionType.FRONT_RIGHT:
-          enableLanes.add(Lane.Outer);
-          break;
-        default:
-          break;
-      }
     }
     this.enableDirections = Array.from(enableDirections);
-    this.enableLanes = Array.from(enableLanes);
   }
 
   private analyzeDistanceWithSources(): Record<DirectionType, DistanceValue> {
-    const front = RaceSituationAnalysis.minDistance([
+    const front = minDistance([
       {
         source: DistanceSource.Wall,
+        angle: this.wallDistances[DirectionType.FRONT].angle,
         distance: this.wallDistances[DirectionType.FRONT].distance,
       },
       {
         source: DistanceSource.Horse,
+        angle: this.horseDistances[DirectionType.FRONT].angle,
         distance: this.horseDistances[DirectionType.FRONT].distance,
       },
     ]);
-    const left = RaceSituationAnalysis.minDistance([
+    const left = minDistance([
       {
         source: DistanceSource.Wall,
+        angle: this.wallDistances[DirectionType.LEFT].angle,
         distance: this.wallDistances[DirectionType.LEFT].distance,
       },
       {
         source: DistanceSource.Horse,
+        angle: this.horseDistances[DirectionType.LEFT].angle,
         distance: this.horseDistances[DirectionType.LEFT].distance,
       },
     ]);
-    const right = RaceSituationAnalysis.minDistance([
+    const right = minDistance([
       {
         source: DistanceSource.Wall,
+        angle: this.wallDistances[DirectionType.RIGHT].angle,
         distance: this.wallDistances[DirectionType.RIGHT].distance,
       },
       {
         source: DistanceSource.Horse,
+        angle: this.horseDistances[DirectionType.RIGHT].angle,
         distance: this.horseDistances[DirectionType.RIGHT].distance,
       },
     ]);
-    const frontLeft = RaceSituationAnalysis.minDistance([
+    const frontLeft = minDistance([
       {
         source: DistanceSource.Wall,
+        angle: this.wallDistances[DirectionType.FRONT_LEFT].angle,
         distance: this.wallDistances[DirectionType.FRONT_LEFT].distance,
       },
       {
         source: DistanceSource.Horse,
+        angle: this.horseDistances[DirectionType.FRONT_LEFT].angle,
         distance: this.horseDistances[DirectionType.FRONT_LEFT].distance,
       },
     ]);
-    const frontRight = RaceSituationAnalysis.minDistance([
+    const frontRight = minDistance([
       {
         source: DistanceSource.Wall,
+        angle: this.wallDistances[DirectionType.FRONT_RIGHT].angle,
         distance: this.wallDistances[DirectionType.FRONT_RIGHT].distance,
       },
       {
         source: DistanceSource.Horse,
+        angle: this.horseDistances[DirectionType.FRONT_RIGHT].angle,
         distance: this.horseDistances[DirectionType.FRONT_RIGHT].distance,
       },
     ]);
@@ -252,16 +234,18 @@ export class RaceSituationAnalysis {
       [DirectionType.FRONT_RIGHT]: frontRight,
     };
   }
+}
 
-  static minDistance(values: DistanceValue[]): DistanceValue {
-    let source: DistanceSource = DistanceSource.Unknown;
-    let distance = Infinity;
-    for (const value of values) {
-      if (value.distance < distance) {
-        distance = value.distance;
-        source = value.source;
-      }
+function minDistance(values: DistanceValue[]): DistanceValue {
+  let source: DistanceSource = DistanceSource.Unknown;
+  let angle = 0;
+  let distance = Infinity;
+  for (const value of values) {
+    if (value.distance < distance) {
+      source = value.source;
+      angle = value.angle;
+      distance = value.distance;
     }
-    return { source, distance };
   }
+  return { source, angle, distance };
 }
