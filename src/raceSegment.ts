@@ -12,7 +12,17 @@ export type BoundingBox = {
   maxY: number;
 };
 
-export type SegmentType = "line" | "corner";
+export enum SegmentType {
+  LINE = "line",
+  CORNER = "corner",
+}
+
+export interface RaceSegmentNode {
+  x: number;
+  y: number;
+  progress: number;
+  lane: number;
+}
 
 export abstract class RaceSegment {
   start: Vector2D;
@@ -35,6 +45,11 @@ export abstract class RaceSegment {
   abstract getTangentDirectionAt(x: number, y: number): number;
   abstract getEndTangentDirection(): number;
   abstract getOrthoVectorAt(x: number, y: number): Vector2D;
+  abstract getSampleNodes(
+    trackWidth: number,
+    resolution: number,
+    padding: number
+  ): Array<RaceSegmentNode>;
   abstract isInner(x: number, y: number): boolean;
   abstract isEndAt(x: number, y: number): boolean;
   abstract raycastBoundary(
@@ -42,7 +57,6 @@ export abstract class RaceSegment {
     rayDir: Vector2D,
     trackWidth: number
   ): Vector2D | null;
-  abstract courseEffect(x: number, y: number, speed: number): Vector2D;
 }
 
 export enum GuardrailType {

@@ -1,7 +1,7 @@
 import { RaceCorner } from "./raceCorner";
 import { RaceHorse } from "./raceHorse";
 import { RaceLine } from "./raceLine";
-import { RaceSegment } from "./raceSegment";
+import { RaceSegment, RaceSegmentNode } from "./raceSegment";
 import { generateClosedTrackSegments } from "./raceTrackHelper";
 
 export class RaceTrack {
@@ -112,6 +112,19 @@ export class RaceTrack {
         y: corner.center.y + corner.radius * Math.sin(currentAngle),
       };
     }
+  }
+
+  getAllSampleNodes(
+    trackWidth: number,
+    resolution: number,
+    padding: number
+  ): Array<RaceSegmentNode> {
+    const allNodes: Array<RaceSegmentNode> = [];
+    for (const segment of this.segments) {
+      const nodes = segment.getSampleNodes(trackWidth, resolution, padding);
+      allNodes.push(...nodes);
+    }
+    return allNodes;
   }
 
   isGoal(horse: RaceHorse): boolean {

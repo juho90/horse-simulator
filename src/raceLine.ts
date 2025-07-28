@@ -1,11 +1,16 @@
 import { addDirectionToAngle, DirectionType } from "./directionalDistance";
 import { RaceCorner } from "./raceCorner";
 import { Distance, EPSILON, NormalizeTheta, Vector2D } from "./raceMath";
-import { BoundingBox, RaceSegment } from "./raceSegment";
+import {
+  BoundingBox,
+  RaceSegment,
+  RaceSegmentNode,
+  SegmentType,
+} from "./raceSegment";
 
 export class RaceLine extends RaceSegment {
   constructor(start: Vector2D, end: Vector2D) {
-    super(start, end, "line");
+    super(start, end, SegmentType.LINE);
     this.length = this.calculateLength();
   }
 
@@ -58,6 +63,31 @@ export class RaceLine extends RaceSegment {
       x: Math.cos(angle),
       y: Math.sin(angle),
     };
+  }
+
+  getSampleNodes(
+    trackWidth: number,
+    resolution: number,
+    padding: number
+  ): Array<RaceSegmentNode> {
+    const nodes: Array<RaceSegmentNode> = [];
+    for (let lane = padding; lane <= trackWidth - padding; lane += resolution) {
+      for (let index = 0; index <= this.length; index += resolution) {
+        const progress = index / this.length;
+        const x = this.start.x + (this.end.x - this.start.x) * progress;
+        const y = this.start.y + (this.end.y - this.start.y) * progress;
+        const ortho = this.getOrthoVectorAt(x, y);
+        const nodeX = x + ortho.x * lane;
+        const nodeY = y + ortho.y * lane;
+        nodes.push({
+          x: nodeX,
+          y: nodeY,
+          progress,
+          lane,
+        });
+      }
+    }
+    return nodes;
   }
 
   isInner(x: number, y: number): boolean {

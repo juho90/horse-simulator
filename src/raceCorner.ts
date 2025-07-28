@@ -7,7 +7,12 @@ import {
   NormalizeTheta,
   Vector2D,
 } from "./raceMath";
-import { BoundingBox, RaceSegment } from "./raceSegment";
+import {
+  BoundingBox,
+  RaceSegment,
+  RaceSegmentNode,
+  SegmentType,
+} from "./raceSegment";
 
 export class RaceCorner extends RaceSegment {
   center: Vector2D;
@@ -28,7 +33,7 @@ export class RaceCorner extends RaceSegment {
       x: center.x + radius * Math.cos(endAngle),
       y: center.y + radius * Math.sin(endAngle),
     };
-    super(start, end, "corner");
+    super(start, end, SegmentType.CORNER);
     this.center = center;
     this.radius = radius;
     this.angle = angle;
@@ -88,6 +93,25 @@ export class RaceCorner extends RaceSegment {
     };
   }
 
+  getSampleNodes(
+    trackWidth: number,
+    resolution: number,
+    padding: number
+  ): Array<RaceSegmentNode> {
+    const nodes: Array<RaceSegmentNode> = [];
+    for (let lane = padding; lane <= trackWidth - padding; lane += resolution) {
+      for (let index = 0; index <= this.length; index += resolution) {
+        const progress = index / this.length;
+        const angle = LerpAngle(this.startAngle, this.endAngle, progress);
+        const radius = this.radius + lane;
+        const nodeX = this.center.x + radius * Math.cos(angle);
+        const nodeY = this.center.y + radius * Math.sin(angle);
+        nodes.push({ x: nodeX, y: nodeY, progress, lane });
+      }
+    }
+    return nodes;
+  }
+
   isInside(x: number, y: number, tolerance: number): boolean {
     const dx = x - this.center.x;
     const dy = y - this.center.y;
@@ -138,21 +162,6 @@ export class RaceCorner extends RaceSegment {
       this.startAngle,
       this.endAngle
     );
-  }
-
-  courseEffect(x: number, y: number, speed: number): Vector2D {
-    const dx = x - this.center.x;
-    const dy = y - this.center.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist > 0) {
-      const centrifugalCoeff = 0.18;
-      const force = (centrifugalCoeff * (speed * speed)) / this.radius;
-      return {
-        x: (dx / dist) * force,
-        y: (dy / dist) * force,
-      };
-    }
-    return { x: 0, y: 0 };
   }
 }
 

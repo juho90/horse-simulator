@@ -3,6 +3,7 @@ import * as fs from "fs";
 import { RaceCorner } from "./raceCorner";
 import { RaceLog } from "./raceLog";
 import { LerpAngle } from "./raceMath";
+import { TRACK_WIDTH } from "./raceSegment";
 import { RaceTrack } from "./raceTrack";
 
 export function generateRaceWebGLHtml(
@@ -77,6 +78,10 @@ export function generateRaceWebGLHtml(
     y: segments[segments.length - 1].end.y,
     color: "#000000",
   });
+  const sampleNodes = track.getAllSampleNodes(TRACK_WIDTH, 15, 10).map((n) => ({
+    x: n.x - minX,
+    y: n.y - minY,
+  }));
   const goalPosition = track.getGoalPosition();
   const js = `
     const logs = ${JSON.stringify(logs)};
@@ -87,6 +92,7 @@ export function generateRaceWebGLHtml(
         color: p.color,
       }))
     )};
+    const sampleNodes = ${JSON.stringify(sampleNodes)};
     const goalPosition = ${JSON.stringify({
       x: goalPosition.x - minX,
       y: goalPosition.y - minY,
@@ -129,6 +135,16 @@ export function generateRaceWebGLHtml(
       ctx.stroke();
       ctx.fillStyle = '#fff';
       ctx.fillText('GOAL', goalPosition.x, goalPosition.y - 18); 
+    }
+    function drawSampleNodes() {
+      ctx.save();
+      ctx.fillStyle = "#ff00aa";
+      for (const node of sampleNodes) {
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, 2, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+      ctx.restore();
     }
     function drawBoundaryPoints() {
       for (let t = 0; t < logs.length; t++) {
@@ -206,6 +222,7 @@ export function generateRaceWebGLHtml(
     }
     function render() {
       drawTrack();
+      drawSampleNodes();
       drawHorses(turn);
       drawTurnInfo(turn);
       drawStatusPanel(turn);
