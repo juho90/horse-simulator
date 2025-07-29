@@ -62,9 +62,13 @@ export function generateRaceWebGLHtml(
       });
     } else if (segment.type === "corner") {
       const corner = segment as RaceCorner;
-      const res = 16;
-      for (let i = 0; i <= res; i++) {
-        const theta = LerpAngle(corner.startAngle, corner.endAngle, i / res);
+      const resolution = 32;
+      for (let index = 0; index <= resolution; index++) {
+        const theta = LerpAngle(
+          corner.startAngle,
+          corner.endAngle,
+          index / resolution
+        );
         centerLinePoints.push({
           x: corner.center.x + corner.radius * Math.cos(theta),
           y: corner.center.y + corner.radius * Math.sin(theta),

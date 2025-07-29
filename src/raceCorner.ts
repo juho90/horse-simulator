@@ -1,6 +1,7 @@
 import { addDirectionToAngle, DirectionType } from "./directionalDistance";
 import { RaceLine } from "./raceLine";
 import {
+  DiffAngle,
   IntersectCircleLineNear,
   LerpAngle,
   NormalizeAngle,
@@ -100,10 +101,13 @@ export class RaceCorner extends RaceSegment {
   ): Array<RaceSegmentNode> {
     const nodes: Array<RaceSegmentNode> = [];
     for (let lane = padding; lane <= trackWidth - padding; lane += resolution) {
-      for (let index = 0; index <= this.length; index += resolution) {
-        const progress = index / this.length;
+      const radius = this.radius + lane;
+      const diffAngle = DiffAngle(this.endAngle, this.startAngle);
+      const arcLength = diffAngle * radius;
+      const count = Math.ceil(arcLength / resolution);
+      for (let index = 0; index <= count; index++) {
+        const progress = index / count;
         const angle = LerpAngle(this.startAngle, this.endAngle, progress);
-        const radius = this.radius + lane;
         const nodeX = this.center.x + radius * Math.cos(angle);
         const nodeY = this.center.y + radius * Math.sin(angle);
         nodes.push({ x: nodeX, y: nodeY, progress, lane });

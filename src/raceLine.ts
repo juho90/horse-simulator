@@ -72,8 +72,9 @@ export class RaceLine extends RaceSegment {
   ): Array<RaceSegmentNode> {
     const nodes: Array<RaceSegmentNode> = [];
     for (let lane = padding; lane <= trackWidth - padding; lane += resolution) {
-      for (let index = 0; index <= this.length; index += resolution) {
-        const progress = index / this.length;
+      const count = Math.max(2, Math.ceil(this.length / resolution));
+      for (let index = 0; index <= count; index++) {
+        const progress = index / count;
         const x = this.start.x + (this.end.x - this.start.x) * progress;
         const y = this.start.y + (this.end.y - this.start.y) * progress;
         const ortho = this.getOrthoVectorAt(x, y);
