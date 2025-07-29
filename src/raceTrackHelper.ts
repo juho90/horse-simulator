@@ -8,7 +8,6 @@ import {
   createLineFromSegment,
   RaceLine,
 } from "./raceLine";
-import { Lerp, OuterGuardrail, ProjectOnSegment, Vector2D } from "./raceMath";
 import { RaceSegment } from "./raceSegment";
 
 export const LINE_LENGTHS = [300, 350, 400, 450];
@@ -275,71 +274,4 @@ export function generateClosedTrackSegments(
     segments.push(finalLine);
   }
   return segments;
-}
-
-export class RaceTrackHelper {
-  innerPoints: Vector2D[];
-  outerPoints: Vector2D[];
-  constructor(innerPoints: Vector2D[], outerOffset: number) {
-    this.innerPoints = innerPoints;
-    this.outerPoints = OuterGuardrail(innerPoints, outerOffset);
-  }
-
-  getLateralPosition(idx: number, laneRatio: number): Vector2D {
-    return Lerp(this.innerPoints[idx], this.outerPoints[idx], laneRatio);
-  }
-
-  getDirection(idx: number): number {
-    return RaceTrackHelper.Direction(this.innerPoints, idx);
-  }
-
-  getLateralDirection(idx: number): number {
-    return RaceTrackHelper.Direction(
-      [this.innerPoints[idx], this.outerPoints[idx]],
-      0
-    );
-  }
-
-  static Direction(arr: Vector2D[], idx: number): number {
-    const a = arr[idx],
-      b = arr[(idx + 1) % arr.length];
-    return Math.atan2(b.y - a.y, b.x - a.x);
-  }
-
-  clampToBoundary(x: number, y: number): Vector2D {
-    return RaceTrackHelper.clampToTrackBoundary(
-      x,
-      y,
-      this.innerPoints,
-      this.outerPoints
-    );
-  }
-
-  static clampToTrackBoundary(
-    x: number,
-    y: number,
-    innerPoints: Vector2D[],
-    outerPoints: Vector2D[]
-  ): Vector2D {
-    let minDist = Infinity,
-      closestIdx = 0;
-    for (let i = 0; i < innerPoints.length; i++) {
-      const d = (x - innerPoints[i].x) ** 2 + (y - innerPoints[i].y) ** 2;
-      if (d < minDist) {
-        minDist = d;
-        closestIdx = i;
-      }
-    }
-    const i1 = closestIdx,
-      i2 = (closestIdx + 1) % innerPoints.length;
-    const in1 = innerPoints[i1],
-      in2 = innerPoints[i2];
-    const out1 = outerPoints[i1],
-      out2 = outerPoints[i2];
-    const t = ProjectOnSegment(x, y, in1, in2);
-    const innerProj = Lerp(in1, in2, t);
-    const outerProj = Lerp(out1, out2, t);
-    const proj = ProjectOnSegment(x, y, innerProj, outerProj);
-    return Lerp(innerProj, outerProj, proj);
-  }
 }

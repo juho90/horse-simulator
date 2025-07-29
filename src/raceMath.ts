@@ -4,17 +4,16 @@ export type Vector2D = { x: number; y: number };
 
 export const EPSILON = 1e-10;
 
+export function Cost(from: Vector2D, to: Vector2D): number {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  return Math.hypot(dx, dy);
+}
+
 export function Distance(from: Vector2D, to: Vector2D): number {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   return Math.sqrt(dx * dx + dy * dy);
-}
-
-export function NormalVector(from: Vector2D, to: Vector2D): Vector2D {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const len = Math.hypot(dx, dy);
-  return { x: dy / len, y: -dx / len };
 }
 
 export function NormalizeAngle(a: number) {
@@ -57,18 +56,6 @@ export function ProjectOnSegment(
   }
   let t = ((x - a.x) * dx + (y - a.y) * dy) / len2;
   return Math.max(0, Math.min(1, t));
-}
-
-export function OuterGuardrail(
-  innerPoints: Vector2D[],
-  offset: number
-): Vector2D[] {
-  return innerPoints.map((pt: Vector2D, i: number) => {
-    const prev = innerPoints[i === 0 ? innerPoints.length - 1 : i - 1];
-    const next = innerPoints[(i + 1) % innerPoints.length];
-    const n = NormalVector(prev, next);
-    return { x: pt.x + n.x * offset, y: pt.y + n.y * offset };
-  });
 }
 
 export function IntersectCircleLineNear(

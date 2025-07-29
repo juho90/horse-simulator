@@ -98,19 +98,25 @@ export class RaceCorner extends RaceSegment {
     trackWidth: number,
     resolution: number,
     padding: number
-  ): Array<RaceSegmentNode> {
-    const nodes: Array<RaceSegmentNode> = [];
+  ): RaceSegmentNode[] {
+    const nodes: RaceSegmentNode[] = [];
+    let laIndex = 0;
     for (let lane = padding; lane <= trackWidth - padding; lane += resolution) {
       const radius = this.radius + lane;
       const diffAngle = DiffAngle(this.endAngle, this.startAngle);
       const arcLength = diffAngle * radius;
       const count = Math.ceil(arcLength / resolution);
-      for (let index = 0; index <= count; index++) {
-        const progress = index / count;
+      for (let prIndex = 0; prIndex <= count; prIndex++) {
+        const progress = prIndex / count;
         const angle = LerpAngle(this.startAngle, this.endAngle, progress);
         const nodeX = this.center.x + radius * Math.cos(angle);
         const nodeY = this.center.y + radius * Math.sin(angle);
-        nodes.push({ x: nodeX, y: nodeY, progress, lane });
+        nodes.push({
+          x: nodeX,
+          y: nodeY,
+          progress: progress,
+          lane: laIndex,
+        });
       }
     }
     return nodes;

@@ -4,7 +4,7 @@ import { RaceCorner } from "./raceCorner";
 import { RaceLog } from "./raceLog";
 import { LerpAngle } from "./raceMath";
 import { TRACK_WIDTH } from "./raceSegment";
-import { RaceTrack } from "./raceTrack";
+import { createGridNodes, RaceTrack } from "./raceTrack";
 
 export function generateRaceWebGLHtml(
   track: RaceTrack,
@@ -82,10 +82,16 @@ export function generateRaceWebGLHtml(
     y: segments[segments.length - 1].end.y,
     color: "#000000",
   });
-  const sampleNodes = track.getAllSampleNodes(TRACK_WIDTH, 15, 10).map((n) => ({
-    x: n.x - minX,
-    y: n.y - minY,
-  }));
+  const sampleNodes: { x: number; y: number }[] = [];
+  const gridNodes = createGridNodes(track, TRACK_WIDTH, 15, 10, 150);
+  for (const gridNode of gridNodes.values()) {
+    for (const node of gridNode) {
+      sampleNodes.push({
+        x: node.x - minX,
+        y: node.y - minY,
+      });
+    }
+  }
   const goalPosition = track.getGoalPosition();
   const js = `
     const logs = ${JSON.stringify(logs)};

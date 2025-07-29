@@ -49,7 +49,7 @@ export abstract class RaceSegment {
     trackWidth: number,
     resolution: number,
     padding: number
-  ): Array<RaceSegmentNode>;
+  ): RaceSegmentNode[];
   abstract isInner(x: number, y: number): boolean;
   abstract isEndAt(x: number, y: number): boolean;
   abstract raycastBoundary(

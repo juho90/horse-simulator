@@ -69,12 +69,13 @@ export class RaceLine extends RaceSegment {
     trackWidth: number,
     resolution: number,
     padding: number
-  ): Array<RaceSegmentNode> {
-    const nodes: Array<RaceSegmentNode> = [];
+  ): RaceSegmentNode[] {
+    const nodes: RaceSegmentNode[] = [];
+    let laIndex = 0;
     for (let lane = padding; lane <= trackWidth - padding; lane += resolution) {
-      const count = Math.max(2, Math.ceil(this.length / resolution));
-      for (let index = 0; index <= count; index++) {
-        const progress = index / count;
+      const count = Math.ceil(this.length / resolution);
+      for (let prIndex = 0; prIndex <= count; prIndex++) {
+        const progress = prIndex / count;
         const x = this.start.x + (this.end.x - this.start.x) * progress;
         const y = this.start.y + (this.end.y - this.start.y) * progress;
         const ortho = this.getOrthoVectorAt(x, y);
@@ -83,8 +84,8 @@ export class RaceLine extends RaceSegment {
         nodes.push({
           x: nodeX,
           y: nodeY,
-          progress,
-          lane,
+          progress: progress,
+          lane: laIndex,
         });
       }
     }

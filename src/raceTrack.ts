@@ -1,6 +1,7 @@
 import { RaceCorner } from "./raceCorner";
 import { RaceHorse } from "./raceHorse";
 import { RaceLine } from "./raceLine";
+import { Distance } from "./raceMath";
 import { RaceSegment, RaceSegmentNode } from "./raceSegment";
 import { generateClosedTrackSegments } from "./raceTrackHelper";
 
@@ -23,7 +24,10 @@ export class RaceTrack {
     this.width = width;
     this.height = height;
     this.segments = segments;
-    this.trackLength = this.segments.reduce((sum, seg) => sum + seg.length, 0);
+    this.trackLength = 0;
+    for (const segment of segments) {
+      this.trackLength += segment.length;
+    }
     if (raceLength === null) {
       const minMultiplier = 0.8;
       const maxMultiplier = 2.0;
@@ -40,10 +44,10 @@ export class RaceTrack {
     let goalSegmentIndex = 0;
     let goalSegmentProgress = 0;
     let accumulatedLength = 0;
-    for (let i = 0; i < this.segments.length; i++) {
-      const segmentLength = this.segments[i].length;
+    for (let index = 0; index < this.segments.length; index++) {
+      const segmentLength = this.segments[index].length;
       if (accumulatedLength + segmentLength >= remainingDistance) {
-        goalSegmentIndex = i;
+        goalSegmentIndex = index;
         const distanceIntoSegment = remainingDistance - accumulatedLength;
         goalSegmentProgress = distanceIntoSegment / segmentLength;
         break;
@@ -114,19 +118,6 @@ export class RaceTrack {
     }
   }
 
-  getAllSampleNodes(
-    trackWidth: number,
-    resolution: number,
-    padding: number
-  ): Array<RaceSegmentNode> {
-    const allNodes: Array<RaceSegmentNode> = [];
-    for (const segment of this.segments) {
-      const nodes = segment.getSampleNodes(trackWidth, resolution, padding);
-      allNodes.push(...nodes);
-    }
-    return allNodes;
-  }
-
   isGoal(horse: RaceHorse): boolean {
     const hasCompletedRequiredLaps = horse.lap >= this.totalLaps;
     const isInTargetSegment = horse.segmentIndex === this.goalSegmentIndex;
@@ -182,4 +173,61 @@ export function convertTrackForRace(raceTrack: {
     }
   }
   return new RaceTrack(raceTrack.width, raceTrack.height, raceSegments);
+}
+
+export function createGridNodes(
+  track: RaceTrack,
+  trackWidth: number,
+  nodeResolution: number,
+  nodePadding: number,
+  gridResolution: number
+): Map<string, RaceSegmentNode[]> {
+  let accumulatedLength = 0;
+  const gridNodes = new Map<string, RaceSegmentNode[]>();
+  for (const segment of track.segments) {
+    const segmentNodes = segment.getSampleNodes(
+      trackWidth,
+      nodeResolution,
+      nodePadding
+    );
+    const segmentLength = segment.length;
+    for (const node of segmentNodes) {
+      const nodeKey = gridKey(node.x, node.y, gridResolution);
+      const nodeDistance = segmentLength * node.progress;
+      const totalDistance = accumulatedLength + nodeDistance;
+      const trackProgress = totalDistance / track.trackLength;
+      const newNode = { ...node, progress: trackProgress };
+      const gridNode = gridNodes.get(nodeKey);
+      if (!gridNode) {
+        gridNodes.set(nodeKey, [newNode]);
+      } else {
+        if (hasNearbyNode(gridNode, newNode, nodeResolution)) {
+          continue;
+        }
+        gridNode.push(newNode);
+      }
+    }
+    accumulatedLength += segmentLength;
+  }
+  return gridNodes;
+}
+
+export function hasNearbyNode(
+  gridNode: RaceSegmentNode[],
+  node: RaceSegmentNode,
+  nodeResolution: number
+): boolean {
+  const tolerance = nodeResolution * 0.85;
+  for (const other of gridNode) {
+    if (Distance(node, other) <= tolerance) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function gridKey(x: number, y: number, nodeResolution: number): string {
+  const gx = Math.floor(x / nodeResolution);
+  const gy = Math.floor(y / nodeResolution);
+  return `${gx},${gy}`;
 }
