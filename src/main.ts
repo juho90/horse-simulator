@@ -1,47 +1,50 @@
 import * as path from "path";
 import { createSampleHorses } from "./horse";
 import { PerformanceMonitor } from "./performanceMonitor";
+import { RaceHorse } from "./raceHorse";
 import { displayRaceResults, displayTrackInfo } from "./raceLog";
+import { RacePathfinder } from "./racePathfinder";
 import { runRaceSimulator } from "./raceSimulator";
 import { createTrack } from "./raceTrack";
 import { generateRaceWebGLHtml, testRaceWebGL } from "./raceViewerWebGL";
 
-async function runAnalysisMode() {
-  const segmentCount = Math.floor(Math.random() * 12) + 6;
-  const track = createTrack(segmentCount);
-  const horses = createSampleHorses();
+async function runReSimulateMode() {
   const monitor = new PerformanceMonitor();
-  monitor.saveInitialRaceState(track, horses);
-  await monitor.runRaceWithAnalysis(track, horses);
-}
-
-async function runAnalysisReMode() {
-  const monitor = new PerformanceMonitor();
-  const { track, horses } = await monitor.loadInitialRaceState();
-  const logs = runRaceSimulator(track, horses);
-  const htmlString = generateRaceWebGLHtml(track, logs);
+  const { track: raceTrack, horses } = await monitor.loadInitialRaceState();
+  const firstSegment = raceTrack.getFirstSegment();
+  const racePathfinder = new RacePathfinder(raceTrack);
+  const raceHorses: RaceHorse[] = horses.map((horse, gate) => {
+    return new RaceHorse(horse, gate, firstSegment);
+  });
+  const logs = runRaceSimulator(raceTrack, racePathfinder, raceHorses);
+  const htmlString = generateRaceWebGLHtml(raceTrack, racePathfinder, logs);
   const outPath = path.resolve(__dirname, "../race-result-replay.html");
   testRaceWebGL(outPath, htmlString);
 }
 
 function runSimulateMode() {
   const segmentCount = Math.floor(Math.random() * 12) + 6;
-  const track = createTrack(segmentCount);
+  const raceTrack = createTrack(segmentCount);
   const horses = createSampleHorses();
-  const logs = runRaceSimulator(track, horses);
-  const htmlString = generateRaceWebGLHtml(track, logs);
+  const firstSegment = raceTrack.getFirstSegment();
+  const racePathfinder = new RacePathfinder(raceTrack);
+  const raceHorses: RaceHorse[] = horses.map((horse, gate) => {
+    return new RaceHorse(horse, gate, firstSegment);
+  });
+  const logs = runRaceSimulator(raceTrack, racePathfinder, raceHorses);
+  const htmlString = generateRaceWebGLHtml(raceTrack, racePathfinder, logs);
   const outPath = path.resolve(__dirname, "../race-result.html");
   testRaceWebGL(outPath, htmlString);
-  displayTrackInfo(track);
-  displayRaceResults(horses, logs, track.raceLength);
+  displayTrackInfo(raceTrack);
+  displayRaceResults(horses, logs, raceTrack.raceLength);
+  const monitor = new PerformanceMonitor();
+  monitor.saveInitialRaceState(raceTrack, horses);
 }
 
 async function main() {
   const args = process.argv.slice(2);
-  if (args.includes("--analysis") || args.includes("-a")) {
-    await runAnalysisMode();
-  } else if (args.includes("--replay") || args.includes("-ar")) {
-    await runAnalysisReMode();
+  if (args.includes("--replay") || args.includes("-r")) {
+    await runReSimulateMode();
   } else {
     runSimulateMode();
   }

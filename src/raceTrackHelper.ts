@@ -215,7 +215,7 @@ export function generateClosedTrackSegments(
         continue;
       }
       const corner = createCornerFromSegment(preLast, radius, angle);
-      const line = new RaceLine(corner.end, startPt);
+      const line = new RaceLine(corner.segmentIndex + 1, corner.end, startPt);
       const tangentErr = Math.abs(
         ((line.getEndTangentDirection() - startDir + Math.PI) % (2 * Math.PI)) -
           Math.PI
@@ -253,7 +253,11 @@ export function generateClosedTrackSegments(
       bestCorner.end.x - startPt.x,
       bestCorner.end.y - startPt.y
     );
-    const finalLine = new RaceLine(bestCorner.end, startPt);
+    const finalLine = new RaceLine(
+      bestCorner.segmentIndex + 1,
+      bestCorner.end,
+      startPt
+    );
     if (Math.abs(finalLine.length - exactDistance) > 1e-6) {
       finalLine.length = exactDistance;
     }
@@ -266,7 +270,11 @@ export function generateClosedTrackSegments(
       corner.end.x - startPt.x,
       corner.end.y - startPt.y
     );
-    const finalLine = new RaceLine(corner.end, startPt);
+    const finalLine = new RaceLine(
+      corner.segmentIndex + 1,
+      corner.end,
+      startPt
+    );
     if (Math.abs(finalLine.length - exactDistance) > 1e-6) {
       finalLine.length = exactDistance;
     }

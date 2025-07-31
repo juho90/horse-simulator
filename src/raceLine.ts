@@ -9,8 +9,8 @@ import {
 } from "./raceSegment";
 
 export class RaceLine extends RaceSegment {
-  constructor(start: Vector2D, end: Vector2D) {
-    super(start, end, SegmentType.LINE);
+  constructor(segmentIndex: number, start: Vector2D, end: Vector2D) {
+    super(segmentIndex, start, end, SegmentType.LINE);
     this.length = this.calculateLength();
   }
 
@@ -84,6 +84,7 @@ export class RaceLine extends RaceSegment {
         nodes.push({
           x: nodeX,
           y: nodeY,
+          segmentIndex: this.segmentIndex,
           progress: progress,
           lane: laIndex,
         });
@@ -164,7 +165,7 @@ export class RaceLine extends RaceSegment {
 export function createHorizontalLine(length: number): RaceLine {
   const start: Vector2D = { x: -length / 2, y: 0 };
   const end: Vector2D = { x: length / 2, y: 0 };
-  return new RaceLine(start, end);
+  return new RaceLine(0, start, end);
 }
 
 export function createLineFromCorner(
@@ -175,7 +176,7 @@ export function createLineFromCorner(
   const endX = corner.end.x + length * Math.cos(dir);
   const endY = corner.end.y + length * Math.sin(dir);
   const end: Vector2D = { x: endX, y: endY };
-  return new RaceLine(corner.end, end);
+  return new RaceLine(corner.segmentIndex + 1, corner.end, end);
 }
 
 export function createLineFromSegment(

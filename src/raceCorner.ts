@@ -23,6 +23,7 @@ export class RaceCorner extends RaceSegment {
   endAngle: number;
 
   constructor(
+    segmentIndex: number,
     start: Vector2D,
     center: Vector2D,
     radius: number,
@@ -34,7 +35,7 @@ export class RaceCorner extends RaceSegment {
       x: center.x + radius * Math.cos(endAngle),
       y: center.y + radius * Math.sin(endAngle),
     };
-    super(start, end, SegmentType.CORNER);
+    super(segmentIndex, start, end, SegmentType.CORNER);
     this.center = center;
     this.radius = radius;
     this.angle = angle;
@@ -114,6 +115,7 @@ export class RaceCorner extends RaceSegment {
         nodes.push({
           x: nodeX,
           y: nodeY,
+          segmentIndex: this.segmentIndex,
           progress: progress,
           lane: laIndex,
         });
@@ -181,7 +183,7 @@ export function createHorizontalCorner(
 ): RaceCorner {
   const start: Vector2D = { x: 0, y: 0 };
   const center: Vector2D = { x: 0, y: radius };
-  return new RaceCorner(start, center, radius, angle);
+  return new RaceCorner(0, start, center, radius, angle);
 }
 
 export function createCornerFromLine(
@@ -194,7 +196,7 @@ export function createCornerFromLine(
   const centerX = line.end.x + radius * Math.cos(centerAngle);
   const centerY = line.end.y + radius * Math.sin(centerAngle);
   const center: Vector2D = { x: centerX, y: centerY };
-  return new RaceCorner(line.end, center, radius, angle);
+  return new RaceCorner(line.segmentIndex + 1, line.end, center, radius, angle);
 }
 
 export function createCornerFromCorner(
@@ -210,7 +212,13 @@ export function createCornerFromCorner(
   const centerX = corner.end.x + radius * Math.cos(centerAngle);
   const centerY = corner.end.y + radius * Math.sin(centerAngle);
   const center: Vector2D = { x: centerX, y: centerY };
-  return new RaceCorner(corner.end, center, radius, angle);
+  return new RaceCorner(
+    corner.segmentIndex + 1,
+    corner.end,
+    center,
+    radius,
+    angle
+  );
 }
 
 export function createCornerFromSegment(

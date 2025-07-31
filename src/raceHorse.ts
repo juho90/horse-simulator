@@ -1,8 +1,6 @@
 import { Horse } from "./horse";
-import { RaceAI } from "./raceAI";
-import { RaceEnvironment } from "./raceEnvironment";
-import { RaceSegment } from "./raceSegment";
-import { RaceSituationAnalysis } from "./raceSituationAnalysis";
+import { RaceSegment, RaceSegmentNode } from "./raceSegment";
+import { RaceTrack } from "./raceTrack";
 
 export class RaceHorse {
   horseId: number;
@@ -16,22 +14,20 @@ export class RaceHorse {
   speed: number;
   accel: number;
   stamina: number;
-  segments: RaceSegment[];
-  segment: RaceSegment;
-  segmentIndex: number;
   gate: number;
   x: number;
   y: number;
   raceHeading: number;
   raceDistance: number;
   lap: number = 0;
+  progress: number = 0;
   finished: boolean = false;
 
-  raceEnv: RaceEnvironment;
-  raceAnalysis: RaceSituationAnalysis;
-  raceAI: RaceAI;
+  private path: RaceSegmentNode[] = [];
+  private currentNodeIndex: number | null = null;
+  private nextNodeIndex: number | null = null;
 
-  constructor(horse: Horse, segments: RaceSegment[], gate: number) {
+  constructor(horse: Horse, gate: number, firstSegment: RaceSegment) {
     this.horseId = horse.horseId;
     this.name = horse.name;
     this.maxSpeed = horse.calculateMaxSpeed();
@@ -45,89 +41,90 @@ export class RaceHorse {
     this.accel = this.maxAccel;
     this.stamina = this.maxStamina;
 
-    this.segments = segments;
-    this.segment = segments[0];
-    this.segmentIndex = 0;
-
     this.gate = gate;
 
     const gateOffset = (this.gate + 1) * 17;
-    const ortho = this.segment.getOrthoVectorAt(
-      this.segment.start.x,
-      this.segment.start.y
+    const ortho = firstSegment.getOrthoVectorAt(
+      firstSegment.start.x,
+      firstSegment.start.y
     );
-    this.x = this.segment.start.x + ortho.x * gateOffset;
-    this.y = this.segment.start.y + ortho.y * gateOffset;
-    const startDir = this.segment.getTangentDirectionAt(
-      this.segment.start.x,
-      this.segment.start.y
+    this.x = firstSegment.start.x + ortho.x * gateOffset;
+    this.y = firstSegment.start.y + ortho.y * gateOffset;
+    const startDir = firstSegment.getTangentDirectionAt(
+      firstSegment.start.x,
+      firstSegment.start.y
     );
     this.raceHeading = startDir;
     this.raceDistance = 0;
-
-    this.raceEnv = new RaceEnvironment(this);
-    this.raceAnalysis = new RaceSituationAnalysis(this, this.raceEnv);
-    this.raceAI = new RaceAI(this, this.raceEnv, this.raceAnalysis);
   }
 
-  moveNextSegment() {
-    const prevIndex = this.segmentIndex;
-    this.segmentIndex = (this.segmentIndex + 1) % this.segments.length;
-    this.segment = this.segments[this.segmentIndex];
-    if (prevIndex !== 0 && this.segmentIndex === 0) {
-      this.lap++;
-    }
+  checkRefreshPath(track: RaceTrack, others: RaceHorse[]): boolean {
+    return false;
   }
 
-  moveOnTrack(turn: number, otherHorses: RaceHorse[]): void {
-    this.raceEnv.update(otherHorses);
-    this.raceAnalysis.update();
-    const aiDecision = this.raceAI.update(turn);
-    this.speed = Math.min(
-      this.speed + aiDecision.targetAccel,
-      aiDecision.targetSpeed
-    );
-    this.raceHeading = aiDecision.targetDirection;
-    this.accel = aiDecision.targetAccel;
-    if (this.accel > 0) {
-      this.stamina -= this.staminaConsumption;
-    } else if (this.speed > 0) {
-      this.stamina -= this.staminaConsumption * 0.5;
-    } else {
-      this.stamina += this.staminaRecovery * 2;
+  refreshPath(raceSegmentNodes: RaceSegmentNode[]): void {
+    this.path = raceSegmentNodes;
+    if (raceSegmentNodes.length === 0) {
+      this.nextNodeIndex = null;
+      return;
     }
-    if (this.accel < 0) {
-      this.stamina += this.staminaRecovery * 0.5;
+    let bestIdx = 0;
+    let minDiff = Infinity;
+    for (let i = 0; i < raceSegmentNodes.length; i++) {
+      const node = raceSegmentNodes[i];
+      let valid = false;
+      if (node.progress > this.progress) {
+        valid = true;
+      } else if (this.progress - node.progress > 0.5) {
+        valid = true;
+      }
+      if (!valid) continue;
+      const diff = Math.abs(this.progress - node.progress);
+      if (diff < minDiff) {
+        minDiff = diff;
+        bestIdx = i;
+      }
     }
-    this.stamina = Math.max(0, Math.min(this.stamina, this.maxStamina));
-    const staminaRatio = this.stamina / this.maxStamina;
-    const staminaEffect =
-      staminaRatio >= 0.5 ? 1.0 : Math.max(0.3, staminaRatio * 2);
-    const currentMaxSpeed = this.maxSpeed * staminaEffect;
-    this.speed = Math.max(0, Math.min(this.speed, currentMaxSpeed));
+    // 조건에 맞는 노드가 없으면 가장 progress가 가까운 노드
+    if (minDiff === Infinity) {
+      bestIdx = 0;
+      minDiff = Math.abs(this.progress - raceSegmentNodes[0].progress);
+      for (let i = 1; i < raceSegmentNodes.length; i++) {
+        const node = raceSegmentNodes[i];
+        const diff = Math.abs(this.progress - node.progress);
+        if (diff < minDiff) {
+          minDiff = diff;
+          bestIdx = i;
+        }
+      }
+    }
+    this.nextNodeIndex = bestIdx;
+  }
+
+  moveOnTrack(turn: number, track: RaceTrack, others: RaceHorse[]): void {
     if (
-      staminaRatio > 0.6 &&
-      this.speed < currentMaxSpeed * 0.85 &&
-      this.accel >= 0
+      this.nextNodeIndex !== null &&
+      this.nextNodeIndex >= 0 &&
+      this.nextNodeIndex < this.path.length
     ) {
-      const recoveryAccel = this.maxAccel * 0.5;
-      this.speed = Math.min(this.speed + recoveryAccel, currentMaxSpeed);
+      const nextNode = this.path[this.nextNodeIndex];
+      this.raceHeading = Math.atan2(nextNode.y - this.y, nextNode.x - this.x);
+      // 다음 노드에 충분히 가까워지면 인덱스 증가
+      const distToNext = Math.hypot(this.x - nextNode.x, this.y - nextNode.y);
+      if (distToNext < 5 && this.nextNodeIndex < this.path.length - 1) {
+        this.nextNodeIndex++;
+      }
     }
+    this.accel = Math.min(this.maxAccel, this.maxAccel);
+    this.speed = Math.min(this.speed + this.accel, this.maxSpeed);
     this.x += Math.cos(this.raceHeading) * this.speed;
     this.y += Math.sin(this.raceHeading) * this.speed;
     this.raceDistance += this.speed;
-    if (this.segment.isEndAt(this.x, this.y)) {
-      this.moveNextSegment();
+    if (
+      track.raceLength <=
+      this.progress * track.trackLength + this.lap * track.trackLength
+    ) {
+      this.finished = true;
     }
-  }
-
-  updateEnvironment(otherHorses: RaceHorse[]): RaceEnvironment {
-    this.raceEnv.update(otherHorses);
-    return this.raceEnv;
-  }
-
-  updateAnalyzeSituation(): RaceSituationAnalysis {
-    this.raceAnalysis.update();
-    return this.raceAnalysis;
   }
 }

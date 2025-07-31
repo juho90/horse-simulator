@@ -3,11 +3,12 @@ import * as fs from "fs";
 import { RaceCorner } from "./raceCorner";
 import { RaceLog } from "./raceLog";
 import { LerpAngle } from "./raceMath";
-import { TRACK_WIDTH } from "./raceSegment";
-import { createGridNodes, RaceTrack } from "./raceTrack";
+import { RacePathfinder } from "./racePathfinder";
+import { RaceTrack } from "./raceTrack";
 
 export function generateRaceWebGLHtml(
   track: RaceTrack,
+  pathfinder: RacePathfinder,
   logs: RaceLog[],
   intervalMs: number = 200
 ): string {
@@ -83,7 +84,7 @@ export function generateRaceWebGLHtml(
     color: "#000000",
   });
   const sampleNodes: { x: number; y: number }[] = [];
-  const gridNodes = createGridNodes(track, TRACK_WIDTH, 15, 10, 150);
+  const gridNodes = pathfinder.progressNodes;
   for (const gridNode of gridNodes.values()) {
     for (const node of gridNode) {
       sampleNodes.push({

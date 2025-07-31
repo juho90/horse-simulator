@@ -20,17 +20,25 @@ export enum SegmentType {
 export interface RaceSegmentNode {
   x: number;
   y: number;
+  segmentIndex: number;
   progress: number;
   lane: number;
 }
 
 export abstract class RaceSegment {
+  segmentIndex: number;
   start: Vector2D;
   end: Vector2D;
   length: number;
   type: SegmentType;
 
-  constructor(start: Vector2D, end: Vector2D, type: SegmentType) {
+  constructor(
+    segmentIndex: number,
+    start: Vector2D,
+    end: Vector2D,
+    type: SegmentType
+  ) {
+    this.segmentIndex = segmentIndex;
     this.start = start;
     this.end = end;
     this.type = type;

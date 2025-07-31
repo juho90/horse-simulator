@@ -1,8 +1,6 @@
 import { RaceCorner } from "./raceCorner";
-import { RaceHorse } from "./raceHorse";
 import { RaceLine } from "./raceLine";
-import { Distance } from "./raceMath";
-import { RaceSegment, RaceSegmentNode } from "./raceSegment";
+import { RaceSegment } from "./raceSegment";
 import { generateClosedTrackSegments } from "./raceTrackHelper";
 
 export class RaceTrack {
@@ -12,8 +10,6 @@ export class RaceTrack {
   trackLength: number;
   raceLength: number;
   totalLaps: number;
-  private goalSegmentIndex: number;
-  private goalSegmentProgress: number;
 
   constructor(
     width: number,
@@ -33,29 +29,12 @@ export class RaceTrack {
       const maxMultiplier = 2.0;
       const randomMultiplier =
         minMultiplier + Math.random() * (maxMultiplier - minMultiplier);
-      this.raceLength =
+      raceLength =
         Math.round((this.trackLength * randomMultiplier) / 100) * 100;
-    } else {
-      this.raceLength = raceLength;
     }
+    this.raceLength = raceLength;
     const totalLaps = Math.floor(this.raceLength / this.trackLength);
     this.totalLaps = totalLaps;
-    const remainingDistance = this.raceLength % this.trackLength;
-    let goalSegmentIndex = 0;
-    let goalSegmentProgress = 0;
-    let accumulatedLength = 0;
-    for (let index = 0; index < this.segments.length; index++) {
-      const segmentLength = this.segments[index].length;
-      if (accumulatedLength + segmentLength >= remainingDistance) {
-        goalSegmentIndex = index;
-        const distanceIntoSegment = remainingDistance - accumulatedLength;
-        goalSegmentProgress = distanceIntoSegment / segmentLength;
-        break;
-      }
-      accumulatedLength += segmentLength;
-    }
-    this.goalSegmentIndex = goalSegmentIndex;
-    this.goalSegmentProgress = goalSegmentProgress;
   }
 
   getFirstSegment(): RaceSegment {
@@ -70,6 +49,42 @@ export class RaceTrack {
       throw new Error("트랙에 세그먼트가 없습니다.");
     }
     return this.segments[this.segments.length - 1];
+  }
+
+  getGoalPosition(): { x: number; y: number } {
+    let goalSegmentIndex = 0;
+    let goalSegmentProgress = 0;
+    let accumulatedLength = 0;
+    const remainingDistance = this.raceLength % this.trackLength;
+    for (let index = 0; index < this.segments.length; index++) {
+      const segmentLength = this.segments[index].length;
+      if (accumulatedLength + segmentLength >= remainingDistance) {
+        goalSegmentIndex = index;
+        const distanceIntoSegment = remainingDistance - accumulatedLength;
+        goalSegmentProgress = distanceIntoSegment / segmentLength;
+        break;
+      }
+      accumulatedLength += segmentLength;
+    }
+    const goalSegment = this.segments[goalSegmentIndex];
+    if (goalSegment.type === "line") {
+      const startX = goalSegment.start.x;
+      const startY = goalSegment.start.y;
+      const endX = goalSegment.end.x;
+      const endY = goalSegment.end.y;
+      return {
+        x: startX + (endX - startX) * goalSegmentProgress,
+        y: startY + (endY - startY) * goalSegmentProgress,
+      };
+    } else {
+      const corner = goalSegment as RaceCorner;
+      const totalAngle = Math.abs(corner.angle);
+      const currentAngle = corner.startAngle + totalAngle * goalSegmentProgress;
+      return {
+        x: corner.center.x + corner.radius * Math.cos(currentAngle),
+        y: corner.center.y + corner.radius * Math.sin(currentAngle),
+      };
+    }
   }
 
   getTrackProgress(segmentIndex: number, x: number, y: number): number {
@@ -93,44 +108,6 @@ export class RaceTrack {
     const totalLength =
       lap * this.trackLength + trackProgress * this.trackLength;
     return totalLength / this.raceLength;
-  }
-
-  getGoalPosition(): { x: number; y: number } {
-    const goalSegment = this.segments[this.goalSegmentIndex];
-    if (goalSegment.type === "line") {
-      const startX = goalSegment.start.x;
-      const startY = goalSegment.start.y;
-      const endX = goalSegment.end.x;
-      const endY = goalSegment.end.y;
-      return {
-        x: startX + (endX - startX) * this.goalSegmentProgress,
-        y: startY + (endY - startY) * this.goalSegmentProgress,
-      };
-    } else {
-      const corner = goalSegment as RaceCorner;
-      const totalAngle = Math.abs(corner.angle);
-      const currentAngle =
-        corner.startAngle + totalAngle * this.goalSegmentProgress;
-      return {
-        x: corner.center.x + corner.radius * Math.cos(currentAngle),
-        y: corner.center.y + corner.radius * Math.sin(currentAngle),
-      };
-    }
-  }
-
-  isGoal(horse: RaceHorse): boolean {
-    const hasCompletedRequiredLaps = horse.lap >= this.totalLaps;
-    const isInTargetSegment = horse.segmentIndex === this.goalSegmentIndex;
-    if (hasCompletedRequiredLaps && isInTargetSegment) {
-      const currentPositionInSegment = horse.segment.getProgress(
-        horse.x,
-        horse.y
-      );
-      if (currentPositionInSegment >= this.goalSegmentProgress) {
-        return true;
-      }
-    }
-    return false;
   }
 }
 
@@ -161,10 +138,15 @@ export function convertTrackForRace(raceTrack: {
     const parseSegment = raceTrack.segments[index] as RaceSegment;
     if (parseSegment.type === "line") {
       const lineSegment = parseSegment as RaceLine;
-      raceSegments[index] = new RaceLine(lineSegment.start, lineSegment.end);
+      raceSegments[index] = new RaceLine(
+        index,
+        lineSegment.start,
+        lineSegment.end
+      );
     } else {
       const cornerSegment = parseSegment as RaceCorner;
       raceSegments[index] = new RaceCorner(
+        index,
         cornerSegment.start,
         cornerSegment.center,
         cornerSegment.radius,
@@ -173,61 +155,4 @@ export function convertTrackForRace(raceTrack: {
     }
   }
   return new RaceTrack(raceTrack.width, raceTrack.height, raceSegments);
-}
-
-export function createGridNodes(
-  track: RaceTrack,
-  trackWidth: number,
-  nodeResolution: number,
-  nodePadding: number,
-  gridResolution: number
-): Map<string, RaceSegmentNode[]> {
-  let accumulatedLength = 0;
-  const gridNodes = new Map<string, RaceSegmentNode[]>();
-  for (const segment of track.segments) {
-    const segmentNodes = segment.getSampleNodes(
-      trackWidth,
-      nodeResolution,
-      nodePadding
-    );
-    const segmentLength = segment.length;
-    for (const node of segmentNodes) {
-      const nodeKey = gridKey(node.x, node.y, gridResolution);
-      const nodeDistance = segmentLength * node.progress;
-      const totalDistance = accumulatedLength + nodeDistance;
-      const trackProgress = totalDistance / track.trackLength;
-      const newNode = { ...node, progress: trackProgress };
-      const gridNode = gridNodes.get(nodeKey);
-      if (!gridNode) {
-        gridNodes.set(nodeKey, [newNode]);
-      } else {
-        if (hasNearbyNode(gridNode, newNode, nodeResolution)) {
-          continue;
-        }
-        gridNode.push(newNode);
-      }
-    }
-    accumulatedLength += segmentLength;
-  }
-  return gridNodes;
-}
-
-export function hasNearbyNode(
-  gridNode: RaceSegmentNode[],
-  node: RaceSegmentNode,
-  nodeResolution: number
-): boolean {
-  const tolerance = nodeResolution * 0.85;
-  for (const other of gridNode) {
-    if (Distance(node, other) <= tolerance) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function gridKey(x: number, y: number, nodeResolution: number): string {
-  const gx = Math.floor(x / nodeResolution);
-  const gy = Math.floor(y / nodeResolution);
-  return `${gx},${gy}`;
 }

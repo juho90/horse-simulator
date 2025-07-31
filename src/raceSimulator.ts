@@ -1,36 +1,30 @@
-import { Horse } from "./horse";
 import { RaceHorse } from "./raceHorse";
 import { HorseTurnState, RaceLog } from "./raceLog";
-import { Vector2D } from "./raceMath";
+import { RacePathfinder } from "./racePathfinder";
 import { RaceTrack } from "./raceTrack";
 
-export function runRaceSimulator(track: RaceTrack, horses: Horse[]): RaceLog[] {
+export function runRaceSimulator(
+  track: RaceTrack,
+  pathfinder: RacePathfinder,
+  horses: RaceHorse[]
+): RaceLog[] {
   const logs: RaceLog[] = [];
   let turn = 0;
   const maxTurns = 2000;
-  const segments = track.segments || [];
-  const raceHorses: RaceHorse[] = horses.map((horse, gate) => {
-    return new RaceHorse(horse, segments, gate);
-  });
-  while (raceHorses.some((h) => !h.finished) && turn < maxTurns) {
-    let horseStates: HorseTurnState[] = new Array(raceHorses.length);
+  while (horses.some((h) => !h.finished) && turn < maxTurns) {
+    let horseStates: HorseTurnState[] = new Array(horses.length);
     let index = 0;
     try {
-      for (; index < raceHorses.length; index++) {
-        const horse = raceHorses[index];
+      for (; index < horses.length; index++) {
+        const horse = horses[index];
         if (!horse.finished) {
-          horse.moveOnTrack(turn, raceHorses);
-          if (track.isGoal(horse)) {
-            horse.finished = true;
+          const path = pathfinder.findPath(horse, horses);
+          if (!path) {
+            continue;
           }
-        }
-        const closestHitPoints: Vector2D[] = [];
-        if (horse.raceEnv.closestRaycasts) {
-          for (const raycast of horse.raceEnv.closestRaycasts) {
-            if (!raycast.hitPoint) {
-              continue;
-            }
-            closestHitPoints.push(raycast.hitPoint);
+          horse.moveOnTrack(turn, track, horses);
+          if (1 <= horse.progress) {
+            horse.finished = true;
           }
         }
         horseStates[index] = {
@@ -43,11 +37,11 @@ export function runRaceSimulator(track: RaceTrack, horses: Horse[]): RaceLog[] {
           accel: horse.accel,
           stamina: horse.stamina,
           dist: horse.raceDistance,
-          closestHitPoints: closestHitPoints,
+          closestHitPoints: null,
         };
       }
     } catch (error) {
-      for (const horse of raceHorses) {
+      for (const horse of horses) {
         horse.finished = true;
       }
       if (index != horseStates.length) {
