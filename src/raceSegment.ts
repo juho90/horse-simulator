@@ -45,6 +45,16 @@ export abstract class RaceSegment {
     this.length = 0;
   }
 
+  private cumulativeProgress: number = 0;
+
+  getCumulativeProgress(): number {
+    return this.cumulativeProgress;
+  }
+
+  setCumulativeProgress(progress: number): void {
+    this.cumulativeProgress = progress;
+  }
+
   protected abstract calculateLength(): number;
 
   abstract getBounds(): BoundingBox;
@@ -57,7 +67,7 @@ export abstract class RaceSegment {
     trackWidth: number,
     resolution: number,
     padding: number
-  ): RaceSegmentNode[];
+  ): RaceSegmentNode[][];
   abstract isInner(x: number, y: number): boolean;
   abstract isEndAt(x: number, y: number): boolean;
   abstract raycastBoundary(

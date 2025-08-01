@@ -58,14 +58,10 @@ export class RaceCorner extends RaceSegment {
   }
 
   getProgress(x: number, y: number): number {
-    const currentAngle = Math.atan2(y - this.center.y, x - this.center.x);
-    let angleDifference = currentAngle - this.startAngle;
-    angleDifference =
-      ((angleDifference % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-    const totalAngle = Math.abs(this.angle);
-    angleDifference = Math.min(angleDifference, totalAngle);
-    const progressDistance = this.radius * angleDifference;
-    return Math.max(0, Math.min(1, progressDistance / this.length));
+    const angle = NormalizeTheta(this.center, { x, y });
+    const diffAngle = DiffAngle(angle, this.startAngle);
+    const progressDistance = this.radius * diffAngle;
+    return progressDistance / this.length;
   }
 
   getProgressAt(x: number, y: number): Vector2D {
@@ -99,20 +95,21 @@ export class RaceCorner extends RaceSegment {
     trackWidth: number,
     resolution: number,
     padding: number
-  ): RaceSegmentNode[] {
-    const nodes: RaceSegmentNode[] = [];
+  ): RaceSegmentNode[][] {
+    const nodes: RaceSegmentNode[][] = [];
     let laIndex = 0;
     for (let lane = padding; lane <= trackWidth - padding; lane += resolution) {
       const radius = this.radius + lane;
       const diffAngle = DiffAngle(this.endAngle, this.startAngle);
       const arcLength = diffAngle * radius;
       const count = Math.ceil(arcLength / resolution);
+      const laneNodes: RaceSegmentNode[] = [];
       for (let prIndex = 0; prIndex <= count; prIndex++) {
         const progress = prIndex / count;
         const angle = LerpAngle(this.startAngle, this.endAngle, progress);
         const nodeX = this.center.x + radius * Math.cos(angle);
         const nodeY = this.center.y + radius * Math.sin(angle);
-        nodes.push({
+        laneNodes.push({
           x: nodeX,
           y: nodeY,
           segmentIndex: this.segmentIndex,
@@ -120,6 +117,8 @@ export class RaceCorner extends RaceSegment {
           lane: laIndex,
         });
       }
+      nodes.push(laneNodes);
+      laIndex++;
     }
     return nodes;
   }

@@ -28,6 +28,17 @@ export class RaceHorse {
   private nextNodeIndex: number | null = null;
 
   constructor(horse: Horse, gate: number, firstSegment: RaceSegment) {
+    const gateOffset = (gate + 1) * 17;
+    const ortho = firstSegment.getOrthoVectorAt(
+      firstSegment.start.x,
+      firstSegment.start.y
+    );
+    const x = firstSegment.start.x + ortho.x * gateOffset;
+    const y = firstSegment.start.y + ortho.y * gateOffset;
+    const raceHeading = firstSegment.getTangentDirectionAt(
+      firstSegment.start.x,
+      firstSegment.start.y
+    );
     this.horseId = horse.horseId;
     this.name = horse.name;
     this.maxSpeed = horse.calculateMaxSpeed();
@@ -36,26 +47,21 @@ export class RaceHorse {
     this.staminaConsumption = horse.calculateStaminaConsumption();
     this.staminaRecovery = horse.calculateStaminaRecovery();
     this.reaction = horse.calculateReaction();
-
     this.speed = 0;
     this.accel = this.maxAccel;
     this.stamina = this.maxStamina;
-
     this.gate = gate;
-
-    const gateOffset = (this.gate + 1) * 17;
-    const ortho = firstSegment.getOrthoVectorAt(
-      firstSegment.start.x,
-      firstSegment.start.y
-    );
-    this.x = firstSegment.start.x + ortho.x * gateOffset;
-    this.y = firstSegment.start.y + ortho.y * gateOffset;
-    const startDir = firstSegment.getTangentDirectionAt(
-      firstSegment.start.x,
-      firstSegment.start.y
-    );
-    this.raceHeading = startDir;
+    this.x = x;
+    this.y = y;
+    this.raceHeading = raceHeading;
     this.raceDistance = 0;
+  }
+
+  getCurrentNode(): RaceSegmentNode | null {
+    if (!this.currentNodeIndex) {
+      return null;
+    }
+    return this.path[this.currentNodeIndex];
   }
 
   checkRefreshPath(track: RaceTrack, others: RaceHorse[]): boolean {
@@ -85,7 +91,6 @@ export class RaceHorse {
         bestIdx = i;
       }
     }
-    // 조건에 맞는 노드가 없으면 가장 progress가 가까운 노드
     if (minDiff === Infinity) {
       bestIdx = 0;
       minDiff = Math.abs(this.progress - raceSegmentNodes[0].progress);

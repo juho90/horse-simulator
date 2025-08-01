@@ -17,23 +17,28 @@ export class RaceTrack {
     segments: RaceSegment[],
     raceLength: number | null = null
   ) {
-    this.width = width;
-    this.height = height;
-    this.segments = segments;
-    this.trackLength = 0;
+    let trackLength = 0;
     for (const segment of segments) {
-      this.trackLength += segment.length;
+      trackLength += segment.length;
+    }
+    let cumulativeLength = 0;
+    for (const segment of segments) {
+      segment.setCumulativeProgress(cumulativeLength / trackLength);
+      cumulativeLength += segment.length;
     }
     if (raceLength === null) {
       const minMultiplier = 0.8;
       const maxMultiplier = 2.0;
-      const randomMultiplier =
-        minMultiplier + Math.random() * (maxMultiplier - minMultiplier);
-      raceLength =
-        Math.round((this.trackLength * randomMultiplier) / 100) * 100;
+      const randomMultiplier = Math.random() * (maxMultiplier - minMultiplier);
+      const calcRaceLength = trackLength * (minMultiplier + randomMultiplier);
+      raceLength = Math.round(calcRaceLength / 100) * 100;
     }
+    const totalLaps = Math.floor(raceLength / trackLength);
+    this.width = width;
+    this.height = height;
+    this.segments = segments;
+    this.trackLength = trackLength;
     this.raceLength = raceLength;
-    const totalLaps = Math.floor(this.raceLength / this.trackLength);
     this.totalLaps = totalLaps;
   }
 
@@ -88,14 +93,9 @@ export class RaceTrack {
   }
 
   getTrackProgress(segmentIndex: number, x: number, y: number): number {
-    let totalLength = 0;
-    for (let i = 0; i < segmentIndex; i++) {
-      totalLength += this.segments[i].length;
-    }
     const segment = this.segments[segmentIndex];
     const segmentProgress = segment.getProgress(x, y);
-    totalLength += segment.length * segmentProgress;
-    return totalLength / this.trackLength;
+    return segment.getCumulativeProgress() + segmentProgress;
   }
 
   getRaceProgress(

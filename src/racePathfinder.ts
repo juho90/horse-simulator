@@ -8,17 +8,18 @@ export interface AStarNode {
   g: number;
   h: number;
   f: number;
-  parent?: AStarNode;
+  parent: AStarNode | null;
 }
 
 export class RacePathfinder {
   track: RaceTrack;
-  progressNodes: RaceSegmentNode[][];
+  nodeResolution: number;
+  nodes: RaceSegmentNode[][][];
 
-  constructor(track: RaceTrack) {
+  constructor(track: RaceTrack, nodeResolution: number = 15) {
     this.track = track;
-    const gridNodes = createGridNodes(track, TRACK_WIDTH, 15, 10, 150);
-    this.progressNodes = convertGridNodesToProgress(gridNodes);
+    this.nodeResolution = nodeResolution;
+    this.nodes = createNodes(track, TRACK_WIDTH, nodeResolution, 10, 150);
   }
 
   findPath(horse: RaceHorse, others: RaceHorse[]): RaceSegmentNode[] | null {
@@ -26,23 +27,34 @@ export class RacePathfinder {
     if (!startNode) {
       return null;
     }
-    return this.raceAStar(startNode, others);
+    return this.raceAStar(startNode, horse, others);
   }
 
   findStartNode(horse: RaceHorse, others: RaceHorse[]): RaceSegmentNode | null {
-    let startNode: RaceSegmentNode | null = null;
+    let startNode = horse.getCurrentNode();
+    if (startNode) {
+      return startNode;
+    }
+    const progress = this.track.getTrackProgress(0, horse.x, horse.y);
+    const prIndex = Math.floor(progress * this.nodes.length);
+    const prNodes = this.nodes[prIndex];
     let minCost = Infinity;
-    for (const progressNode of this.progressNodes) {
-      for (const node of progressNode) {
+    for (const laNodes of prNodes) {
+      for (const node of laNodes) {
+        if (startNode && startNode.progress < node.progress) {
+          continue;
+        }
         let tooClose = false;
         for (const other of others) {
-          const dist = Math.hypot(node.x - other.x, node.y - other.y);
-          if (dist < 10) {
+          const cost = Cost(node, other);
+          if (cost < horse.speed) {
             tooClose = true;
             break;
           }
         }
-        if (tooClose) continue;
+        if (tooClose) {
+          continue;
+        }
         const cost = Cost(horse, node);
         if (cost < minCost) {
           minCost = cost;
@@ -58,126 +70,145 @@ export class RacePathfinder {
 
   private raceAStar(
     startNode: RaceSegmentNode,
+    horse: RaceHorse,
     others: RaceHorse[]
   ): RaceSegmentNode[] | null {
+    const nodeSections = this.findNodeSections(startNode);
     const open: AStarNode[] = [];
+    const opened = new Set<string>();
     const closed = new Set<string>();
     open.push({
       node: startNode,
       g: 0,
       h: 0,
       f: 0,
+      parent: null,
     });
-    while (open.length > 0) {
+    let loopCount = 0;
+    const maxLoop = 20;
+    while (open.length > 0 && loopCount < maxLoop) {
+      loopCount++;
       open.sort((a, b) => a.f - b.f);
-      const current = open.shift()!;
-      const path: RaceSegmentNode[] = [];
-      let n: AStarNode | undefined = current;
-      while (n) {
-        path.push(n.node);
-        n = n.parent;
+      const current = open.shift();
+      if (!current) {
+        break;
       }
-      const reversedPath = path.reverse();
-      if (reversedPath.length >= 10) {
-        return reversedPath.slice(0, 10);
+      if (10 <= loopCount) {
+        const path: RaceSegmentNode[] = [];
+        let n = current;
+        while (n) {
+          if (n.node) {
+            path.push(n.node);
+          }
+          if (!n.parent) {
+            break;
+          }
+          n = n.parent;
+        }
+        const reversedPath = path.reverse();
+        if (reversedPath.length >= 10) {
+          return reversedPath.slice(0, 10);
+        }
       }
-      closed.add(nodeKey(current.node));
-      let idx = Math.floor(current.node.progress * 10);
-      if (idx < 0) {
-        idx = 0;
-      }
-      if (idx > 9) {
-        idx = 9;
-      }
-      const neighborBins = [idx];
-      if (idx === 0) {
-        neighborBins.push(9);
-      }
-      if (idx === 9) {
-        neighborBins.push(0);
-      }
-      for (const b of neighborBins) {
-        for (const neighbor of this.progressNodes[b]) {
-          if (nodeKey(neighbor) === nodeKey(current.node)) {
+      if (current.node) {
+        const currentNode = current.node;
+        const currentKey = nodeKey(currentNode);
+        closed.add(currentKey);
+        const nearestNodes = this.findNearestNodes(currentNode);
+        for (const nearestNode of nearestNodes) {
+          if (!nearestNode) {
             continue;
           }
-          if (closed.has(nodeKey(neighbor))) {
+          const nearestKey = nodeKey(nearestNode);
+          if (nearestKey === currentKey) {
             continue;
           }
-          let tooClose = false;
-          for (const other of others) {
-            const distToOther = Math.hypot(
-              neighbor.x - other.x,
-              neighbor.y - other.y
-            );
-            if (distToOther < 10) {
-              tooClose = true;
-              break;
-            }
-          }
-          if (tooClose) continue;
-          let progressDiff = neighbor.progress - current.node.progress;
-          if (progressDiff < -0.5) {
-            progressDiff += 1;
-          }
-          if (progressDiff <= 0) {
+          if (closed.has(nearestKey)) {
             continue;
           }
-          if (
-            neighbor.segmentIndex !== current.node.segmentIndex &&
-            Math.abs(progressDiff) > 0.1
-          ) {
+          if (opened.has(nearestKey)) {
             continue;
           }
-          const dist = Math.hypot(
-            current.node.x - neighbor.x,
-            current.node.y - neighbor.y
-          );
-          if (dist > 20) {
+          if (this.isBlockedByOthers(nearestNode, horse, others)) {
             continue;
           }
-          const g = current.g + dist;
-          const hVal = 0;
-          const f = g;
-          const existing = open.find(
-            (n) => nodeKey(n.node) === nodeKey(neighbor)
-          );
-          if (existing && existing.f <= f) {
-            continue;
-          }
-          open.push({ node: neighbor, g, h: hVal, f, parent: current });
+          const laDiff = Math.abs(nearestNode.lane - currentNode.lane);
+          const prDiff = Math.abs(nearestNode.progress - startNode.progress);
+          const g = current.g + prDiff * 100 + laDiff * 15;
+          const h = (1 - prDiff) * 100;
+          const f = g + h;
+          open.push({
+            node: nearestNode,
+            g,
+            h,
+            f,
+            parent: current,
+          });
+          opened.add(nearestKey);
         }
       }
     }
     return null;
   }
-}
 
-export function convertGridNodesToProgress(
-  gridNodes: Map<string, RaceSegmentNode[]>
-): RaceSegmentNode[][] {
-  const progresssArr: RaceSegmentNode[][] = Array.from(
-    { length: 10 },
-    () => []
-  );
-  for (const nodeArr of gridNodes.values()) {
-    for (const node of nodeArr) {
-      const idx = Math.min(9, Math.floor(node.progress * 10));
-      progresssArr[idx].push(node);
-    }
+  private findNodeSections(node: RaceSegmentNode): number[] {
+    const prIndex = Math.floor(node.progress * this.nodes.length);
+    const nextPrIndex = (prIndex + 1) % this.nodes.length;
+    return [prIndex, nextPrIndex];
   }
-  return progresssArr;
+
+  private findNearestNodes(
+    startNode: RaceSegmentNode
+  ): (RaceSegmentNode | null)[] {
+    const nodeSections = this.findNodeSections(startNode);
+    const laIndexs = [startNode.lane - 1, startNode.lane, startNode.lane + 1];
+    const nearestNodes: (RaceSegmentNode | null)[] = new Array(laIndexs.length);
+    nearestNodes.fill(null);
+    for (const nodeSection of nodeSections) {
+      const sectionNodes = this.nodes[nodeSection];
+      for (const laIndex of laIndexs) {
+        if (laIndex < 0 || sectionNodes.length <= laIndex) {
+          continue;
+        }
+        const laneNodes = sectionNodes[laIndex];
+        for (const node of laneNodes) {
+          if (nearestNodes[laIndex]) {
+            continue;
+          }
+          if (startNode.progress < node.progress) {
+            nearestNodes[laIndex] = node;
+            break;
+          }
+        }
+      }
+    }
+    return nearestNodes;
+  }
+
+  private isBlockedByOthers(
+    node: RaceSegmentNode,
+    raceHorse: RaceHorse,
+    others: RaceHorse[]
+  ) {
+    for (const other of others) {
+      if (Cost(node, other) < raceHorse.speed) {
+        return true;
+      }
+    }
+    return false;
+  }
 }
 
-export function createGridNodes(
+export function createNodes(
   track: RaceTrack,
   trackWidth: number,
   nodeResolution: number,
   nodePadding: number,
   gridResolution: number
-): Map<string, RaceSegmentNode[]> {
+): RaceSegmentNode[][][] {
   let accumulatedLength = 0;
   const gridNodes = new Map<string, RaceSegmentNode[]>();
+  const nodes: RaceSegmentNode[][][] = Array.from({ length: 10 }, () => []);
   for (const segment of track.segments) {
     const segmentNodes = segment.getSampleNodes(
       trackWidth,
@@ -185,25 +216,49 @@ export function createGridNodes(
       nodePadding
     );
     const segmentLength = segment.length;
-    for (const node of segmentNodes) {
-      const nodeKey = gridKey(node.x, node.y, gridResolution);
-      const nodeDistance = segmentLength * node.progress;
-      const totalDistance = accumulatedLength + nodeDistance;
-      const trackProgress = totalDistance / track.trackLength;
-      const newNode = { ...node, progress: trackProgress };
-      const gridNode = gridNodes.get(nodeKey);
-      if (!gridNode) {
-        gridNodes.set(nodeKey, [newNode]);
-      } else {
-        if (hasNearbyNode(gridNode, newNode, nodeResolution)) {
-          continue;
+    let laIndex = 0;
+    for (
+      let lane = nodePadding;
+      lane <= trackWidth - nodePadding;
+      lane += nodeResolution
+    ) {
+      const laneNodes = segmentNodes[laIndex];
+      for (const node of laneNodes) {
+        const nodeKey = gridKey(node.x, node.y, gridResolution);
+        const nodeDistance = segmentLength * node.progress;
+        const totalDistance = accumulatedLength + nodeDistance;
+        const trackProgress = totalDistance / track.trackLength;
+        const newNode = { ...node, progress: trackProgress };
+        const gridNode = gridNodes.get(nodeKey);
+        let isNew = false;
+        if (!gridNode) {
+          gridNodes.set(nodeKey, [newNode]);
+          isNew = true;
+        } else {
+          if (hasNearbyNode(gridNode, newNode, nodeResolution)) {
+            continue;
+          }
+          gridNode.push(newNode);
+          isNew = true;
         }
-        gridNode.push(newNode);
+        if (isNew) {
+          const prIndex = Math.min(9, Math.floor(newNode.progress * 10));
+          let prNodes = nodes[prIndex];
+          if (!prNodes) {
+            prNodes = nodes[prIndex] = [];
+          }
+          let laNodes = prNodes[laIndex];
+          if (!laNodes) {
+            laNodes = prNodes[laIndex] = [];
+          }
+          laNodes.push(newNode);
+        }
       }
+      laIndex++;
     }
     accumulatedLength += segmentLength;
   }
-  return gridNodes;
+  return nodes;
 }
 
 export function hasNearbyNode(

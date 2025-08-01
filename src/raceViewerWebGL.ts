@@ -84,13 +84,15 @@ export function generateRaceWebGLHtml(
     color: "#000000",
   });
   const sampleNodes: { x: number; y: number }[] = [];
-  const gridNodes = pathfinder.progressNodes;
-  for (const gridNode of gridNodes.values()) {
-    for (const node of gridNode) {
-      sampleNodes.push({
-        x: node.x - minX,
-        y: node.y - minY,
-      });
+  const nodes = pathfinder.nodes;
+  for (const prNodes of nodes.values()) {
+    for (const laNodes of prNodes) {
+      for (const node of laNodes) {
+        sampleNodes.push({
+          x: node.x - minX,
+          y: node.y - minY,
+        });
+      }
     }
   }
   const goalPosition = track.getGoalPosition();
