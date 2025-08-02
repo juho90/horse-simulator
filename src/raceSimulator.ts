@@ -14,39 +14,30 @@ export function runRaceSimulator(
   while (horses.some((h) => !h.finished) && turn < maxTurns) {
     let horseStates: HorseTurnState[] = new Array(horses.length);
     let index = 0;
-    try {
-      for (; index < horses.length; index++) {
-        const horse = horses[index];
-        if (!horse.finished) {
-          if (horse.checkRefreshPath(track, horses)) {
-            const path = pathfinder.findPath(horse, horses);
-            if (!path) {
-              continue;
-            }
-            horse.refreshPath(track, path);
+    for (; index < horses.length; index++) {
+      const horse = horses[index];
+      if (!horse.finished) {
+        if (horse.checkRefreshPath(track, horses)) {
+          const path = pathfinder.findPath(horse, horses);
+          if (!path) {
+            continue;
           }
-          horse.moveOnTrack(turn, track, horses);
+          horse.refreshPath(track, path);
         }
-        horseStates[index] = {
-          id: horse.horseId,
-          name: horse.name,
-          x: horse.x,
-          y: horse.y,
-          heading: horse.raceHeading,
-          speed: horse.speed,
-          accel: horse.accel,
-          stamina: horse.stamina,
-          dist: horse.raceDistance,
-          pathPoints: horse.path?.map((p) => ({ x: p.x, y: p.y })),
-        };
+        horse.moveOnTrack(turn, track, horses);
       }
-    } catch (error) {
-      for (const horse of horses) {
-        horse.finished = true;
-      }
-      if (index != horseStates.length) {
-        horseStates = horseStates.slice(0, index - 1);
-      }
+      horseStates[index] = {
+        id: horse.horseId,
+        name: horse.name,
+        x: horse.x,
+        y: horse.y,
+        heading: horse.raceHeading,
+        speed: horse.speed,
+        accel: horse.accel,
+        stamina: horse.stamina,
+        distance: horse.raceDistance,
+        pathPoints: horse.path?.map((p) => ({ x: p.x, y: p.y })),
+      };
     }
     logs.push({ turn, horseStates });
     turn++;

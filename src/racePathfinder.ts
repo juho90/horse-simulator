@@ -19,7 +19,7 @@ export class RacePathfinder {
   constructor(track: RaceTrack, nodeResolution: number = 15) {
     this.track = track;
     this.nodeResolution = nodeResolution;
-    this.nodes = createNodes(track, TRACK_WIDTH, nodeResolution, 10, 150);
+    this.nodes = createNodes(track, TRACK_WIDTH, nodeResolution);
   }
 
   findPath(horse: RaceHorse, others: RaceHorse[]): RaceSegmentNode[] | null {
@@ -31,17 +31,13 @@ export class RacePathfinder {
   }
 
   findStartNode(horse: RaceHorse, others: RaceHorse[]): RaceSegmentNode | null {
-    let startNode = horse.getCurrentNode();
-    if (startNode) {
-      return startNode;
-    }
-    const progress = this.track.getTrackProgress(0, horse);
-    const prIndex = Math.floor(progress * this.nodes.length);
+    let startNode: RaceSegmentNode | null = null;
+    const prIndex = progressIndex(horse.progress, this.nodes.length);
     const prNodes = this.nodes[prIndex];
     let minCost = Infinity;
     for (const laNodes of prNodes) {
       for (const node of laNodes) {
-        if (startNode && startNode.progress < node.progress) {
+        if (node.progress < horse.progress) {
           continue;
         }
         let tooClose = false;
@@ -61,9 +57,6 @@ export class RacePathfinder {
           startNode = node;
         }
       }
-    }
-    if (!startNode) {
-      return null;
     }
     return startNode;
   }
@@ -162,7 +155,7 @@ export class RacePathfinder {
   }
 
   private findNodeSections(node: RaceSegmentNode): number[] {
-    const prIndex = Math.floor(node.progress * this.nodes.length);
+    const prIndex = progressIndex(node.progress, this.nodes.length);
     const nextPrIndex = (prIndex + 1) % this.nodes.length;
     return [prIndex, nextPrIndex];
   }
@@ -176,6 +169,10 @@ export class RacePathfinder {
     nearestNodes.fill(null);
     for (const nodeSection of nodeSections) {
       const sectionNodes = this.nodes[nodeSection];
+      if (!sectionNodes) {
+        const nodeSections = this.findNodeSections(startNode);
+        throw new Error(`No nodes found for section ${nodeSection}`);
+      }
       for (const laIndex of laIndexs) {
         if (laIndex < 0 || sectionNodes.length <= laIndex) {
           continue;
@@ -213,12 +210,16 @@ export function createNodes(
   track: RaceTrack,
   trackWidth: number,
   nodeResolution: number,
-  nodePadding: number,
-  gridResolution: number
+  nodePadding: number = 10,
+  gridResolution: number = 150,
+  progressResolution: number = 10
 ): RaceSegmentNode[][][] {
   let accumulatedLength = 0;
   const gridNodes = new Map<string, RaceSegmentNode[]>();
-  const nodes: RaceSegmentNode[][][] = Array.from({ length: 10 }, () => []);
+  const nodes: RaceSegmentNode[][][] = Array.from(
+    { length: progressResolution },
+    () => []
+  );
   for (const segment of track.segments) {
     const segmentNodes = segment.getSampleNodes(
       trackWidth,
@@ -250,10 +251,7 @@ export function createNodes(
           isNew = true;
         }
         if (isNew) {
-          const prIndex = Math.min(9, Math.floor(newNode.progress * 10));
-          if (prIndex < 0 || prIndex >= 10) {
-            throw new Error(`Progress index out of bounds: ${prIndex}`);
-          }
+          const prIndex = progressIndex(newNode.progress, progressResolution);
           let prNodes = nodes[prIndex];
           if (!prNodes) {
             prNodes = nodes[prIndex] = [];
@@ -311,4 +309,12 @@ export function findNearestNodeIndex(
     break;
   }
   return currentNodeIndex;
+}
+
+function progressIndex(progress: number, length: number): number {
+  const prIndex = Math.min(9, Math.floor(progress * length));
+  if (prIndex < 0 || length <= prIndex) {
+    throw new Error(`Progress index out of bounds: ${prIndex}`);
+  }
+  return prIndex;
 }

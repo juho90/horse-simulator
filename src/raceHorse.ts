@@ -53,28 +53,6 @@ export class RaceHorse {
     this.raceDistance = 0;
   }
 
-  getCurrentNode(): RaceSegmentNode | null {
-    if (
-      this.currentNodeIndex === null ||
-      this.currentNodeIndex < 0 ||
-      this.path.length <= this.currentNodeIndex
-    ) {
-      return null;
-    }
-    return this.path[this.currentNodeIndex];
-  }
-
-  getNextNode(): RaceSegmentNode | null {
-    if (
-      this.nextNodeIndex === null ||
-      this.nextNodeIndex < 0 ||
-      this.path.length <= this.nextNodeIndex
-    ) {
-      return null;
-    }
-    return this.path[this.nextNodeIndex];
-  }
-
   checkRefreshPath(track: RaceTrack, others: RaceHorse[]): boolean {
     const currentNode = this.getCurrentNode();
     if (!currentNode) {
@@ -136,5 +114,27 @@ export class RaceHorse {
     this.progress = progress;
     this.currentNodeIndex = currentNodeIndex;
     this.nextNodeIndex = currentNodeIndex + 1;
+  }
+
+  private getCurrentNode(): RaceSegmentNode | null {
+    if (
+      this.currentNodeIndex === null ||
+      this.currentNodeIndex < 0 ||
+      this.path.length <= this.currentNodeIndex
+    ) {
+      return null;
+    }
+    return this.path[this.currentNodeIndex];
+  }
+
+  private getNextNode(): RaceSegmentNode | null {
+    if (
+      this.nextNodeIndex === null ||
+      this.nextNodeIndex < 0 ||
+      this.path.length <= this.nextNodeIndex
+    ) {
+      return null;
+    }
+    return this.path[this.nextNodeIndex];
   }
 }

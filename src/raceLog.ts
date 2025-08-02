@@ -14,7 +14,7 @@ export interface HorseTurnState {
   speed: number;
   accel: number;
   stamina: number;
-  dist: number;
+  distance: number;
   pathPoints: Vector2D[] | null;
 }
 
@@ -37,7 +37,7 @@ export function displayRaceResults(
   ): number | null {
     for (const log of logs) {
       for (const horse of log.horseStates) {
-        if (horse.id === horseId && horse.dist >= targetDistance) {
+        if (horse.id === horseId && horse.distance >= targetDistance) {
           return log.turn;
         }
       }

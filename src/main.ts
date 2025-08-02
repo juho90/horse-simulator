@@ -25,7 +25,8 @@ async function runReSimulateMode() {
 function runSimulateMode() {
   const segmentCount = Math.floor(Math.random() * 12) + 6;
   const raceTrack = createTrack(segmentCount);
-  const horses = createSampleHorses();
+  const testHorses = createSampleHorses();
+  const horses = [testHorses[0]];
   const firstSegment = raceTrack.getFirstSegment();
   const racePathfinder = new RacePathfinder(raceTrack);
   const raceHorses: RaceHorse[] = horses.map((horse, gate) => {
