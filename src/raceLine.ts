@@ -96,35 +96,6 @@ export class RaceLine extends RaceSegment {
     return nodes;
   }
 
-  isInner(pos: Vector2D): boolean {
-    const dx = this.end.x - this.start.x;
-    const dy = this.end.y - this.start.y;
-    const len2 = dx * dx + dy * dy;
-    if (len2 === 0) {
-      return false;
-    }
-    const t =
-      ((pos.x - this.start.x) * dx + (pos.y - this.start.y) * dy) / len2;
-    const tClamped = Math.max(0, Math.min(1, t));
-    const projX = this.start.x + dx * tClamped;
-    const projY = this.start.y + dy * tClamped;
-    const ortho = this.getOrthoVectorAt(pos);
-    const rel = (pos.x - projX) * ortho.x + (pos.y - projY) * ortho.y;
-    return rel > 0;
-  }
-
-  isEndAt(pos: Vector2D): boolean {
-    const dx = this.end.x - this.start.x;
-    const dy = this.end.y - this.start.y;
-    const len2 = dx * dx + dy * dy;
-    if (len2 === 0) {
-      return false;
-    }
-    const t =
-      ((pos.x - this.start.x) * dx + (pos.y - this.start.y) * dy) / len2;
-    return t >= 1;
-  }
-
   raycastBoundary(
     rayPoint: Vector2D,
     rayDir: Vector2D,
@@ -160,10 +131,6 @@ export class RaceLine extends RaceSegment {
     const ix = rayPoint.x + rayDir.x * t;
     const iy = rayPoint.y + rayDir.y * t;
     return { x: ix, y: iy };
-  }
-
-  courseEffect(pos: Vector2D, speed: number): Vector2D {
-    return { x: 0, y: 0 };
   }
 }
 

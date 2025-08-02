@@ -2,11 +2,10 @@ import * as path from "path";
 import { createSampleHorses } from "./horse";
 import { PerformanceMonitor } from "./performanceMonitor";
 import { RaceHorse } from "./raceHorse";
-import { displayRaceResults, displayTrackInfo } from "./raceLog";
 import { RacePathfinder } from "./racePathfinder";
 import { runRaceSimulator } from "./raceSimulator";
 import { createTrack } from "./raceTrack";
-import { generateRaceWebGLHtml, testRaceWebGL } from "./raceViewerWebGL";
+import { generateRaceWebGLHtml, testRaceWebGL } from "./raceViewer";
 
 async function runReSimulateMode() {
   const monitor = new PerformanceMonitor();
@@ -25,8 +24,7 @@ async function runReSimulateMode() {
 function runSimulateMode() {
   const segmentCount = Math.floor(Math.random() * 12) + 6;
   const raceTrack = createTrack(segmentCount);
-  const testHorses = createSampleHorses();
-  const horses = [testHorses[0]];
+  const horses = createSampleHorses();
   const firstSegment = raceTrack.getFirstSegment();
   const racePathfinder = new RacePathfinder(raceTrack);
   const raceHorses: RaceHorse[] = horses.map((horse, gate) => {
@@ -36,8 +34,6 @@ function runSimulateMode() {
   const htmlString = generateRaceWebGLHtml(raceTrack, racePathfinder, logs);
   const outPath = path.resolve(__dirname, "../race-result.html");
   testRaceWebGL(outPath, htmlString);
-  displayTrackInfo(raceTrack);
-  displayRaceResults(horses, logs, raceTrack.raceLength);
   const monitor = new PerformanceMonitor();
   monitor.saveInitialRaceState(raceTrack, horses);
 }

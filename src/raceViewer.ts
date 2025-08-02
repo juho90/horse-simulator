@@ -1,10 +1,27 @@
 import * as child_process from "child_process";
 import * as fs from "fs";
 import { RaceCorner } from "./raceCorner";
-import { RaceLog } from "./raceLog";
-import { LerpAngle } from "./raceMath";
+import { LerpAngle, Vector2D } from "./raceMath";
 import { RacePathfinder } from "./racePathfinder";
 import { RaceTrack } from "./raceTrack";
+
+export interface HorseTurnState {
+  id: number;
+  name: string;
+  x: number;
+  y: number;
+  heading: number;
+  speed: number;
+  accel: number;
+  stamina: number;
+  distance: number;
+  pathPoints: Vector2D[] | null;
+}
+
+export interface RaceLog {
+  turn: number;
+  horseStates: HorseTurnState[];
+}
 
 export function generateRaceWebGLHtml(
   track: RaceTrack,

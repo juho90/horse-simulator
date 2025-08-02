@@ -123,42 +123,6 @@ export class RaceCorner extends RaceSegment {
     return nodes;
   }
 
-  isInside(pos: Vector2D, tolerance: number): boolean {
-    const dx = pos.x - this.center.x;
-    const dy = pos.y - this.center.y;
-    const dist = Math.hypot(dx, dy);
-    if (Math.abs(dist - this.radius) > tolerance) {
-      return false;
-    }
-    const start = NormalizeAngle(this.startAngle);
-    const end = NormalizeAngle(this.endAngle);
-    let theta = NormalizeAngle(Math.atan2(dy, dx));
-    if (start < end) {
-      if (theta < start || end < theta) {
-        return false;
-      }
-    } else {
-      if (theta < start && end < theta) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  isInner(pos: Vector2D): boolean {
-    const dx = pos.x - this.center.x;
-    const dy = pos.y - this.center.y;
-    const dist = Math.hypot(dx, dy);
-    return dist > this.radius;
-  }
-
-  isEndAt(pos: Vector2D): boolean {
-    const angle = Math.atan2(pos.y - this.center.y, pos.x - this.center.x);
-    const norm = NormalizeAngle(angle - this.startAngle);
-    const span = NormalizeAngle(this.endAngle - this.startAngle);
-    return norm >= span - 0.05;
-  }
-
   raycastBoundary(
     rayPoint: Vector2D,
     rayDir: Vector2D,

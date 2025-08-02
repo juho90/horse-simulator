@@ -68,8 +68,6 @@ export abstract class RaceSegment {
     resolution: number,
     padding: number
   ): RaceSegmentNode[][];
-  abstract isInner(pos: Vector2D): boolean;
-  abstract isEndAt(pos: Vector2D): boolean;
   abstract raycastBoundary(
     rayPoint: Vector2D,
     rayDir: Vector2D,

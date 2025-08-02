@@ -1,5 +1,5 @@
 import { Horse } from "./horse";
-import { NormalizeTheta } from "./raceMath";
+import { LerpAngle, NormalizeTheta } from "./raceMath";
 import { findNearestNodeIndex } from "./racePathfinder";
 import { RaceSegment, RaceSegmentNode } from "./raceSegment";
 import { RaceTrack } from "./raceTrack";
@@ -27,7 +27,6 @@ export class RaceHorse {
 
   path: RaceSegmentNode[] = [];
   private currentNodeIndex: number | null = null;
-  private nextNodeIndex: number | null = null;
 
   constructor(horse: Horse, gate: number, firstSegment: RaceSegment) {
     const gateOffset = (gate + 1) * 17;
@@ -58,18 +57,6 @@ export class RaceHorse {
     if (!currentNode) {
       return true;
     }
-    const nextNode = this.getNextNode();
-    if (!nextNode) {
-      return true;
-    }
-    const accel = Math.min(this.accel + 0.2, this.maxAccel);
-    const speed = Math.min(this.speed + accel, this.maxSpeed);
-    const segment = track.getSegment(currentNode.segmentIndex);
-    const x = this.x + Math.cos(this.raceHeading) * speed;
-    const y = this.y + Math.sin(this.raceHeading) * speed;
-    if (!segment.isInner({ x, y })) {
-      return true;
-    }
     return false;
   }
 
@@ -77,33 +64,37 @@ export class RaceHorse {
     if (path.length === 0) {
       return;
     }
-    const currentNodeIndex = findNearestNodeIndex(path, this.progress);
+    const currentNodeIndex = findNearestNodeIndex(
+      this,
+      this.progress,
+      track,
+      path
+    );
     this.path = path;
     this.currentNodeIndex = currentNodeIndex;
-    this.nextNodeIndex = currentNodeIndex + 1;
   }
 
   moveOnTrack(turn: number, track: RaceTrack, others: RaceHorse[]): void {
-    const currentNode = this.getCurrentNode();
-    if (!currentNode) {
+    const targetNode = this.getCurrentNode();
+    if (!targetNode) {
       return;
     }
-    const nextNode = this.getNextNode();
-    if (!nextNode) {
-      return;
-    }
-    const raceHeading = NormalizeTheta(this, currentNode);
+    const segment = track.getSegment(targetNode.segmentIndex);
+    const nodeHeading = NormalizeTheta(this, targetNode);
+    const segmentHeading = segment.getTangentDirectionAt(this);
+    const raceHeading = LerpAngle(
+      nodeHeading,
+      segmentHeading,
+      this.progress / targetNode.progress
+    );
     const accel = Math.min(this.accel + 0.2, this.maxAccel);
     const speed = Math.min(this.speed + accel, this.maxSpeed);
-    const segment = track.getSegment(currentNode.segmentIndex);
     const x = this.x + Math.cos(raceHeading) * speed;
     const y = this.y + Math.sin(raceHeading) * speed;
     const progress = track.getTrackProgress(segment.segmentIndex, { x, y });
     let currentNodeIndex = this.currentNodeIndex ?? 0;
-    let segmentIndex = segment.segmentIndex;
-    if (currentNode.progress < progress) {
-      currentNodeIndex = findNearestNodeIndex(this.path, progress);
-      segmentIndex = nextNode.segmentIndex;
+    if (targetNode.progress < progress) {
+      currentNodeIndex = findNearestNodeIndex(this, progress, track, this.path);
     }
     this.accel = accel;
     this.speed = speed;
@@ -113,7 +104,6 @@ export class RaceHorse {
     this.raceDistance += this.speed;
     this.progress = progress;
     this.currentNodeIndex = currentNodeIndex;
-    this.nextNodeIndex = currentNodeIndex + 1;
   }
 
   private getCurrentNode(): RaceSegmentNode | null {
@@ -125,16 +115,5 @@ export class RaceHorse {
       return null;
     }
     return this.path[this.currentNodeIndex];
-  }
-
-  private getNextNode(): RaceSegmentNode | null {
-    if (
-      this.nextNodeIndex === null ||
-      this.nextNodeIndex < 0 ||
-      this.path.length <= this.nextNodeIndex
-    ) {
-      return null;
-    }
-    return this.path[this.nextNodeIndex];
   }
 }

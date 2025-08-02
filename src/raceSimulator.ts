@@ -1,7 +1,7 @@
 import { RaceHorse } from "./raceHorse";
-import { HorseTurnState, RaceLog } from "./raceLog";
 import { RacePathfinder } from "./racePathfinder";
 import { RaceTrack } from "./raceTrack";
+import { HorseTurnState, RaceLog } from "./raceViewer";
 
 export function runRaceSimulator(
   track: RaceTrack,
@@ -19,14 +19,15 @@ export function runRaceSimulator(
       if (!horse.finished) {
         if (horse.checkRefreshPath(track, horses)) {
           const path = pathfinder.findPath(horse, horses);
-          if (!path) {
-            continue;
+          if (path && 0 < path.length) {
+            horse.refreshPath(track, path);
+          } else {
+            const path = pathfinder.findPath(horse, horses);
           }
-          horse.refreshPath(track, path);
         }
         horse.moveOnTrack(turn, track, horses);
       }
-      horseStates[index] = {
+      const horseState = {
         id: horse.horseId,
         name: horse.name,
         x: horse.x,
@@ -37,7 +38,8 @@ export function runRaceSimulator(
         stamina: horse.stamina,
         distance: horse.raceDistance,
         pathPoints: horse.path?.map((p) => ({ x: p.x, y: p.y })),
-      };
+      } as HorseTurnState;
+      horseStates[index] = horseState;
     }
     logs.push({ turn, horseStates });
     turn++;
