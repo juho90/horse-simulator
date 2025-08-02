@@ -73,7 +73,6 @@ export class RacePathfinder {
     horse: RaceHorse,
     others: RaceHorse[]
   ): RaceSegmentNode[] | null {
-    const nodeSections = this.findNodeSections(startNode);
     const open: AStarNode[] = [];
     const opened = new Set<string>();
     const closed = new Set<string>();
@@ -85,7 +84,7 @@ export class RacePathfinder {
       parent: null,
     });
     let loopCount = 0;
-    const maxLoop = 20;
+    const maxLoop = 50;
     while (open.length > 0 && loopCount < maxLoop) {
       loopCount++;
       open.sort((a, b) => a.f - b.f);
@@ -95,19 +94,18 @@ export class RacePathfinder {
       }
       if (10 <= loopCount) {
         const path: RaceSegmentNode[] = [];
-        let n = current;
-        while (n) {
-          if (n.node) {
-            path.push(n.node);
+        let astar = current;
+        while (astar) {
+          if (astar.node) {
+            path.push(astar.node);
           }
-          if (!n.parent) {
+          if (!astar.parent) {
             break;
           }
-          n = n.parent;
+          astar = astar.parent;
         }
-        const reversedPath = path.reverse();
-        if (reversedPath.length >= 10) {
-          return reversedPath.slice(0, 10);
+        if (path.length >= 10) {
+          return path.reverse().slice(0, 10);
         }
       }
       if (current.node) {
@@ -148,7 +146,19 @@ export class RacePathfinder {
         }
       }
     }
-    return null;
+    const path: RaceSegmentNode[] = [];
+    open.sort((a, b) => a.f - b.f);
+    let astar = open.shift();
+    while (astar) {
+      if (astar.node) {
+        path.push(astar.node);
+      }
+      if (!astar.parent) {
+        break;
+      }
+      astar = astar.parent;
+    }
+    return path.reverse().slice(0, 10);
   }
 
   private findNodeSections(node: RaceSegmentNode): number[] {

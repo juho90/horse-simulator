@@ -18,9 +18,12 @@ export function runRaceSimulator(
       for (; index < horses.length; index++) {
         const horse = horses[index];
         if (!horse.finished) {
-          const path = pathfinder.findPath(horse, horses);
-          if (!path) {
-            continue;
+          if (horse.checkRefreshPath(track, horses)) {
+            const path = pathfinder.findPath(horse, horses);
+            if (!path) {
+              continue;
+            }
+            horse.refreshPath(track, path);
           }
           horse.moveOnTrack(turn, track, horses);
           if (1 <= horse.progress) {
@@ -37,7 +40,7 @@ export function runRaceSimulator(
           accel: horse.accel,
           stamina: horse.stamina,
           dist: horse.raceDistance,
-          closestHitPoints: null,
+          pathPoints: horse.path?.map((p) => ({ x: p.x, y: p.y })),
         };
       }
     } catch (error) {

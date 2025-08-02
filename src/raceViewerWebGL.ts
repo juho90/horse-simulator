@@ -151,32 +151,13 @@ export function generateRaceWebGLHtml(
     }
     function drawSampleNodes() {
       ctx.save();
-      ctx.fillStyle = "#ff00aa";
+      ctx.fillStyle = "#009dffff";
       for (const node of sampleNodes) {
         ctx.beginPath();
         ctx.arc(node.x, node.y, 2, 0, 2 * Math.PI);
         ctx.fill();
       }
       ctx.restore();
-    }
-    function drawBoundaryPoints() {
-      for (let t = 0; t < logs.length; t++) {
-        const horses = logs[t].horseStates;
-        if (!horses) continue;
-        horses.forEach((horse) => {
-          if (horse.closestHitPoints) {
-            horse.closestHitPoints.forEach((point) => {
-              ctx.save();
-              ctx.beginPath();
-              ctx.arc(point.x - ${minX}, point.y - ${minY}, 2, 0, 2 * Math.PI);
-              ctx.fillStyle = '#2980ff';
-              ctx.globalAlpha = 0.7;
-              ctx.fill();
-              ctx.restore();
-            });
-          }
-        });
-      }
     }
     function drawHorses(turnIdx) {
       const log = logs[turnIdx];
@@ -197,14 +178,28 @@ export function generateRaceWebGLHtml(
         ctx.textBaseline = 'middle';
         ctx.fillText((idx+1).toString(), horse.x - ${minX}, horse.y - ${minY});
         ctx.restore();
-        if (horse.closestHitPoints) {
-          horse.closestHitPoints.forEach((point) => {
+        if (horse.pathPoints) {
+          horse.pathPoints.forEach((point, index) => {
+            if (index > 0) {
+              const prevPoint = horse.pathPoints[index - 1];
+              ctx.save();
+              ctx.beginPath();
+              ctx.moveTo(prevPoint.x - ${minX}, prevPoint.y - ${minY});
+              ctx.lineTo(point.x - ${minX}, point.y - ${minY});
+              ctx.strokeStyle = '#ff4f4fff';
+              ctx.lineWidth = 2;
+              ctx.globalAlpha = 0.8;
+              ctx.shadowColor = '#ff4f4fff';
+              ctx.shadowBlur = 5;
+              ctx.stroke();
+              ctx.restore();
+            }
             ctx.save();
             ctx.beginPath();
             ctx.arc(point.x - ${minX}, point.y - ${minY}, 2, 0, 2 * Math.PI);
-            ctx.fillStyle = '#4fc3ff';
+            ctx.fillStyle = '#ff0000ff';
             ctx.globalAlpha = 1.0;
-            ctx.shadowColor = '#4fc3ff';
+            ctx.shadowColor = '#ff4f4fff';
             ctx.shadowBlur = 10;
             ctx.fill();
             ctx.restore();

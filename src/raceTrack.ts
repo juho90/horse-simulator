@@ -56,6 +56,13 @@ export class RaceTrack {
     return this.segments[this.segments.length - 1];
   }
 
+  getSegment(index: number): RaceSegment {
+    if (index < 0 || index >= this.segments.length) {
+      throw new Error("세그먼트 인덱스가 범위를 벗어났습니다.");
+    }
+    return this.segments[index];
+  }
+
   getGoalPosition(): { x: number; y: number } {
     let goalSegmentIndex = 0;
     let goalSegmentProgress = 0;
