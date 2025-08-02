@@ -58,18 +58,18 @@ export abstract class RaceSegment {
   protected abstract calculateLength(): number;
 
   abstract getBounds(): BoundingBox;
-  abstract getProgress(x: number, y: number): number;
-  abstract getProgressAt(x: number, y: number): Vector2D;
-  abstract getTangentDirectionAt(x: number, y: number): number;
+  abstract getProgress(pos: Vector2D): number;
+  abstract getProgressAt(pos: Vector2D): Vector2D;
+  abstract getTangentDirectionAt(pos: Vector2D): number;
   abstract getEndTangentDirection(): number;
-  abstract getOrthoVectorAt(x: number, y: number): Vector2D;
+  abstract getOrthoVectorAt(pos: Vector2D): Vector2D;
   abstract getSampleNodes(
     trackWidth: number,
     resolution: number,
     padding: number
   ): RaceSegmentNode[][];
-  abstract isInner(x: number, y: number): boolean;
-  abstract isEndAt(x: number, y: number): boolean;
+  abstract isInner(pos: Vector2D): boolean;
+  abstract isEndAt(pos: Vector2D): boolean;
   abstract raycastBoundary(
     rayPoint: Vector2D,
     rayDir: Vector2D,

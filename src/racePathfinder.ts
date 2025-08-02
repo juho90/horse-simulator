@@ -1,5 +1,5 @@
 import { RaceHorse } from "./raceHorse";
-import { Cost, Distance } from "./raceMath";
+import { Cost, Distance, EPSILON } from "./raceMath";
 import { RaceSegmentNode, TRACK_WIDTH } from "./raceSegment";
 import { RaceTrack } from "./raceTrack";
 
@@ -35,7 +35,7 @@ export class RacePathfinder {
     if (startNode) {
       return startNode;
     }
-    const progress = this.track.getTrackProgress(0, horse.x, horse.y);
+    const progress = this.track.getTrackProgress(0, horse);
     const prIndex = Math.floor(progress * this.nodes.length);
     const prNodes = this.nodes[prIndex];
     let minCost = Infinity;
@@ -235,9 +235,7 @@ export function createNodes(
       const laneNodes = segmentNodes[laIndex];
       for (const node of laneNodes) {
         const nodeKey = gridKey(node.x, node.y, gridResolution);
-        const nodeDistance = segmentLength * node.progress;
-        const totalDistance = accumulatedLength + nodeDistance;
-        const trackProgress = totalDistance / track.trackLength;
+        const trackProgress = track.getTrackProgress(node.segmentIndex, node);
         const newNode = { ...node, progress: trackProgress };
         const gridNode = gridNodes.get(nodeKey);
         let isNew = false;
@@ -253,6 +251,9 @@ export function createNodes(
         }
         if (isNew) {
           const prIndex = Math.min(9, Math.floor(newNode.progress * 10));
+          if (prIndex < 0 || prIndex >= 10) {
+            throw new Error(`Progress index out of bounds: ${prIndex}`);
+          }
           let prNodes = nodes[prIndex];
           if (!prNodes) {
             prNodes = nodes[prIndex] = [];
@@ -293,4 +294,21 @@ function gridKey(x: number, y: number, nodeResolution: number): string {
 
 function nodeKey(n: RaceSegmentNode) {
   return `${n.x.toFixed(2)},${n.y.toFixed(2)}`;
+}
+
+export function findNearestNodeIndex(
+  path: RaceSegmentNode[],
+  progress: number
+): number {
+  let currentNodeIndex = -1;
+  for (let i = 0; i < path.length; i++) {
+    const node = path[i];
+    const diffProgress = node.progress - progress;
+    if (diffProgress < EPSILON) {
+      continue;
+    }
+    currentNodeIndex = i;
+    break;
+  }
+  return currentNodeIndex;
 }

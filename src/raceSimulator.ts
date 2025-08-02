@@ -26,9 +26,6 @@ export function runRaceSimulator(
             horse.refreshPath(track, path);
           }
           horse.moveOnTrack(turn, track, horses);
-          if (1 <= horse.progress) {
-            horse.finished = true;
-          }
         }
         horseStates[index] = {
           id: horse.horseId,

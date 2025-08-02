@@ -1,5 +1,6 @@
 import { RaceCorner } from "./raceCorner";
 import { RaceLine } from "./raceLine";
+import { Vector2D } from "./raceMath";
 import { RaceSegment } from "./raceSegment";
 import { generateClosedTrackSegments } from "./raceTrackHelper";
 
@@ -99,19 +100,15 @@ export class RaceTrack {
     }
   }
 
-  getTrackProgress(segmentIndex: number, x: number, y: number): number {
+  getTrackProgress(segmentIndex: number, pos: Vector2D): number {
     const segment = this.segments[segmentIndex];
-    const segmentProgress = segment.getProgress(x, y);
-    return segment.getCumulativeProgress() + segmentProgress;
+    const segmentRate = segment.length / this.trackLength;
+    const trackProgress = segment.getProgress(pos) * segmentRate;
+    return Math.max(0, segment.getCumulativeProgress() + trackProgress);
   }
 
-  getRaceProgress(
-    lap: number,
-    segmentIndex: number,
-    x: number,
-    y: number
-  ): number {
-    const trackProgress = this.getTrackProgress(segmentIndex, x, y);
+  getRaceProgress(lap: number, segmentIndex: number, pos: Vector2D): number {
+    const trackProgress = this.getTrackProgress(segmentIndex, pos);
     const totalLength =
       lap * this.trackLength + trackProgress * this.trackLength;
     return totalLength / this.raceLength;

@@ -57,15 +57,15 @@ export class RaceCorner extends RaceSegment {
     };
   }
 
-  getProgress(x: number, y: number): number {
-    const angle = NormalizeTheta(this.center, { x, y });
+  getProgress(pos: Vector2D): number {
+    const angle = NormalizeTheta(this.center, pos);
     const diffAngle = DiffAngle(angle, this.startAngle);
     const progressDistance = this.radius * diffAngle;
     return progressDistance / this.length;
   }
 
-  getProgressAt(x: number, y: number): Vector2D {
-    const progress = this.getProgress(x, y);
+  getProgressAt(pos: Vector2D): Vector2D {
+    const progress = this.getProgress(pos);
     const angle = LerpAngle(this.startAngle, this.endAngle, progress);
     return {
       x: this.center.x + this.radius * Math.cos(angle),
@@ -73,8 +73,8 @@ export class RaceCorner extends RaceSegment {
     };
   }
 
-  getTangentDirectionAt(x: number, y: number): number {
-    const angle = Math.atan2(y - this.center.y, x - this.center.x);
+  getTangentDirectionAt(pos: Vector2D): number {
+    const angle = Math.atan2(pos.y - this.center.y, pos.x - this.center.x);
     return addDirectionToAngle(angle, DirectionType.RIGHT);
   }
 
@@ -82,8 +82,8 @@ export class RaceCorner extends RaceSegment {
     return addDirectionToAngle(this.endAngle, DirectionType.RIGHT);
   }
 
-  getOrthoVectorAt(x: number, y: number): Vector2D {
-    const dir = this.getTangentDirectionAt(x, y);
+  getOrthoVectorAt(pos: Vector2D): Vector2D {
+    const dir = this.getTangentDirectionAt(pos);
     const angle = addDirectionToAngle(dir, DirectionType.LEFT);
     return {
       x: Math.cos(angle),
@@ -123,9 +123,9 @@ export class RaceCorner extends RaceSegment {
     return nodes;
   }
 
-  isInside(x: number, y: number, tolerance: number): boolean {
-    const dx = x - this.center.x;
-    const dy = y - this.center.y;
+  isInside(pos: Vector2D, tolerance: number): boolean {
+    const dx = pos.x - this.center.x;
+    const dy = pos.y - this.center.y;
     const dist = Math.hypot(dx, dy);
     if (Math.abs(dist - this.radius) > tolerance) {
       return false;
@@ -145,15 +145,15 @@ export class RaceCorner extends RaceSegment {
     return true;
   }
 
-  isInner(x: number, y: number): boolean {
-    const dx = x - this.center.x;
-    const dy = y - this.center.y;
+  isInner(pos: Vector2D): boolean {
+    const dx = pos.x - this.center.x;
+    const dy = pos.y - this.center.y;
     const dist = Math.hypot(dx, dy);
     return dist > this.radius;
   }
 
-  isEndAt(x: number, y: number): boolean {
-    const angle = Math.atan2(y - this.center.y, x - this.center.x);
+  isEndAt(pos: Vector2D): boolean {
+    const angle = Math.atan2(pos.y - this.center.y, pos.x - this.center.x);
     const norm = NormalizeAngle(angle - this.startAngle);
     const span = NormalizeAngle(this.endAngle - this.startAngle);
     return norm >= span - 0.05;

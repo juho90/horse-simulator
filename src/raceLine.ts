@@ -27,28 +27,28 @@ export class RaceLine extends RaceSegment {
     };
   }
 
-  getProgress(x: number, y: number): number {
+  getProgress(pos: Vector2D): number {
     const directionX = this.end.x - this.start.x;
     const directionY = this.end.y - this.start.y;
     const len2 = directionX * directionX + directionY * directionY;
     if (len2 === 0) {
       return 0;
     }
-    const positionX = x - this.start.x;
-    const positionY = y - this.start.y;
+    const positionX = pos.x - this.start.x;
+    const positionY = pos.y - this.start.y;
     const t = (positionX * directionX + positionY * directionY) / len2;
-    return Math.max(0, Math.min(1, t));
+    return Math.max(0, t);
   }
 
-  getProgressAt(x: number, y: number): Vector2D {
-    const progress = this.getProgress(x, y);
+  getProgressAt(pos: Vector2D): Vector2D {
+    const progress = this.getProgress(pos);
     return {
       x: this.start.x + (this.end.x - this.start.x) * progress,
       y: this.start.y + (this.end.y - this.start.y) * progress,
     };
   }
 
-  getTangentDirectionAt(x: number, y: number): number {
+  getTangentDirectionAt(pos: Vector2D): number {
     return NormalizeTheta(this.start, this.end);
   }
 
@@ -56,8 +56,8 @@ export class RaceLine extends RaceSegment {
     return NormalizeTheta(this.start, this.end);
   }
 
-  getOrthoVectorAt(x: number, y: number): Vector2D {
-    const dir = this.getTangentDirectionAt(x, y);
+  getOrthoVectorAt(pos: Vector2D): Vector2D {
+    const dir = this.getTangentDirectionAt(pos);
     const angle = addDirectionToAngle(dir, DirectionType.LEFT);
     return {
       x: Math.cos(angle),
@@ -79,7 +79,7 @@ export class RaceLine extends RaceSegment {
         const progress = prIndex / count;
         const x = this.start.x + (this.end.x - this.start.x) * progress;
         const y = this.start.y + (this.end.y - this.start.y) * progress;
-        const ortho = this.getOrthoVectorAt(x, y);
+        const ortho = this.getOrthoVectorAt({ x, y });
         const nodeX = x + ortho.x * lane;
         const nodeY = y + ortho.y * lane;
         laneNodes.push({
@@ -96,30 +96,32 @@ export class RaceLine extends RaceSegment {
     return nodes;
   }
 
-  isInner(x: number, y: number): boolean {
+  isInner(pos: Vector2D): boolean {
     const dx = this.end.x - this.start.x;
     const dy = this.end.y - this.start.y;
     const len2 = dx * dx + dy * dy;
     if (len2 === 0) {
       return false;
     }
-    const t = ((x - this.start.x) * dx + (y - this.start.y) * dy) / len2;
+    const t =
+      ((pos.x - this.start.x) * dx + (pos.y - this.start.y) * dy) / len2;
     const tClamped = Math.max(0, Math.min(1, t));
     const projX = this.start.x + dx * tClamped;
     const projY = this.start.y + dy * tClamped;
-    const ortho = this.getOrthoVectorAt(x, y);
-    const rel = (x - projX) * ortho.x + (y - projY) * ortho.y;
+    const ortho = this.getOrthoVectorAt(pos);
+    const rel = (pos.x - projX) * ortho.x + (pos.y - projY) * ortho.y;
     return rel > 0;
   }
 
-  isEndAt(x: number, y: number): boolean {
+  isEndAt(pos: Vector2D): boolean {
     const dx = this.end.x - this.start.x;
     const dy = this.end.y - this.start.y;
     const len2 = dx * dx + dy * dy;
     if (len2 === 0) {
       return false;
     }
-    const t = ((x - this.start.x) * dx + (y - this.start.y) * dy) / len2;
+    const t =
+      ((pos.x - this.start.x) * dx + (pos.y - this.start.y) * dy) / len2;
     return t >= 1;
   }
 
@@ -135,7 +137,7 @@ export class RaceLine extends RaceSegment {
     let offsetX = 0;
     let offsetY = 0;
     if (0 < trackWidth) {
-      const ortho = this.getOrthoVectorAt(x1, y1);
+      const ortho = this.getOrthoVectorAt({ x: x1, y: y1 });
       offsetX = ortho.x * trackWidth;
       offsetY = ortho.y * trackWidth;
     }
@@ -160,7 +162,7 @@ export class RaceLine extends RaceSegment {
     return { x: ix, y: iy };
   }
 
-  courseEffect(x: number, y: number, speed: number): Vector2D {
+  courseEffect(pos: Vector2D, speed: number): Vector2D {
     return { x: 0, y: 0 };
   }
 }

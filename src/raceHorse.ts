@@ -1,5 +1,6 @@
 import { Horse } from "./horse";
-import { EPSILON, NormalizeTheta } from "./raceMath";
+import { NormalizeTheta } from "./raceMath";
+import { findNearestNodeIndex } from "./racePathfinder";
 import { RaceSegment, RaceSegmentNode } from "./raceSegment";
 import { RaceTrack } from "./raceTrack";
 
@@ -20,26 +21,20 @@ export class RaceHorse {
   y: number;
   raceHeading: number;
   raceDistance: number;
-  path: RaceSegmentNode[] = [];
   lap: number = 0;
   progress: number = 0;
   finished: boolean = false;
 
+  path: RaceSegmentNode[] = [];
   private currentNodeIndex: number | null = null;
   private nextNodeIndex: number | null = null;
 
   constructor(horse: Horse, gate: number, firstSegment: RaceSegment) {
     const gateOffset = (gate + 1) * 17;
-    const ortho = firstSegment.getOrthoVectorAt(
-      firstSegment.start.x,
-      firstSegment.start.y
-    );
+    const ortho = firstSegment.getOrthoVectorAt(firstSegment.start);
     const x = firstSegment.start.x + ortho.x * gateOffset;
     const y = firstSegment.start.y + ortho.y * gateOffset;
-    const raceHeading = firstSegment.getTangentDirectionAt(
-      firstSegment.start.x,
-      firstSegment.start.y
-    );
+    const raceHeading = firstSegment.getTangentDirectionAt(firstSegment.start);
     this.horseId = horse.horseId;
     this.name = horse.name;
     this.maxSpeed = horse.calculateMaxSpeed();
@@ -94,7 +89,7 @@ export class RaceHorse {
     const segment = track.getSegment(currentNode.segmentIndex);
     const x = this.x + Math.cos(this.raceHeading) * speed;
     const y = this.y + Math.sin(this.raceHeading) * speed;
-    if (!segment.isInner(x, y)) {
+    if (!segment.isInner({ x, y })) {
       return true;
     }
     return false;
@@ -104,21 +99,7 @@ export class RaceHorse {
     if (path.length === 0) {
       return;
     }
-    let currentNodeIndex = 0;
-    for (let i = 0; i < path.length; i++) {
-      const node = path[i];
-      const trackProgress = track.getTrackProgress(
-        node.segmentIndex,
-        this.x,
-        this.y
-      );
-      const diffProgress = node.progress - trackProgress;
-      if (diffProgress < EPSILON) {
-        continue;
-      }
-      currentNodeIndex = i;
-      break;
-    }
+    const currentNodeIndex = findNearestNodeIndex(path, this.progress);
     this.path = path;
     this.currentNodeIndex = currentNodeIndex;
     this.nextNodeIndex = currentNodeIndex + 1;
@@ -139,11 +120,11 @@ export class RaceHorse {
     const segment = track.getSegment(currentNode.segmentIndex);
     const x = this.x + Math.cos(raceHeading) * speed;
     const y = this.y + Math.sin(raceHeading) * speed;
-    const progress = track.getTrackProgress(segment.segmentIndex, x, y);
+    const progress = track.getTrackProgress(segment.segmentIndex, { x, y });
+    let currentNodeIndex = this.currentNodeIndex ?? 0;
     let segmentIndex = segment.segmentIndex;
     if (currentNode.progress < progress) {
-      this.currentNodeIndex = this.nextNodeIndex ?? 0;
-      this.nextNodeIndex = this.currentNodeIndex + 1;
+      currentNodeIndex = findNearestNodeIndex(this.path, progress);
       segmentIndex = nextNode.segmentIndex;
     }
     this.accel = accel;
@@ -152,9 +133,8 @@ export class RaceHorse {
     this.y = y;
     this.raceHeading = raceHeading;
     this.raceDistance += this.speed;
-    this.progress = track.getRaceProgress(this.lap, segmentIndex, x, y);
-    if (progress >= 1) {
-      this.finished = true;
-    }
+    this.progress = progress;
+    this.currentNodeIndex = currentNodeIndex;
+    this.nextNodeIndex = currentNodeIndex + 1;
   }
 }
