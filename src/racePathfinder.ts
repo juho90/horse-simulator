@@ -171,7 +171,7 @@ export class RacePathfinder {
           if (nearestNodes[laIndex]) {
             continue;
           }
-          if (node.progress < laNode.progress) {
+          if (isNextNode(node.progress, laNode.progress)) {
             nearestNodes[laIndex] = laNode;
             break;
           }
@@ -280,7 +280,7 @@ export function findFirstNode(
   while (left <= right) {
     const mid = Math.floor((left + right) / 2);
     const midNode = nodes[mid];
-    if (midNode.progress > progress) {
+    if (isNextNode(progress, midNode.progress)) {
       result = midNode;
       right = mid - 1;
     } else {
@@ -300,8 +300,7 @@ export function findNearestNodeIndex(
   let minDiffAnge = Infinity;
   for (let i = 0; i < path.length; i++) {
     const node = path[i];
-    const diffProgress = node.progress - progress;
-    if (diffProgress < EPSILON) {
+    if (isNextNode(progress, node.progress) === false) {
       continue;
     }
     const segment = track.getSegment(node.segmentIndex);
@@ -328,4 +327,19 @@ function progressIndex(progress: number, length: number): number {
     throw new Error(`Progress index out of bounds: ${prIndex}`);
   }
   return prIndex;
+}
+
+export function isNextNode(from: number, to: number): boolean {
+  const diff = Math.abs(to - from);
+  if (diff < EPSILON) {
+    return false;
+  }
+  if (from < to) {
+    return true;
+  } else {
+    if (0.8 < from && to < 0.2) {
+      return true;
+    }
+    return false;
+  }
 }

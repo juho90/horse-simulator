@@ -1,6 +1,6 @@
 import { Horse } from "./horse";
 import { LerpAngle, NormalizeTheta } from "./raceMath";
-import { findNearestNodeIndex } from "./racePathfinder";
+import { findNearestNodeIndex, isNextNode } from "./racePathfinder";
 import { RaceSegment, RaceSegmentNode } from "./raceSegment";
 import { RaceTrack } from "./raceTrack";
 
@@ -93,7 +93,7 @@ export class RaceHorse {
     const y = this.y + Math.sin(raceHeading) * speed;
     const progress = track.getTrackProgress(segment.segmentIndex, { x, y });
     let currentNodeIndex = this.currentNodeIndex ?? 0;
-    if (targetNode.progress < progress) {
+    if (isNextNode(targetNode.progress, progress)) {
       currentNodeIndex = findNearestNodeIndex(this, progress, track, this.path);
     }
     this.accel = accel;
