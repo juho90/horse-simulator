@@ -7,28 +7,14 @@ import { runRaceSimulator } from "./raceSimulator";
 import { createTrack } from "./raceTrack";
 import { generateRaceWebGLHtml, testRaceWebGL } from "./raceViewer";
 
-async function runReSimulateMode() {
-  const monitor = new PerformanceMonitor();
-  const { track: raceTrack, horses } = await monitor.loadInitialRaceState();
-  const firstSegment = raceTrack.getFirstSegment();
-  const racePathfinder = new RacePathfinder(raceTrack);
-  const raceHorses: RaceHorse[] = horses.map((horse, gate) => {
-    return new RaceHorse(horse, gate, firstSegment);
-  });
-  const logs = runRaceSimulator(raceTrack, racePathfinder, raceHorses);
-  const htmlString = generateRaceWebGLHtml(raceTrack, racePathfinder, logs);
-  const outPath = path.resolve(__dirname, "../race-result-replay.html");
-  testRaceWebGL(outPath, htmlString);
-}
-
 function runSimulateMode() {
   const segmentCount = Math.floor(Math.random() * 12) + 6;
   const raceTrack = createTrack(segmentCount);
   const horses = createSampleHorses();
-  const firstSegment = raceTrack.getFirstSegment();
   const racePathfinder = new RacePathfinder(raceTrack);
-  const raceHorses: RaceHorse[] = horses.map((horse, gate) => {
-    return new RaceHorse(horse, gate, firstSegment);
+  const gateNodes = racePathfinder.getGateNodes();
+  const raceHorses: RaceHorse[] = horses.map((horse, index) => {
+    return new RaceHorse(horse, gateNodes[index]);
   });
   const logs = runRaceSimulator(raceTrack, racePathfinder, raceHorses);
   const htmlString = generateRaceWebGLHtml(raceTrack, racePathfinder, logs);
@@ -36,6 +22,20 @@ function runSimulateMode() {
   testRaceWebGL(outPath, htmlString);
   const monitor = new PerformanceMonitor();
   monitor.saveInitialRaceState(raceTrack, horses);
+}
+
+async function runReSimulateMode() {
+  const monitor = new PerformanceMonitor();
+  const { track: raceTrack, horses } = await monitor.loadInitialRaceState();
+  const racePathfinder = new RacePathfinder(raceTrack);
+  const gateNodes = racePathfinder.getGateNodes();
+  const raceHorses: RaceHorse[] = horses.map((horse, index) => {
+    return new RaceHorse(horse, gateNodes[index]);
+  });
+  const logs = runRaceSimulator(raceTrack, racePathfinder, raceHorses);
+  const htmlString = generateRaceWebGLHtml(raceTrack, racePathfinder, logs);
+  const outPath = path.resolve(__dirname, "../race-result-replay.html");
+  testRaceWebGL(outPath, htmlString);
 }
 
 async function main() {

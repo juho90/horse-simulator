@@ -16,6 +16,21 @@ export function Distance(from: Vector2D, to: Vector2D): number {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
+export function DistanceArc(
+  from: Vector2D,
+  to: Vector2D,
+  center: Vector2D
+): {
+  angle: number;
+  arcDistance: number;
+} {
+  const radius = Distance(center, from);
+  const startAngle = NormalizeTheta(center, from);
+  const endAngle = NormalizeTheta(center, to);
+  const angle = DiffAngle(startAngle, endAngle);
+  return { angle, arcDistance: Math.abs(radius * angle) };
+}
+
 export function NormalizeAngle(a: number) {
   return (a + 2 * Math.PI) % (2 * Math.PI);
 }

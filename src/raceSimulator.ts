@@ -17,22 +17,13 @@ export function runRaceSimulator(
     for (; index < horses.length; index++) {
       const horse = horses[index];
       if (!horse.finished) {
-        if (horse.checkRefreshPath(track, horses)) {
-          const path = pathfinder.findPath(horse, horses);
-          if (path && 0 < path.length) {
-            horse.refreshPath(track, path);
-          } else {
-            const path = pathfinder.findPath(horse, horses);
-          }
-        }
-        horse.moveOnTrack(turn, track, horses);
+        horse.moveOnTrack(turn, pathfinder, horses);
       }
       const horseState = {
         id: horse.horseId,
         name: horse.name,
         x: horse.x,
         y: horse.y,
-        heading: horse.raceHeading,
         speed: horse.speed,
         accel: horse.accel,
         stamina: horse.stamina,

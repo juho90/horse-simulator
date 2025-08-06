@@ -1,6 +1,6 @@
 import { RaceHorse } from "./raceHorse";
-import { CalculateDirection, Distance, NormalizeAngle } from "./raceMath";
-import { findNearRaycast, GuardrailType, RaycastResult } from "./raceSegment";
+import { NormalizeAngle } from "./raceMath";
+import { GuardrailType } from "./raceSegment";
 
 export enum DirectionType {
   FRONT = "front",
@@ -69,126 +69,10 @@ export interface WallDistanceValue {
   distance: number;
 }
 
-export function convertWallDistance(
-  horse: RaceHorse,
-  raycasts: RaycastResult[]
-): Record<DirectionType, WallDistanceValue> {
-  if (!raycasts || raycasts.length === 0) {
-    return {
-      [DirectionType.FRONT]: {
-        guardrailType: GuardrailType.Inner,
-        angle: 0,
-        distance: Infinity,
-      },
-      [DirectionType.LEFT]: {
-        guardrailType: GuardrailType.Inner,
-        angle: Math.PI / 2,
-        distance: Infinity,
-      },
-      [DirectionType.RIGHT]: {
-        guardrailType: GuardrailType.Inner,
-        angle: -Math.PI / 2,
-        distance: Infinity,
-      },
-      [DirectionType.FRONT_LEFT]: {
-        guardrailType: GuardrailType.Inner,
-        angle: Math.PI / 4,
-        distance: Infinity,
-      },
-      [DirectionType.FRONT_RIGHT]: {
-        guardrailType: GuardrailType.Inner,
-        angle: -Math.PI / 4,
-        distance: Infinity,
-      },
-    };
-  }
-  const currentHeading = horse.raceHeading;
-  const front = NormalizeAngle(currentHeading);
-  const left = NormalizeAngle(
-    currentHeading + convertDirectionToAngle(DirectionType.LEFT)
-  );
-  const right = NormalizeAngle(
-    currentHeading - convertDirectionToAngle(DirectionType.RIGHT)
-  );
-  const frontLeft = NormalizeAngle(
-    currentHeading + convertDirectionToAngle(DirectionType.FRONT_LEFT)
-  );
-  const frontRight = NormalizeAngle(
-    currentHeading - convertDirectionToAngle(DirectionType.FRONT_RIGHT)
-  );
-  const frontRaycast = findNearRaycast(front, raycasts);
-  const leftRaycast = findNearRaycast(left, raycasts);
-  const rightRaycast = findNearRaycast(right, raycasts);
-  const frontLeftRaycast = findNearRaycast(frontLeft, raycasts);
-  const frontRightRaycast = findNearRaycast(frontRight, raycasts);
-  return {
-    [DirectionType.FRONT]: {
-      guardrailType: frontRaycast?.guardrailType ?? GuardrailType.Inner,
-      angle: front,
-      distance: frontRaycast?.hitDistance ?? Infinity,
-    },
-    [DirectionType.LEFT]: {
-      guardrailType: leftRaycast?.guardrailType ?? GuardrailType.Inner,
-      angle: left,
-      distance: leftRaycast?.hitDistance ?? Infinity,
-    },
-    [DirectionType.RIGHT]: {
-      guardrailType: rightRaycast?.guardrailType ?? GuardrailType.Inner,
-      angle: right,
-      distance: rightRaycast?.hitDistance ?? Infinity,
-    },
-    [DirectionType.FRONT_LEFT]: {
-      guardrailType: frontLeftRaycast?.guardrailType ?? GuardrailType.Inner,
-      angle: frontLeft,
-      distance: frontLeftRaycast?.hitDistance ?? Infinity,
-    },
-    [DirectionType.FRONT_RIGHT]: {
-      guardrailType: frontRightRaycast?.guardrailType ?? GuardrailType.Inner,
-      angle: frontRight,
-      distance: frontRightRaycast?.hitDistance ?? Infinity,
-    },
-  };
-}
-
 export interface HorseDistanceValue {
   horse: RaceHorse | null;
   angle: number;
   distance: number;
-}
-
-export function convertHorseDistance(
-  horse: RaceHorse,
-  otherHorses: RaceHorse[]
-): Record<DirectionType, HorseDistanceValue> {
-  const horseDistances: Record<DirectionType, HorseDistanceValue> = {
-    [DirectionType.FRONT]: { horse: null, angle: 0, distance: Infinity },
-    [DirectionType.LEFT]: { horse: null, angle: 0, distance: Infinity },
-    [DirectionType.RIGHT]: { horse: null, angle: 0, distance: Infinity },
-    [DirectionType.FRONT_LEFT]: { horse: null, angle: 0, distance: Infinity },
-    [DirectionType.FRONT_RIGHT]: { horse: null, angle: 0, distance: Infinity },
-  };
-  for (const otherHorse of otherHorses) {
-    if (otherHorse.horseId === horse.horseId) {
-      continue;
-    }
-    const distance = Distance(otherHorse, horse);
-    if (horse.speed * 3 < distance) {
-      continue;
-    }
-    const { direction, angle } = CalculateDirection(
-      horse,
-      otherHorse,
-      horse.raceHeading
-    );
-    if (!direction) {
-      continue;
-    }
-    const before = horseDistances[direction];
-    if (!before.horse || distance < before.distance) {
-      horseDistances[direction] = { horse: otherHorse, angle, distance };
-    }
-  }
-  return horseDistances;
 }
 
 export function convertDirectionToAngle(directionType: DirectionType): number {
