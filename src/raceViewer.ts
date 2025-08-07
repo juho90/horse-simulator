@@ -133,6 +133,8 @@ export function generateRaceWebGLHtml(
     const height = ${height};
     let turn = 0;
     let timer = null;
+    let isPlaying = false;
+    let playSpeed = ${intervalMs};
     const totalTurns = logs.length;
     function drawTrack() {
       ctx.save();
@@ -244,6 +246,82 @@ export function generateRaceWebGLHtml(
         \${horses.map((h, i) => \`<tr><td>\${h.name}</td><td style='text-align:center;'>\${i+1}</td><td>\${h.speed.toFixed(2)}</td><td>\${h.accel.toFixed(3)}</td><td>\${h.stamina.toFixed(1)}</td></tr>\`).join('')}
       </table>\`;
     }
+    function updateControls() {
+      const playBtn = document.getElementById('play-btn');
+      const pauseBtn = document.getElementById('pause-btn');
+      const prevBtn = document.getElementById('prev-btn');
+      const nextBtn = document.getElementById('next-btn');
+      const turnSlider = document.getElementById('turn-slider');
+      const speedSlider = document.getElementById('speed-slider');
+      playBtn.disabled = isPlaying || turn >= totalTurns - 1;
+      pauseBtn.disabled = !isPlaying;
+      prevBtn.disabled = turn <= 0;
+      nextBtn.disabled = turn >= totalTurns - 1;
+      if (turnSlider) {
+        turnSlider.value = turn;
+        turnSlider.max = totalTurns - 1;
+      }
+      if (speedSlider) {
+        speedSlider.value = playSpeed;
+      }
+      const turnInfo = document.getElementById('turn-info');
+      if (turnInfo) {
+        turnInfo.textContent = \`\${turn + 1} / \${totalTurns}\`;
+      }
+    }
+    function play() {
+      if (isPlaying) return;
+      if (turn >= totalTurns - 1) {
+        turn = 0;
+      }
+      isPlaying = true;
+      timer = setInterval(() => {
+        if (turn < totalTurns - 1) {
+          turn++;
+          render();
+          updateControls();
+        } else {
+          pause();
+        }
+      }, playSpeed);
+      updateControls();
+    }
+    function pause() {
+      if (!isPlaying) return;
+      isPlaying = false;
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+      updateControls();
+    }
+    function previousTurn() {
+      if (turn > 0) {
+        turn--;
+        render();
+        updateControls();
+      }
+    }
+    function nextTurn() {
+      if (turn < totalTurns - 1) {
+        turn++;
+        render();
+        updateControls();
+      }
+    }
+    function goToTurn(targetTurn) {
+      pause();
+      turn = Math.max(0, Math.min(targetTurn, totalTurns - 1));
+      render();
+      updateControls();
+    }
+    function changeSpeed(newSpeed) {
+      playSpeed = parseInt(newSpeed);
+      if (isPlaying) {
+        pause();
+        play();
+      }
+    }
     function render() {
       drawTrack();
       drawSampleNodes();
@@ -264,7 +342,20 @@ export function generateRaceWebGLHtml(
     }
     window.onload = () => {
       render();
-      startReplay();
+      updateControls();
+      document.getElementById('play-btn').onclick = play;
+      document.getElementById('pause-btn').onclick = pause;
+      document.getElementById('prev-btn').onclick = previousTurn;
+      document.getElementById('next-btn').onclick = nextTurn;
+      document.getElementById('turn-slider').oninput = (e) => goToTurn(parseInt(e.target.value));
+      document.getElementById('speed-slider').oninput = (e) => changeSpeed(e.target.value);
+      document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') { e.preventDefault(); isPlaying ? pause() : play(); }
+        else if (e.code === 'ArrowLeft') { e.preventDefault(); previousTurn(); }
+        else if (e.code === 'ArrowRight') { e.preventDefault(); nextTurn(); }
+        else if (e.code === 'Home') { e.preventDefault(); goToTurn(0); }
+        else if (e.code === 'End') { e.preventDefault(); goToTurn(totalTurns - 1); }
+      });
     };
   `;
   return `
@@ -275,27 +366,26 @@ export function generateRaceWebGLHtml(
   <title>경마 시뮬레이션 리플레이</title>
   <style>
     body { background: #f8f8f8; text-align: center; }
-    #main-layout { display: flex; flex-direction: row; justify-content: center; align-items: flex-start; min-height: 100vh; height: 100vh; overflow: hidden; }
+    #controls { margin: 10px 0; }
+    #controls button { margin: 0 5px; padding: 8px 12px; font-size: 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; }
+    #controls button:disabled { background: #bdc3c7; cursor: not-allowed; }
+    #controls input[type="range"] { margin: 0 10px; }
+    #controls label { margin: 0 15px; }
+    #turn-info { margin: 0 10px; font-weight: bold; }
+    #main-layout { display: flex; flex-direction: row; justify-content: center; align-items: flex-start; }
     #canvas-wrap { flex: 1 1 0; display: flex; align-items: flex-start; justify-content: center; min-width: 0; min-height: 0; position: relative; }
     #race-canvas { background: #fff; border: 2px solid #333; margin: 40px 0 0 0; display: block; box-shadow: 0 2px 8px #0002; width: 80vw; height: 70vh; max-width: 80vw; max-height: 70vh; min-width: 200px; min-height: 200px; }
     #status-panel {
-      position: fixed;
-      top: 8px;
-      left: 8px;
-      z-index: 100;
-      width: 260px;
-      min-width: 120px;
-      max-width: 95vw;
+      margin: 20px auto;
+      width: 80vw;
+      max-width: 800px;
       background: rgba(255,255,255,0.97);
       border: 2px solid #888;
       border-radius: 10px;
       box-shadow: 0 4px 24px #0002;
-      padding: 8px 6px;
+      padding: 15px;
       font-family: 'Consolas', 'monospace', 'Malgun Gothic', sans-serif;
-      overflow-y: auto;
-      max-height: 60vh;
-      font-size: 13px;
-      pointer-events: none;
+      font-size: 14px;
       text-align: left;
     }
     #status-panel table { width: 100%; font-size: 14px; }
@@ -306,6 +396,15 @@ export function generateRaceWebGLHtml(
 </head>
 <body>
   <h2>경마 리플레이</h2>
+  <div id="controls">
+    <button id="play-btn">▶</button>
+    <button id="pause-btn">⏸</button>
+    <button id="prev-btn">⏮</button>
+    <button id="next-btn">⏭</button>
+    <span id="turn-info">1 / 1</span>
+    <input type="range" id="turn-slider" min="0" max="0" value="0">
+    <label>속도: <input type="range" id="speed-slider" min="50" max="1000" value="200"></label>
+  </div>
   <div id="main-layout">
     <div id="canvas-wrap">
       <canvas id="race-canvas" width="${width}" height="${height}"></canvas>
