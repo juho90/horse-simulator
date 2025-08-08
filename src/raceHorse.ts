@@ -44,7 +44,6 @@ export class RaceHorse {
     this.y = gateNode.y;
     this.raceLane = gateNode.lane;
     this.raceDistance = 0;
-    this.path = [gateNode];
   }
 
   moveOnTrack(
@@ -56,25 +55,26 @@ export class RaceHorse {
     const speed = Math.min(this.speed + accel, this.maxSpeed);
     let remainingDistance = speed;
     do {
-      let nextPos = racePathfinder.findNextPos(
-        this,
+      let nextPos = racePathfinder.findNextPosInPath(
+        { x: this.x, y: this.y },
         this.progress,
-        speed,
+        remainingDistance,
         this.path
       );
-      this.x = nextPos.pos.x;
-      this.y = nextPos.pos.y;
-      this.raceLane = nextPos.startNode.lane;
-      this.progress = nextPos.progress;
-      remainingDistance -= nextPos.distance;
-      if (!nextPos.endNode) {
+      if (nextPos) {
+        this.x = nextPos.pos.x;
+        this.y = nextPos.pos.y;
+        this.raceLane = nextPos.startNode.lane;
+        this.progress = nextPos.progress;
+        remainingDistance -= nextPos.distance;
+      } else {
         const path = racePathfinder.findPath(this, others);
         if (!path || !path.length) {
           throw new Error("No valid path found");
         }
         this.path = path;
       }
-    } while (0 < remainingDistance);
+    } while (EPSILON < remainingDistance);
     this.accel = accel;
     this.speed = speed;
     this.raceDistance += this.speed;

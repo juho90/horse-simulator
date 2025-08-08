@@ -13,7 +13,7 @@ function runSimulateMode() {
   const horses = createSampleHorses();
   const racePathfinder = new RacePathfinder(raceTrack);
   const gateNodes = racePathfinder.getGateNodes();
-  const raceHorses: RaceHorse[] = horses.map((horse, index) => {
+  const raceHorses: RaceHorse[] = [horses[0]].map((horse, index) => {
     return new RaceHorse(horse, gateNodes[index]);
   });
   const logs = runRaceSimulator(raceTrack, racePathfinder, raceHorses);

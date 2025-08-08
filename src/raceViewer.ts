@@ -374,7 +374,7 @@ export function generateRaceWebGLHtml(
     #turn-info { margin: 0 10px; font-weight: bold; }
     #main-layout { display: flex; flex-direction: row; justify-content: center; align-items: flex-start; }
     #canvas-wrap { flex: 1 1 0; display: flex; align-items: flex-start; justify-content: center; min-width: 0; min-height: 0; position: relative; }
-    #race-canvas { background: #fff; border: 2px solid #333; margin: 40px 0 0 0; display: block; box-shadow: 0 2px 8px #0002; width: 80vw; height: 70vh; max-width: 80vw; max-height: 70vh; min-width: 200px; min-height: 200px; }
+    #race-canvas { background: #fff; border: 2px solid #333; margin: 40px 0 0 0; display: block; box-shadow: 0 2px 8px #0002; width: 60vmin; height: 60vmin; max-width: 60vmin; max-height: 60vmin; min-width: 200px; min-height: 200px; }
     #status-panel {
       margin: 20px auto;
       width: 80vw;

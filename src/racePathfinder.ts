@@ -50,58 +50,53 @@ export class RacePathfinder {
     return gateNodes;
   }
 
-  findNextPos(
+  findNextPosInPath(
     pos: Vector2D,
     progress: number,
-    remainingDistance: number,
+    remaining: number,
     path: RaceSegmentNode[]
-  ): NextPos {
-    if (path.length < 1) {
-      throw new Error("Path must contain at least one node");
-    }
+  ): NextPos | null {
     let startNode: RaceSegmentNode = path[0];
     let endNode: RaceSegmentNode | null = null;
     let newPos = pos;
     let newProgress = progress;
     let distance = 0;
-    const firstIndex = findNearestIndexInPath(path, progress);
-    if (firstIndex === null || path.length - 1 <= firstIndex) {
-      return {
-        startNode: startNode,
-        endNode: null,
-        pos: newPos,
-        progress: newProgress,
-        distance: distance,
-      };
+    if (path.length < 2) {
+      return null;
     }
-    startNode = path[firstIndex];
-    endNode = path[firstIndex + 1];
+    let nextIndex = findNearestIndexInPath(path, progress, true);
+    if (nextIndex === null || path.length - 1 <= nextIndex) {
+      return null;
+    }
+    startNode = path[nextIndex - 1];
+    endNode = path[nextIndex];
+    if (!startNode || !endNode) {
+      throw new Error("Start or end node is null");
+    }
     const segment = this.track.getSegment(startNode.segmentIndex);
     if (segment.type === SegmentType.LINE) {
-      distance = Distance(startNode, endNode);
-      if (remainingDistance < distance) {
-        const ratio = remainingDistance / distance;
-        newPos = Lerp(startNode, endNode, ratio);
-        newProgress = this.track.getTrackProgress(endNode.segmentIndex, newPos);
-      } else {
-        newPos = endNode;
-        newProgress = this.track.getTrackProgress(endNode.segmentIndex, newPos);
-      }
+      const nodeDistance = Distance(startNode, endNode);
+      const moveDistance = Distance(startNode, pos);
+      const ratio = Math.min(1, (moveDistance + remaining) / nodeDistance);
+      newPos = Lerp(startNode, endNode, ratio);
+      newProgress = this.track.getTrackProgress(endNode.segmentIndex, newPos);
+      distance = nodeDistance * ratio - moveDistance;
     } else {
       const center = (segment as RaceCorner).center;
-      const { angle, arcDistance } = DistanceArc(startNode, endNode, center);
-      distance = arcDistance;
-      if (remainingDistance < distance) {
-        const ratio = remainingDistance / distance;
-        newPos = {
-          x: startNode.x + distance * ratio * Math.cos(angle),
-          y: startNode.y + distance * ratio * Math.sin(angle),
-        };
-        newProgress = this.track.getTrackProgress(endNode.segmentIndex, newPos);
-      } else {
-        newPos = endNode;
-        newProgress = this.track.getTrackProgress(endNode.segmentIndex, newPos);
-      }
+      const { arcDistance: moveDistance } = DistanceArc(startNode, pos, center);
+      const { radius, startAngle, angle, arcDistance } = DistanceArc(
+        startNode,
+        endNode,
+        center
+      );
+      const ratio = Math.min(1, (moveDistance + remaining) / arcDistance);
+      const newAngle = startAngle + angle * ratio;
+      newPos = {
+        x: center.x + radius * Math.cos(newAngle),
+        y: center.y + radius * Math.sin(newAngle),
+      };
+      newProgress = this.track.getTrackProgress(endNode.segmentIndex, newPos);
+      distance = arcDistance * ratio - moveDistance;
     }
     return {
       startNode,
@@ -127,7 +122,7 @@ export class RacePathfinder {
     for (const prIndex of nodeSections) {
       const prNodes = this.nodes[prIndex];
       const laNodes = prNodes[horse.raceLane];
-      const firstIndex = findNearestIndexInPath(laNodes, horse.progress);
+      const firstIndex = findNearestIndexInPath(laNodes, horse.progress, false);
       if (firstIndex === null) {
         continue;
       }
@@ -178,10 +173,9 @@ export class RacePathfinder {
     for (const prIndex of prIndices) {
       const prNodes = this.nodes[prIndex];
       const laNodes = prNodes[lane];
-      for (const laNode of laNodes) {
-        if (isProgressInFront(progress, laNode.progress)) {
-          return laNode;
-        }
+      const laNodeIndex = findNearestIndexInPath(laNodes, progress, true);
+      if (laNodeIndex !== null) {
+        return laNodes[laNodeIndex];
       }
     }
     return null;
@@ -228,7 +222,8 @@ export class RacePathfinder {
       if (lane !== other.raceLane) {
         continue;
       }
-      if (isProgressInFront(progress, other.progress) === false) {
+      const comparison = isProgressInFront(progress, other.progress);
+      if (comparison !== 1) {
         continue;
       }
       // todo: check distance
@@ -335,38 +330,52 @@ function progressIndex(progress: number, length: number): number {
   return prIndex;
 }
 
-function isProgressInFront(from: number, to: number): boolean {
+function isProgressInFront(from: number, to: number): number {
   const diff = Math.abs(to - from);
   if (diff < EPSILON) {
-    return false;
+    return 0;
   }
   if (0.9 < from && to < 0.1) {
-    return true;
+    return 1;
   } else if (from < to) {
     if (from < 0.1 && 0.9 < to) {
-      return false;
+      return -1;
     }
-    return true;
+    return 1;
   } else {
-    return false;
+    return -1;
   }
 }
 
 function findNearestIndexInPath(
   path: RaceSegmentNode[],
-  progress: number
+  progress: number,
+  mustFront: boolean
 ): number | null {
+  if (path.length === 0) {
+    return null;
+  }
   let left = 0;
   let right = path.length - 1;
   let index: number | null = null;
   while (left <= right) {
     const mid = Math.floor((left + right) / 2);
-    index = mid;
     const midNode = path[mid];
-    if (isProgressInFront(progress, midNode.progress)) {
-      right = mid - 1;
+    const comparison = isProgressInFront(progress, midNode.progress);
+    if (mustFront) {
+      if (comparison === 1) {
+        index = mid;
+        right = mid - 1;
+      } else {
+        left = mid + 1;
+      }
     } else {
-      left = mid + 1;
+      if (comparison !== -1) {
+        index = mid;
+        right = mid - 1;
+      } else {
+        left = mid + 1;
+      }
     }
   }
   return index;
