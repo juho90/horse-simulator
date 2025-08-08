@@ -38,7 +38,7 @@ export function NormalizeAngle(a: number) {
 }
 
 export function DiffAngle(from: number, to: number) {
-  const diff = NormalizeAngle(from - to);
+  const diff = NormalizeAngle(to - from);
   if (diff > Math.PI) {
     return diff - 2 * Math.PI;
   }
@@ -51,12 +51,16 @@ export function NormalizeTheta(from: Vector2D, to: Vector2D): number {
   return NormalizeAngle(Math.atan2(dy, dx));
 }
 
+export function LerpNumber(from: number, to: number, t: number): number {
+  return from + (to - from) * t;
+}
+
 export function Lerp(from: Vector2D, to: Vector2D, t: number): Vector2D {
-  return { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
+  return { x: LerpNumber(from.x, to.x, t), y: LerpNumber(from.y, to.y, t) };
 }
 
 export function LerpAngle(from: number, to: number, t: number): number {
-  return from + DiffAngle(to, from) * t;
+  return from + DiffAngle(from, to) * t;
 }
 
 export function ProjectOnSegment(

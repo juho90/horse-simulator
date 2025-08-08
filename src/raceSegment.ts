@@ -58,8 +58,6 @@ export abstract class RaceSegment {
   protected abstract calculateLength(): number;
 
   abstract getBounds(): BoundingBox;
-  abstract getProgress(pos: Vector2D): number;
-  abstract getProgressAt(pos: Vector2D): Vector2D;
   abstract getTangentDirectionAt(pos: Vector2D): number;
   abstract getEndTangentDirection(): number;
   abstract getOrthoVectorAt(pos: Vector2D): Vector2D;

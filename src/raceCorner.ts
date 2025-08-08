@@ -57,22 +57,6 @@ export class RaceCorner extends RaceSegment {
     };
   }
 
-  getProgress(pos: Vector2D): number {
-    const angle = NormalizeTheta(this.center, pos);
-    const diffAngle = DiffAngle(angle, this.startAngle);
-    const progressDistance = this.radius * diffAngle;
-    return progressDistance / this.length;
-  }
-
-  getProgressAt(pos: Vector2D): Vector2D {
-    const progress = this.getProgress(pos);
-    const angle = LerpAngle(this.startAngle, this.endAngle, progress);
-    return {
-      x: this.center.x + this.radius * Math.cos(angle),
-      y: this.center.y + this.radius * Math.sin(angle),
-    };
-  }
-
   getTangentDirectionAt(pos: Vector2D): number {
     const angle = Math.atan2(pos.y - this.center.y, pos.x - this.center.x);
     return addDirectionToAngle(angle, DirectionType.RIGHT);
@@ -100,7 +84,7 @@ export class RaceCorner extends RaceSegment {
     let laIndex = 0;
     for (let lane = padding; lane <= trackWidth - padding; lane += resolution) {
       const radius = this.radius + lane;
-      const diffAngle = DiffAngle(this.endAngle, this.startAngle);
+      const diffAngle = DiffAngle(this.startAngle, this.endAngle);
       const arcLength = diffAngle * radius;
       const count = Math.ceil(arcLength / resolution);
       const laneNodes: RaceSegmentNode[] = [];

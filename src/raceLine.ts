@@ -27,27 +27,6 @@ export class RaceLine extends RaceSegment {
     };
   }
 
-  getProgress(pos: Vector2D): number {
-    const directionX = this.end.x - this.start.x;
-    const directionY = this.end.y - this.start.y;
-    const len2 = directionX * directionX + directionY * directionY;
-    if (len2 === 0) {
-      return 0;
-    }
-    const positionX = pos.x - this.start.x;
-    const positionY = pos.y - this.start.y;
-    const t = (positionX * directionX + positionY * directionY) / len2;
-    return Math.max(0, t);
-  }
-
-  getProgressAt(pos: Vector2D): Vector2D {
-    const progress = this.getProgress(pos);
-    return {
-      x: this.start.x + (this.end.x - this.start.x) * progress,
-      y: this.start.y + (this.end.y - this.start.y) * progress,
-    };
-  }
-
   getTangentDirectionAt(pos: Vector2D): number {
     return NormalizeTheta(this.start, this.end);
   }

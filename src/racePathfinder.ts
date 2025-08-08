@@ -6,6 +6,7 @@ import {
   DistanceArc,
   EPSILON,
   Lerp,
+  LerpNumber,
   Vector2D,
 } from "./raceMath";
 import { RaceSegmentNode, SegmentType, TRACK_WIDTH } from "./raceSegment";
@@ -16,7 +17,7 @@ export interface NextPos {
   endNode: RaceSegmentNode | null;
   pos: Vector2D;
   progress: number;
-  distance: number;
+  moveDistance: number;
 }
 
 export class RacePathfinder {
@@ -60,7 +61,7 @@ export class RacePathfinder {
     let endNode: RaceSegmentNode | null = null;
     let newPos = pos;
     let newProgress = progress;
-    let distance = 0;
+    let moveDistance = 0;
     if (path.length < 2) {
       return null;
     }
@@ -71,39 +72,50 @@ export class RacePathfinder {
     startNode = path[nextIndex - 1];
     endNode = path[nextIndex];
     if (!startNode || !endNode) {
+      let nextIndex = findNearestIndexInPath(path, progress, true);
       throw new Error("Start or end node is null");
     }
     const segment = this.track.getSegment(startNode.segmentIndex);
     if (segment.type === SegmentType.LINE) {
       const nodeDistance = Distance(startNode, endNode);
-      const moveDistance = Distance(startNode, pos);
-      const ratio = Math.min(1, (moveDistance + remaining) / nodeDistance);
+      const currDistance = Distance(startNode, pos);
+      const ratio = Math.min(1, (currDistance + remaining) / nodeDistance);
       newPos = Lerp(startNode, endNode, ratio);
-      newProgress = this.track.getTrackProgress(endNode.segmentIndex, newPos);
-      distance = nodeDistance * ratio - moveDistance;
+      moveDistance = nodeDistance * ratio - currDistance;
+      const addProgress = LerpNumber(
+        startNode.progress,
+        endNode.progress,
+        ratio
+      );
+      newProgress = segment.getCumulativeProgress() + addProgress;
     } else {
       const center = (segment as RaceCorner).center;
-      const { arcDistance: moveDistance } = DistanceArc(startNode, pos, center);
+      const { arcDistance: currDistance } = DistanceArc(startNode, pos, center);
       const { radius, startAngle, angle, arcDistance } = DistanceArc(
         startNode,
         endNode,
         center
       );
-      const ratio = Math.min(1, (moveDistance + remaining) / arcDistance);
+      const ratio = Math.min(1, (currDistance + remaining) / arcDistance);
       const newAngle = startAngle + angle * ratio;
       newPos = {
         x: center.x + radius * Math.cos(newAngle),
         y: center.y + radius * Math.sin(newAngle),
       };
-      newProgress = this.track.getTrackProgress(endNode.segmentIndex, newPos);
-      distance = arcDistance * ratio - moveDistance;
+      moveDistance = arcDistance * ratio - currDistance;
+      const addProgress = LerpNumber(
+        startNode.progress,
+        endNode.progress,
+        ratio
+      );
+      newProgress = segment.getCumulativeProgress() + addProgress;
     }
     return {
       startNode,
       endNode,
       pos: newPos,
       progress: newProgress,
-      distance,
+      moveDistance,
     };
   }
 
@@ -240,7 +252,6 @@ export function createNodes(
   gridResolution: number = 150,
   progressResolution: number = 10
 ): RaceSegmentNode[][][] {
-  let accumulatedLength = 0;
   const gridNodes = new Map<string, RaceSegmentNode[]>();
   const nodes: RaceSegmentNode[][][] = Array.from(
     { length: progressResolution },
@@ -253,6 +264,7 @@ export function createNodes(
       trackPadding
     );
     const segmentLength = segment.length;
+    const segmentProgress = segmentLength / track.trackLength;
     let laIndex = 0;
     for (
       let lane = trackPadding;
@@ -262,8 +274,11 @@ export function createNodes(
       const laNodes = segmentNodes[laIndex];
       for (const node of laNodes) {
         const nodeKey = gridKey(node.x, node.y, gridResolution);
-        const trackProgress = track.getTrackProgress(node.segmentIndex, node);
-        const newNode = { ...node, progress: trackProgress };
+        const nodeProgress = node.progress * segmentProgress;
+        const newNode = {
+          ...node,
+          progress: segment.getCumulativeProgress() + nodeProgress,
+        };
         const gridNode = gridNodes.get(nodeKey);
         let isNew = false;
         if (!gridNode) {
@@ -291,7 +306,6 @@ export function createNodes(
       }
       laIndex++;
     }
-    accumulatedLength += segmentLength;
   }
   return nodes;
 }

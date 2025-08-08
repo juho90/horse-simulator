@@ -66,7 +66,7 @@ export class RaceHorse {
         this.y = nextPos.pos.y;
         this.raceLane = nextPos.startNode.lane;
         this.progress = nextPos.progress;
-        remainingDistance -= nextPos.distance;
+        remainingDistance -= nextPos.moveDistance;
       } else {
         const path = racePathfinder.findPath(this, others);
         if (!path || !path.length) {
