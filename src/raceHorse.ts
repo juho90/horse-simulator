@@ -65,6 +65,15 @@ export class RaceHorse {
         this.x = nextPos.pos.x;
         this.y = nextPos.pos.y;
         this.raceLane = nextPos.startNode.lane;
+        if (1 < nextPos.progress) {
+          let nextPos = racePathfinder.findNextPosInPath(
+            { x: this.x, y: this.y },
+            this.progress,
+            remainingDistance,
+            this.path
+          );
+          throw new Error("Invalid progress");
+        }
         this.progress = nextPos.progress;
         remainingDistance -= nextPos.moveDistance;
       } else {
@@ -73,6 +82,10 @@ export class RaceHorse {
           throw new Error("No valid path found");
         }
         this.path = path;
+      }
+      if (1 < this.progress) {
+        this.lap++;
+        this.progress %= 1;
       }
     } while (EPSILON < remainingDistance);
     this.accel = accel;
