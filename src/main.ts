@@ -6,7 +6,6 @@ import { runRaceSimulator } from "./raceSimulator";
 import { createTrack } from "./raceTrack";
 import { RaceTrackNode } from "./raceTrackNode";
 import { generateRaceWebGLHtml, testRaceWebGL } from "./raceViewer";
-import { saveTrackPNG } from "./saveTrackPNG";
 
 async function runSimulateMode() {
   const segmentCount = Math.floor(Math.random() * 12) + 6;
@@ -14,7 +13,7 @@ async function runSimulateMode() {
   const horses = createSampleHorses();
   const raceTrackNode = new RaceTrackNode(raceTrack);
   const gateNodes = raceTrackNode.getGateNodes();
-  const raceHorses: RaceHorse[] = [horses[0]].map((horse, index) => {
+  const raceHorses: RaceHorse[] = horses.map((horse, index) => {
     return new RaceHorse(horse, gateNodes[index]);
   });
   const logs = runRaceSimulator(raceTrack, raceTrackNode, raceHorses);
@@ -29,10 +28,8 @@ async function runReSimulateMode() {
   const monitor = new RaceMonitor();
   const { track: raceTrack, horses } = await monitor.loadInitialRaceState();
   const raceTrackNode = new RaceTrackNode(raceTrack);
-  // todo: debug delete
-  await saveTrackPNG(raceTrackNode);
   const gateNodes = raceTrackNode.getGateNodes();
-  const raceHorses: RaceHorse[] = [horses[0]].map((horse, index) => {
+  const raceHorses: RaceHorse[] = horses.map((horse, index) => {
     return new RaceHorse(horse, gateNodes[index]);
   });
   const logs = runRaceSimulator(raceTrack, raceTrackNode, raceHorses);

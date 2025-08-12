@@ -59,7 +59,7 @@ export class RaceLine extends RaceSegment {
     for (let lane = padding; lane <= trackWidth - padding; lane += resolution) {
       const count = Math.ceil(this.length / resolution);
       const laneNodes: RaceSegmentNode[] = [];
-      for (let prIndex = 0; prIndex <= count; prIndex++) {
+      for (let prIndex = 0; prIndex < count; prIndex++) {
         const progress = prIndex / count;
         const x = this.start.x + (this.end.x - this.start.x) * progress;
         const y = this.start.y + (this.end.y - this.start.y) * progress;

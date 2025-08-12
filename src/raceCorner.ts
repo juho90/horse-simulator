@@ -88,7 +88,7 @@ export class RaceCorner extends RaceSegment {
       const arcLength = diffAngle * radius;
       const count = Math.ceil(arcLength / resolution);
       const laneNodes: RaceSegmentNode[] = [];
-      for (let prIndex = 0; prIndex <= count; prIndex++) {
+      for (let prIndex = 0; prIndex < count; prIndex++) {
         const progress = prIndex / count;
         const angle = LerpAngle(this.startAngle, this.endAngle, progress);
         const nodeX = this.center.x + radius * Math.cos(angle);

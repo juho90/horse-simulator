@@ -71,9 +71,12 @@ export class RaceTrackNode {
     startNode = path[nextIndex - 1];
     endNode = path[nextIndex];
     if (!startNode || !endNode) {
-      // todo: debug delete
-      let nextIndex = findNearestIndexInPath(path, progress);
       throw new Error("Start or end node is null");
+    }
+    const startProgress = startNode.progress;
+    let endProgress = endNode.progress;
+    if (endProgress < startProgress) {
+      endProgress += 1;
     }
     const segment = this.track.getSegment(startNode.segmentIndex);
     if (segment.type === SegmentType.LINE) {
@@ -82,7 +85,7 @@ export class RaceTrackNode {
       const ratio = Math.min(1, (currDistance + remaining) / nodeDistance);
       newPos = Lerp(startNode, endNode, ratio);
       moveDistance = nodeDistance * ratio - currDistance;
-      newProgress = LerpNumber(startNode.progress, endNode.progress, ratio);
+      newProgress = LerpNumber(startProgress, endProgress, ratio);
     } else {
       const center = (segment as RaceCorner).center;
       const { arcDistance: currDistance } = DistanceArc(startNode, pos, center);
@@ -98,7 +101,7 @@ export class RaceTrackNode {
         y: center.y + radius * Math.sin(newAngle),
       };
       moveDistance = arcDistance * ratio - currDistance;
-      newProgress = LerpNumber(startNode.progress, endNode.progress, ratio);
+      newProgress = LerpNumber(startProgress, endProgress, ratio);
     }
     return {
       startNode,
@@ -125,20 +128,25 @@ export class RaceTrackNode {
       const laNodes = prNodes[horse.raceLane];
       let firstIndex = findNearestIndexInPath(laNodes, horse.progress);
       if (firstIndex === null) {
-        continue;
-      }
-      if (0 < firstIndex) {
-        firstIndex--;
+        firstIndex = laNodes.length - 1;
+      } else {
+        if (0 < firstIndex) {
+          --firstIndex;
+        }
       }
       const firstNode = laNodes[firstIndex];
       if (startNode) {
-        if (isProgressInFront(horse.progress, firstNode.progress)) {
+        const horseCheck = checkProgress(horse.progress, firstNode.progress);
+        if (0 < horseCheck) {
           continue;
         }
-        if (isProgressInFront(firstNode.progress, startNode.progress)) {
-          continue;
+        const startCheck = checkProgress(
+          startNode.progress,
+          firstNode.progress
+        );
+        if (0 < startCheck) {
+          startNode = firstNode;
         }
-        startNode = firstNode;
       } else {
         startNode = firstNode;
       }
@@ -232,7 +240,7 @@ export class RaceTrackNode {
       if (lane !== other.raceLane) {
         continue;
       }
-      const comparison = isProgressInFront(progress, other.progress);
+      const comparison = checkProgress(progress, other.progress);
       if (comparison !== 1) {
         continue;
       }
@@ -256,10 +264,6 @@ export function createNodes(
     () => []
   );
   for (const segment of track.segments) {
-    if (segment.segmentIndex == track.segments.length - 1) {
-      // todo: debug delete
-      const a = 1;
-    }
     const segmentNodes = segment.getNodes(
       trackWidth,
       nodeResolution,
@@ -278,10 +282,6 @@ export function createNodes(
         const nodeKey = gridKey(node.x, node.y, gridResolution);
         const nodeProgress = node.progress * segmentProgress;
         const newProgress = segment.getCumulativeProgress() + nodeProgress;
-        if (1 <= newProgress) {
-          // todo: debug delete
-          const newProgress = segment.getCumulativeProgress() + nodeProgress;
-        }
         const newNode = {
           ...node,
           progress: newProgress,
@@ -351,7 +351,7 @@ function progressIndex(progress: number, length: number): number {
   return prIndex;
 }
 
-export function isProgressInFront(from: number, to: number): number {
+export function checkProgress(from: number, to: number): number {
   const diff = Math.abs(to - from);
   if (diff < EPSILON) {
     return 0;
@@ -381,7 +381,7 @@ function findNearestIndexInPath(
   while (left <= right) {
     const mid = Math.floor((left + right) / 2);
     const midNode = path[mid];
-    const comparison = isProgressInFront(progress, midNode.progress);
+    const comparison = checkProgress(progress, midNode.progress);
     if (comparison === 1) {
       index = mid;
       right = mid - 1;
