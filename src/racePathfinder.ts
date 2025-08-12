@@ -65,12 +65,13 @@ export class RacePathfinder {
       return null;
     }
     let nextIndex = findNearestIndexInPath(path, progress);
-    if (nextIndex === null || path.length - 1 <= nextIndex) {
+    if (nextIndex === null) {
       return null;
     }
     startNode = path[nextIndex - 1];
     endNode = path[nextIndex];
     if (!startNode || !endNode) {
+      // todo: debug delete
       let nextIndex = findNearestIndexInPath(path, progress);
       throw new Error("Start or end node is null");
     }
@@ -81,12 +82,7 @@ export class RacePathfinder {
       const ratio = Math.min(1, (currDistance + remaining) / nodeDistance);
       newPos = Lerp(startNode, endNode, ratio);
       moveDistance = nodeDistance * ratio - currDistance;
-      const addProgress = LerpNumber(
-        startNode.progress,
-        endNode.progress,
-        ratio
-      );
-      newProgress = segment.getCumulativeProgress() + addProgress;
+      newProgress = LerpNumber(startNode.progress, endNode.progress, ratio);
     } else {
       const center = (segment as RaceCorner).center;
       const { arcDistance: currDistance } = DistanceArc(startNode, pos, center);
@@ -102,12 +98,7 @@ export class RacePathfinder {
         y: center.y + radius * Math.sin(newAngle),
       };
       moveDistance = arcDistance * ratio - currDistance;
-      const addProgress = LerpNumber(
-        startNode.progress,
-        endNode.progress,
-        ratio
-      );
-      newProgress = segment.getCumulativeProgress() + addProgress;
+      newProgress = LerpNumber(startNode.progress, endNode.progress, ratio);
     }
     return {
       startNode,
@@ -141,10 +132,10 @@ export class RacePathfinder {
       }
       const firstNode = laNodes[firstIndex];
       if (startNode) {
-        if (horse.progress < firstNode.progress) {
+        if (isProgressInFront(horse.progress, firstNode.progress)) {
           continue;
         }
-        if (firstNode.progress < startNode.progress) {
+        if (isProgressInFront(firstNode.progress, startNode.progress)) {
           continue;
         }
         startNode = firstNode;
@@ -351,7 +342,7 @@ function progressIndex(progress: number, length: number): number {
   return prIndex;
 }
 
-function isProgressInFront(from: number, to: number): number {
+export function isProgressInFront(from: number, to: number): number {
   const diff = Math.abs(to - from);
   if (diff < EPSILON) {
     return 0;

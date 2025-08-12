@@ -1,7 +1,7 @@
 import * as path from "path";
 import { createSampleHorses } from "./horse";
-import { PerformanceMonitor } from "./performanceMonitor";
 import { RaceHorse } from "./raceHorse";
+import { RaceMonitor } from "./raceMonitor";
 import { RacePathfinder } from "./racePathfinder";
 import { runRaceSimulator } from "./raceSimulator";
 import { createTrack } from "./raceTrack";
@@ -20,12 +20,12 @@ function runSimulateMode() {
   const htmlString = generateRaceWebGLHtml(raceTrack, racePathfinder, logs);
   const outPath = path.resolve(__dirname, "../race-result.html");
   testRaceWebGL(outPath, htmlString);
-  const monitor = new PerformanceMonitor();
+  const monitor = new RaceMonitor();
   monitor.saveInitialRaceState(raceTrack, horses);
 }
 
 async function runReSimulateMode() {
-  const monitor = new PerformanceMonitor();
+  const monitor = new RaceMonitor();
   const { track: raceTrack, horses } = await monitor.loadInitialRaceState();
   const racePathfinder = new RacePathfinder(raceTrack);
   const gateNodes = racePathfinder.getGateNodes();

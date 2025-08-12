@@ -2,22 +2,7 @@ import * as fs from "fs";
 import { convertHorsesForRace, Horse } from "./horse";
 import { convertTrackForRace, RaceTrack } from "./raceTrack";
 
-enum ThreatLevel {
-  NONE = "none",
-  LOW = "low",
-  MEDIUM = "medium",
-  HIGH = "high",
-  CRITICAL = "critical",
-}
-
-interface RaceEvent {
-  turn: number;
-  horseName: string;
-  description: string;
-  threatLevel: ThreatLevel;
-}
-
-export class PerformanceMonitor {
+export class RaceMonitor {
   async saveSituationReport(report: string): Promise<void> {
     const filename = "race-statistics.txt";
     try {

@@ -1,6 +1,6 @@
 import { Horse } from "./horse";
 import { EPSILON } from "./raceMath";
-import { RacePathfinder } from "./racePathfinder";
+import { isProgressInFront, RacePathfinder } from "./racePathfinder";
 import { RaceSegmentNode } from "./raceSegment";
 
 export class RaceHorse {
@@ -66,6 +66,7 @@ export class RaceHorse {
         this.y = nextPos.pos.y;
         this.raceLane = nextPos.startNode.lane;
         if (1 < nextPos.progress) {
+          // todo: debug delete
           let nextPos = racePathfinder.findNextPosInPath(
             { x: this.x, y: this.y },
             this.progress,
@@ -82,6 +83,10 @@ export class RaceHorse {
           throw new Error("No valid path found");
         }
         this.path = path;
+        // todo: debug delete
+        if (isProgressInFront(this.progress, path[0].progress)) {
+          const path = racePathfinder.findPath(this, others);
+        }
       }
       if (1 < this.progress) {
         this.lap++;

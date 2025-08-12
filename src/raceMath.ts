@@ -1,5 +1,3 @@
-import { convertAngleToDirection, DirectionType } from "./directionalDistance";
-
 export type Vector2D = { x: number; y: number };
 
 export const EPSILON = 1e-10;
@@ -134,12 +132,68 @@ export function IsAngleBetween(
   }
 }
 
+export enum DirectionType {
+  FRONT = "front",
+  LEFT = "left",
+  RIGHT = "right",
+  FRONT_LEFT = "frontLeft",
+  FRONT_RIGHT = "frontRight",
+}
+
+export function AddDirectionToAngle(
+  angle: number,
+  directionType: DirectionType
+): number {
+  return NormalizeAngle(angle + ConvertDirectionToAngle(directionType));
+}
+
+export function ConvertDirectionToAngle(directionType: DirectionType): number {
+  switch (directionType) {
+    case DirectionType.FRONT:
+      return 0;
+    case DirectionType.LEFT: // 위
+      return -Math.PI / 2;
+    case DirectionType.RIGHT: // 아래
+      return Math.PI / 2;
+    case DirectionType.FRONT_LEFT:
+      return -Math.PI / 4;
+    case DirectionType.FRONT_RIGHT:
+      return Math.PI / 4;
+    default:
+      return 0;
+  }
+}
+
+export function ConvertAngleToDirection(angle: number): DirectionType | null {
+  let normalAngle = NormalizeAngle(angle);
+  if (Math.PI < normalAngle) {
+    normalAngle -= 2 * Math.PI;
+  }
+  const pi10 = Math.PI / 10;
+  if (normalAngle >= -pi10 && normalAngle < pi10) {
+    return DirectionType.FRONT;
+  }
+  if (normalAngle >= pi10 && normalAngle < 3 * pi10) {
+    return DirectionType.FRONT_RIGHT;
+  }
+  if (normalAngle >= 3 * pi10 && normalAngle < 5 * pi10) {
+    return DirectionType.RIGHT;
+  }
+  if (normalAngle <= -pi10 && normalAngle > -3 * pi10) {
+    return DirectionType.FRONT_LEFT;
+  }
+  if (normalAngle <= -3 * pi10 && normalAngle >= -5 * pi10) {
+    return DirectionType.LEFT;
+  }
+  return null;
+}
+
 export function CalculateDirection(
   from: { x: number; y: number },
   to: { x: number; y: number },
   heading: number
 ): { direction: DirectionType | null; angle: number } {
   const angle = NormalizeAngle(NormalizeTheta(from, to) - heading);
-  const direction = convertAngleToDirection(angle);
+  const direction = ConvertAngleToDirection(angle);
   return { direction, angle: angle };
 }

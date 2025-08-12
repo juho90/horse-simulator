@@ -1,8 +1,8 @@
-import { addDirectionToAngle, DirectionType } from "./directionalDistance";
 import { RaceLine } from "./raceLine";
 import {
+  AddDirectionToAngle,
   DiffAngle,
-  IntersectCircleLineNear,
+  DirectionType,
   LerpAngle,
   NormalizeAngle,
   NormalizeTheta,
@@ -59,16 +59,16 @@ export class RaceCorner extends RaceSegment {
 
   getTangentDirectionAt(pos: Vector2D): number {
     const angle = Math.atan2(pos.y - this.center.y, pos.x - this.center.x);
-    return addDirectionToAngle(angle, DirectionType.RIGHT);
+    return AddDirectionToAngle(angle, DirectionType.RIGHT);
   }
 
   getEndTangentDirection(): number {
-    return addDirectionToAngle(this.endAngle, DirectionType.RIGHT);
+    return AddDirectionToAngle(this.endAngle, DirectionType.RIGHT);
   }
 
   getOrthoVectorAt(pos: Vector2D): Vector2D {
     const dir = this.getTangentDirectionAt(pos);
-    const angle = addDirectionToAngle(dir, DirectionType.LEFT);
+    const angle = AddDirectionToAngle(dir, DirectionType.LEFT);
     return {
       x: Math.cos(angle),
       y: Math.sin(angle),
@@ -106,22 +106,6 @@ export class RaceCorner extends RaceSegment {
     }
     return nodes;
   }
-
-  raycastBoundary(
-    rayPoint: Vector2D,
-    rayDir: Vector2D,
-    trackWidth: number
-  ): Vector2D | null {
-    const radius = this.radius + trackWidth;
-    return IntersectCircleLineNear(
-      this.center,
-      radius,
-      rayPoint,
-      rayDir,
-      this.startAngle,
-      this.endAngle
-    );
-  }
 }
 
 export function createHorizontalCorner(
@@ -139,7 +123,7 @@ export function createCornerFromLine(
   angle: number
 ): RaceCorner {
   const lineAngle = NormalizeTheta(line.start, line.end);
-  const centerAngle = addDirectionToAngle(lineAngle, DirectionType.RIGHT);
+  const centerAngle = AddDirectionToAngle(lineAngle, DirectionType.RIGHT);
   const centerX = line.end.x + radius * Math.cos(centerAngle);
   const centerY = line.end.y + radius * Math.sin(centerAngle);
   const center: Vector2D = { x: centerX, y: centerY };
@@ -151,11 +135,11 @@ export function createCornerFromCorner(
   radius: number,
   angle: number
 ): RaceCorner {
-  const tangentAngle = addDirectionToAngle(
+  const tangentAngle = AddDirectionToAngle(
     corner.endAngle,
     DirectionType.RIGHT
   );
-  const centerAngle = addDirectionToAngle(tangentAngle, DirectionType.RIGHT);
+  const centerAngle = AddDirectionToAngle(tangentAngle, DirectionType.RIGHT);
   const centerX = corner.end.x + radius * Math.cos(centerAngle);
   const centerY = corner.end.y + radius * Math.sin(centerAngle);
   const center: Vector2D = { x: centerX, y: centerY };

@@ -1,6 +1,11 @@
-import { addDirectionToAngle, DirectionType } from "./directionalDistance";
 import { RaceCorner } from "./raceCorner";
-import { Distance, EPSILON, NormalizeTheta, Vector2D } from "./raceMath";
+import {
+  AddDirectionToAngle,
+  DirectionType,
+  Distance,
+  NormalizeTheta,
+  Vector2D,
+} from "./raceMath";
 import {
   BoundingBox,
   RaceSegment,
@@ -37,7 +42,7 @@ export class RaceLine extends RaceSegment {
 
   getOrthoVectorAt(pos: Vector2D): Vector2D {
     const dir = this.getTangentDirectionAt(pos);
-    const angle = addDirectionToAngle(dir, DirectionType.LEFT);
+    const angle = AddDirectionToAngle(dir, DirectionType.LEFT);
     return {
       x: Math.cos(angle),
       y: Math.sin(angle),
@@ -73,43 +78,6 @@ export class RaceLine extends RaceSegment {
       laIndex++;
     }
     return nodes;
-  }
-
-  raycastBoundary(
-    rayPoint: Vector2D,
-    rayDir: Vector2D,
-    trackWidth: number
-  ): Vector2D | null {
-    const x1 = this.start.x;
-    const y1 = this.start.y;
-    const x2 = this.end.x;
-    const y2 = this.end.y;
-    let offsetX = 0;
-    let offsetY = 0;
-    if (0 < trackWidth) {
-      const ortho = this.getOrthoVectorAt({ x: x1, y: y1 });
-      offsetX = ortho.x * trackWidth;
-      offsetY = ortho.y * trackWidth;
-    }
-    const x1b = x1 + offsetX;
-    const y1b = y1 + offsetY;
-    const x2b = x2 + offsetX;
-    const y2b = y2 + offsetY;
-    const dx = x2b - x1b;
-    const dy = y2b - y1b;
-    const det = rayDir.x * dy - rayDir.y * dx;
-    if (Math.abs(det) < EPSILON) {
-      return null;
-    }
-    const t = ((x1b - rayPoint.x) * dy - (y1b - rayPoint.y) * dx) / det;
-    const s =
-      ((x1b - rayPoint.x) * rayDir.y - (y1b - rayPoint.y) * rayDir.x) / det;
-    if (t < -EPSILON || s < -EPSILON || s > 1 + EPSILON) {
-      return null;
-    }
-    const ix = rayPoint.x + rayDir.x * t;
-    const iy = rayPoint.y + rayDir.y * t;
-    return { x: ix, y: iy };
   }
 }
 
