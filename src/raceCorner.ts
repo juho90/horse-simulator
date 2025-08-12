@@ -75,7 +75,7 @@ export class RaceCorner extends RaceSegment {
     };
   }
 
-  getSampleNodes(
+  getNodes(
     trackWidth: number,
     resolution: number,
     padding: number

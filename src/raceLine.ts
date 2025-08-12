@@ -49,7 +49,7 @@ export class RaceLine extends RaceSegment {
     };
   }
 
-  getSampleNodes(
+  getNodes(
     trackWidth: number,
     resolution: number,
     padding: number

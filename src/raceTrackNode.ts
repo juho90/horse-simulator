@@ -19,7 +19,7 @@ export interface NextPos {
   moveDistance: number;
 }
 
-export class RacePathfinder {
+export class RaceTrackNode {
   track: RaceTrack;
   nodeResolution: number;
   trackPadding: number;
@@ -256,7 +256,11 @@ export function createNodes(
     () => []
   );
   for (const segment of track.segments) {
-    const segmentNodes = segment.getSampleNodes(
+    if (segment.segmentIndex == track.segments.length - 1) {
+      // todo: debug delete
+      const a = 1;
+    }
+    const segmentNodes = segment.getNodes(
       trackWidth,
       nodeResolution,
       trackPadding
@@ -273,9 +277,14 @@ export function createNodes(
       for (const node of laNodes) {
         const nodeKey = gridKey(node.x, node.y, gridResolution);
         const nodeProgress = node.progress * segmentProgress;
+        const newProgress = segment.getCumulativeProgress() + nodeProgress;
+        if (1 <= newProgress) {
+          // todo: debug delete
+          const newProgress = segment.getCumulativeProgress() + nodeProgress;
+        }
         const newNode = {
           ...node,
-          progress: segment.getCumulativeProgress() + nodeProgress,
+          progress: newProgress,
         };
         const gridNode = gridNodes.get(nodeKey);
         let isNew = false;

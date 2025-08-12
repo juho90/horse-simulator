@@ -1,7 +1,7 @@
 import { Horse } from "./horse";
 import { EPSILON } from "./raceMath";
-import { isProgressInFront, RacePathfinder } from "./racePathfinder";
 import { RaceSegmentNode } from "./raceSegment";
+import { isProgressInFront, RaceTrackNode } from "./raceTrackNode";
 
 export class RaceHorse {
   horseId: number;
@@ -48,14 +48,14 @@ export class RaceHorse {
 
   moveOnTrack(
     turn: number,
-    racePathfinder: RacePathfinder,
+    raceTrackNode: RaceTrackNode,
     others: RaceHorse[]
   ): void {
     const accel = Math.min(this.accel + 0.2, this.maxAccel);
     const speed = Math.min(this.speed + accel, this.maxSpeed);
     let remainingDistance = speed;
     do {
-      let nextPos = racePathfinder.findNextPosInPath(
+      let nextPos = raceTrackNode.findNextPosInPath(
         { x: this.x, y: this.y },
         this.progress,
         remainingDistance,
@@ -67,7 +67,7 @@ export class RaceHorse {
         this.raceLane = nextPos.startNode.lane;
         if (1 < nextPos.progress) {
           // todo: debug delete
-          let nextPos = racePathfinder.findNextPosInPath(
+          let nextPos = raceTrackNode.findNextPosInPath(
             { x: this.x, y: this.y },
             this.progress,
             remainingDistance,
@@ -78,14 +78,14 @@ export class RaceHorse {
         this.progress = nextPos.progress;
         remainingDistance -= nextPos.moveDistance;
       } else {
-        const path = racePathfinder.findPath(this, others);
+        const path = raceTrackNode.findPath(this, others);
         if (!path || !path.length) {
           throw new Error("No valid path found");
         }
         this.path = path;
         // todo: debug delete
         if (isProgressInFront(this.progress, path[0].progress)) {
-          const path = racePathfinder.findPath(this, others);
+          const path = raceTrackNode.findPath(this, others);
         }
       }
       if (1 < this.progress) {

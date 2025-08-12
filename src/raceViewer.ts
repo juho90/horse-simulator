@@ -2,8 +2,8 @@ import * as child_process from "child_process";
 import * as fs from "fs";
 import { RaceCorner } from "./raceCorner";
 import { LerpAngle, Vector2D } from "./raceMath";
-import { RacePathfinder } from "./racePathfinder";
-import { RaceTrack } from "./raceTrack";
+import { calcTrackBounds, RaceTrack } from "./raceTrack";
+import { RaceTrackNode } from "./raceTrackNode";
 
 export interface HorseTurnState {
   id: number;
@@ -23,40 +23,13 @@ export interface RaceLog {
 }
 
 export function generateRaceWebGLHtml(
-  track: RaceTrack,
-  pathfinder: RacePathfinder,
+  raceTrack: RaceTrack,
+  racePathfinder: RaceTrackNode,
   logs: RaceLog[],
   intervalMs: number = 200
 ): string {
-  const segments = track.segments;
-  const marginX = 160;
-  const marginY = 60;
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minY = Infinity;
-  let maxY = -Infinity;
-  segments.forEach((seg) => {
-    const b = seg.getBounds();
-    if (b.minX < minX) {
-      minX = b.minX;
-    }
-    if (b.maxX > maxX) {
-      maxX = b.maxX;
-    }
-    if (b.minY < minY) {
-      minY = b.minY;
-    }
-    if (b.maxY > maxY) {
-      maxY = b.maxY;
-    }
-  });
-  const trackWidth = 160;
-  minX -= trackWidth + marginX;
-  maxX += trackWidth + marginX;
-  minY -= trackWidth + marginY;
-  maxY += trackWidth + marginY;
-  const width = maxX - minX;
-  const height = maxY - minY;
+  const segments = raceTrack.segments;
+  const { minX, minY, width, height } = calcTrackBounds(raceTrack, 160, 60);
   const horseColors = [
     "#e74c3c",
     "#3498db",
@@ -100,7 +73,7 @@ export function generateRaceWebGLHtml(
     color: "#000000",
   });
   const sampleNodes: { x: number; y: number }[] = [];
-  const nodes = pathfinder.nodes;
+  const nodes = racePathfinder.nodes;
   for (const prNodes of nodes.values()) {
     for (const laNodes of prNodes) {
       for (const node of laNodes) {
@@ -111,7 +84,7 @@ export function generateRaceWebGLHtml(
       }
     }
   }
-  const goalPosition = track.getGoalPosition();
+  const goalPosition = raceTrack.getGoalPosition();
   const js = `
     const logs = ${JSON.stringify(logs)};
     const trackPoints = ${JSON.stringify(

@@ -56,7 +56,7 @@ export abstract class RaceSegment {
   abstract getTangentDirectionAt(pos: Vector2D): number;
   abstract getEndTangentDirection(): number;
   abstract getOrthoVectorAt(pos: Vector2D): Vector2D;
-  abstract getSampleNodes(
+  abstract getNodes(
     trackWidth: number,
     resolution: number,
     padding: number

@@ -1,11 +1,11 @@
 import { RaceHorse } from "./raceHorse";
-import { RacePathfinder } from "./racePathfinder";
 import { RaceTrack } from "./raceTrack";
+import { RaceTrackNode } from "./raceTrackNode";
 import { HorseTurnState, RaceLog } from "./raceViewer";
 
 export function runRaceSimulator(
   track: RaceTrack,
-  pathfinder: RacePathfinder,
+  pathfinder: RaceTrackNode,
   horses: RaceHorse[]
 ): RaceLog[] {
   const logs: RaceLog[] = [];
