@@ -1,45 +1,116 @@
-import { RaceCorner } from "./raceCorner";
-import { RaceHorse } from "./raceHorse";
-import {
-  Distance,
-  DistanceArc,
-  EPSILON,
-  Lerp,
-  LerpNumber,
-  Vector2D,
-} from "./raceMath";
-import { RaceSegmentNode, SegmentType, TRACK_WIDTH } from "./raceSegment";
+import { Distance, EPSILON } from "./raceMath";
+import { RaceSegmentNode } from "./raceSegment";
 import { RaceTrack } from "./raceTrack";
 
-export interface NextPos {
-  startNode: RaceSegmentNode;
-  endNode: RaceSegmentNode | null;
-  pos: Vector2D;
-  progress: number;
-  moveDistance: number;
-}
-
 export class RaceTrackNode {
-  track: RaceTrack;
-  nodeResolution: number;
-  trackPadding: number;
-  nodes: RaceSegmentNode[][][];
+  private progressResolution: number;
+  private gridNodes: Map<string, RaceSegmentNode[]>;
+  private segmentNodes: Map<number, RaceSegmentNode[][]>;
+  private allNodes: RaceSegmentNode[][][];
 
   constructor(
     track: RaceTrack,
-    nodeResolution: number = 15,
-    trackPadding: number = 10
+    trackWidth: number,
+    trackPadding: number,
+    nodeResolution: number,
+    progressResolution: number = 10,
+    gridResolution: number = 150
   ) {
-    this.track = track;
-    this.nodeResolution = nodeResolution;
-    this.trackPadding = trackPadding;
-    this.nodes = createNodes(track, TRACK_WIDTH, nodeResolution, trackPadding);
+    this.progressResolution = progressResolution;
+    const gridNodes = new Map<string, RaceSegmentNode[]>();
+    const segmentNodes = new Map<number, RaceSegmentNode[][]>();
+    const allNodes: RaceSegmentNode[][][] = Array.from(
+      { length: progressResolution },
+      () => []
+    );
+    for (const segment of track.segments) {
+      const newNodes: RaceSegmentNode[][] = [];
+      const sampleNodes = segment.getNodes(
+        trackWidth,
+        nodeResolution,
+        trackPadding
+      );
+      const segmentLength = segment.length;
+      const segmentProgress = segmentLength / track.trackLength;
+      let laIndex = 0;
+      for (
+        let lane = trackPadding;
+        lane <= trackWidth - trackPadding;
+        lane += nodeResolution
+      ) {
+        const laNodes = sampleNodes[laIndex];
+        for (const node of laNodes) {
+          const nodeKey = gridKey(node.x, node.y, gridResolution);
+          const nodeProgress = node.progress * segmentProgress;
+          const newProgress = segment.getCumulativeProgress() + nodeProgress;
+          const newNode = {
+            ...node,
+            progress: newProgress,
+          };
+          const gridNode = gridNodes.get(nodeKey);
+          let isNew = false;
+          if (!gridNode) {
+            gridNodes.set(nodeKey, [newNode]);
+            isNew = true;
+          } else {
+            if (hasNearbyNode(gridNode, newNode, nodeResolution)) {
+              continue;
+            }
+            gridNode.push(newNode);
+            isNew = true;
+          }
+          if (isNew) {
+            let laNodes = newNodes[laIndex];
+            if (!laNodes) {
+              laNodes = newNodes[laIndex] = [];
+            }
+            laNodes.push(newNode);
+          }
+          if (isNew) {
+            const prIndex = this.progressIndex(newNode.progress);
+            let prNodes = allNodes[prIndex];
+            if (!prNodes) {
+              prNodes = allNodes[prIndex] = [];
+            }
+            let laNodes = prNodes[laIndex];
+            if (!laNodes) {
+              laNodes = prNodes[laIndex] = [];
+            }
+            laNodes.push(newNode);
+          }
+        }
+        laIndex++;
+      }
+      segmentNodes.set(segment.segmentIndex, newNodes);
+    }
+    this.gridNodes = gridNodes;
+    this.segmentNodes = segmentNodes;
+    this.allNodes = allNodes;
+  }
+
+  getNodes(): RaceSegmentNode[][][] {
+    return this.allNodes;
+  }
+
+  getProgressNodes(prIndex: number) {
+    if (prIndex < 0 || this.progressResolution <= prIndex) {
+      throw new Error(`Progress index out of bounds: ${prIndex}`);
+    }
+    return this.allNodes[prIndex];
+  }
+
+  getLaneNodes(prIndex: number, laneIndex: number) {
+    const prNodes = this.getProgressNodes(prIndex);
+    if (laneIndex < 0 || prNodes.length <= laneIndex) {
+      throw new Error(`Lane index out of bounds: ${laneIndex}`);
+    }
+    return prNodes[laneIndex];
   }
 
   getGateNodes(): RaceSegmentNode[] {
     const gateNodes: RaceSegmentNode[] = [];
     const prIndex = 0;
-    const prNodes = this.nodes[prIndex];
+    const prNodes = this.allNodes[prIndex];
     for (const laNodes of prNodes) {
       const firstNode = laNodes[0];
       if (EPSILON < firstNode.progress) {
@@ -50,83 +121,14 @@ export class RaceTrackNode {
     return gateNodes;
   }
 
-  findNextPosInPath(
-    pos: Vector2D,
-    progress: number,
-    remaining: number,
-    path: RaceSegmentNode[]
-  ): NextPos | null {
-    let startNode: RaceSegmentNode = path[0];
-    let endNode: RaceSegmentNode | null = null;
-    let newPos = pos;
-    let newProgress = progress;
-    let moveDistance = 0;
-    if (path.length < 2) {
-      return null;
-    }
-    let nextIndex = findNearestIndexInPath(path, progress);
-    if (nextIndex === null) {
-      return null;
-    }
-    startNode = path[nextIndex - 1];
-    endNode = path[nextIndex];
-    if (!startNode || !endNode) {
-      throw new Error("Start or end node is null");
-    }
-    const startProgress = startNode.progress;
-    let endProgress = endNode.progress;
-    if (endProgress < startProgress) {
-      endProgress += 1;
-    }
-    const segment = this.track.getSegment(startNode.segmentIndex);
-    if (segment.type === SegmentType.LINE) {
-      const nodeDistance = Distance(startNode, endNode);
-      const currDistance = Distance(startNode, pos);
-      const ratio = Math.min(1, (currDistance + remaining) / nodeDistance);
-      newPos = Lerp(startNode, endNode, ratio);
-      moveDistance = nodeDistance * ratio - currDistance;
-      newProgress = LerpNumber(startProgress, endProgress, ratio);
-    } else {
-      const center = (segment as RaceCorner).center;
-      const { arcDistance: currDistance } = DistanceArc(startNode, pos, center);
-      const { radius, startAngle, angle, arcDistance } = DistanceArc(
-        startNode,
-        endNode,
-        center
-      );
-      const ratio = Math.min(1, (currDistance + remaining) / arcDistance);
-      const newAngle = startAngle + angle * ratio;
-      newPos = {
-        x: center.x + radius * Math.cos(newAngle),
-        y: center.y + radius * Math.sin(newAngle),
-      };
-      moveDistance = arcDistance * ratio - currDistance;
-      newProgress = LerpNumber(startProgress, endProgress, ratio);
-    }
-    return {
-      startNode,
-      endNode,
-      pos: newPos,
-      progress: newProgress,
-      moveDistance,
-    };
-  }
-
-  findPath(horse: RaceHorse, others: RaceHorse[]): RaceSegmentNode[] | null {
-    const startNode = this.findStartNode(horse);
-    if (!startNode) {
-      return null;
-    }
-    return this.raceAStar(startNode, horse, others);
-  }
-
-  findStartNode(horse: RaceHorse): RaceSegmentNode | null {
+  findPrevNode(lane: number, progress: number): RaceSegmentNode | null {
     let startNode: RaceSegmentNode | null = null;
-    const nodeSections = findNodeSections(horse.progress, this.nodes.length);
-    for (const prIndex of nodeSections) {
-      const prNodes = this.nodes[prIndex];
-      const laNodes = prNodes[horse.raceLane];
-      let firstIndex = findNearestIndexInPath(laNodes, horse.progress);
+    const prIndex = this.progressIndex(progress);
+    const prPostIndex = this.progressNextIndex(prIndex);
+    const prIndices = [prIndex, prPostIndex];
+    for (const prIndex of prIndices) {
+      const laNodes = this.getLaneNodes(prIndex, lane);
+      let firstIndex = findNearestIndexInPath(laNodes, progress);
       if (firstIndex === null) {
         firstIndex = laNodes.length - 1;
       } else {
@@ -136,11 +138,11 @@ export class RaceTrackNode {
       }
       const firstNode = laNodes[firstIndex];
       if (startNode) {
-        const horseCheck = checkProgress(horse.progress, firstNode.progress);
+        const horseCheck = compareProgress(progress, firstNode.progress);
         if (0 < horseCheck) {
           continue;
         }
-        const startCheck = checkProgress(
+        const startCheck = compareProgress(
           startNode.progress,
           firstNode.progress
         );
@@ -154,43 +156,12 @@ export class RaceTrackNode {
     return startNode;
   }
 
-  private raceAStar(
-    startNode: RaceSegmentNode,
-    horse: RaceHorse,
-    others: RaceHorse[],
-    pathLength = 10
-  ): RaceSegmentNode[] | null {
-    const path: RaceSegmentNode[] = [startNode];
-    let currentNode = startNode;
-    for (let pIndex = 0; pIndex < pathLength; pIndex++) {
-      const node = this.findNextNode(currentNode, horse, others);
-      if (!node) {
-        break;
-      }
-      path.push(node);
-      currentNode = node;
-    }
-    return path;
-  }
-
-  private findNextNode(
-    startNode: RaceSegmentNode,
-    horse: RaceHorse,
-    others: RaceHorse[]
-  ): RaceSegmentNode | null {
-    let progress = startNode.progress;
-    let lane = this.findBestLane(
-      startNode.progress,
-      startNode.lane,
-      horse,
-      others
-    );
-    const prIndex = progressIndex(progress, this.nodes.length);
-    const prPostIndex = (prIndex + 1) % this.nodes.length;
+  findPostNode(lane: number, progress: number): RaceSegmentNode | null {
+    const prIndex = this.progressIndex(progress);
+    const prPostIndex = this.progressNextIndex(prIndex);
     const prIndices = [prIndex, prPostIndex];
     for (const prIndex of prIndices) {
-      const prNodes = this.nodes[prIndex];
-      const laNodes = prNodes[lane];
+      const laNodes = this.getLaneNodes(prIndex, lane);
       const laNodeIndex = findNearestIndexInPath(laNodes, progress);
       if (laNodeIndex !== null) {
         return laNodes[laNodeIndex];
@@ -199,125 +170,23 @@ export class RaceTrackNode {
     return null;
   }
 
-  private findBestLane(
-    progress: number,
-    lane: number,
-    horse: RaceHorse,
-    others: RaceHorse[]
-  ): number {
-    if (this.isLaneSafe(progress, lane, horse, others)) {
-      return lane;
+  progressIndex(progress: number): number {
+    const prIndex = Math.min(9, Math.floor(progress * this.progressResolution));
+    if (prIndex < 0 || this.progressResolution <= prIndex) {
+      throw new Error(`Progress index out of bounds: ${prIndex}`);
     }
-    const prIndex = progressIndex(progress, this.nodes.length);
-    const prNodes = this.nodes[prIndex];
-    for (let offset = 1; offset <= 4; offset++) {
-      const rightLaIndex = lane + offset;
-      if (rightLaIndex < 0 || prNodes.length <= rightLaIndex) {
-        if (this.isLaneSafe(progress, rightLaIndex, horse, others)) {
-          return rightLaIndex;
-        }
-      }
-      const leftLaIndex = lane - offset;
-      if (leftLaIndex < 0 || prNodes.length <= leftLaIndex) {
-        if (this.isLaneSafe(progress, leftLaIndex, horse, others)) {
-          return leftLaIndex;
-        }
-      }
-    }
-    return lane;
+    return prIndex;
   }
 
-  private isLaneSafe(
-    progress: number,
-    lane: number,
-    horse: RaceHorse,
-    others: RaceHorse[]
-  ): boolean {
-    for (const other of others) {
-      if (horse.horseId === other.horseId) {
-        continue;
-      }
-      if (lane !== other.raceLane) {
-        continue;
-      }
-      const comparison = checkProgress(progress, other.progress);
-      if (comparison !== 1) {
-        continue;
-      }
-      // todo: check distance
+  progressNextIndex(prIndex: number): number {
+    if (prIndex < 0 || this.progressResolution <= prIndex) {
+      throw new Error(`Progress index out of bounds: ${prIndex}`);
     }
-    return true;
+    return (prIndex + 1) % this.progressResolution;
   }
 }
 
-export function createNodes(
-  track: RaceTrack,
-  trackWidth: number,
-  nodeResolution: number,
-  trackPadding: number,
-  gridResolution: number = 150,
-  progressResolution: number = 10
-): RaceSegmentNode[][][] {
-  const gridNodes = new Map<string, RaceSegmentNode[]>();
-  const nodes: RaceSegmentNode[][][] = Array.from(
-    { length: progressResolution },
-    () => []
-  );
-  for (const segment of track.segments) {
-    const segmentNodes = segment.getNodes(
-      trackWidth,
-      nodeResolution,
-      trackPadding
-    );
-    const segmentLength = segment.length;
-    const segmentProgress = segmentLength / track.trackLength;
-    let laIndex = 0;
-    for (
-      let lane = trackPadding;
-      lane <= trackWidth - trackPadding;
-      lane += nodeResolution
-    ) {
-      const laNodes = segmentNodes[laIndex];
-      for (const node of laNodes) {
-        const nodeKey = gridKey(node.x, node.y, gridResolution);
-        const nodeProgress = node.progress * segmentProgress;
-        const newProgress = segment.getCumulativeProgress() + nodeProgress;
-        const newNode = {
-          ...node,
-          progress: newProgress,
-        };
-        const gridNode = gridNodes.get(nodeKey);
-        let isNew = false;
-        if (!gridNode) {
-          gridNodes.set(nodeKey, [newNode]);
-          isNew = true;
-        } else {
-          if (hasNearbyNode(gridNode, newNode, nodeResolution)) {
-            continue;
-          }
-          gridNode.push(newNode);
-          isNew = true;
-        }
-        if (isNew) {
-          const prIndex = progressIndex(newNode.progress, progressResolution);
-          let prNodes = nodes[prIndex];
-          if (!prNodes) {
-            prNodes = nodes[prIndex] = [];
-          }
-          let laNodes = prNodes[laIndex];
-          if (!laNodes) {
-            laNodes = prNodes[laIndex] = [];
-          }
-          laNodes.push(newNode);
-        }
-      }
-      laIndex++;
-    }
-  }
-  return nodes;
-}
-
-export function hasNearbyNode(
+function hasNearbyNode(
   gridNode: RaceSegmentNode[],
   node: RaceSegmentNode,
   nodeResolution: number
@@ -337,21 +206,7 @@ function gridKey(x: number, y: number, nodeResolution: number): string {
   return `${gx},${gy}`;
 }
 
-function findNodeSections(progress: number, length: number): number[] {
-  const prIndex = progressIndex(progress, length);
-  const nextPrIndex = (prIndex + 1) % length;
-  return [prIndex, nextPrIndex];
-}
-
-function progressIndex(progress: number, length: number): number {
-  const prIndex = Math.min(9, Math.floor(progress * length));
-  if (prIndex < 0 || length <= prIndex) {
-    throw new Error(`Progress index out of bounds: ${prIndex}`);
-  }
-  return prIndex;
-}
-
-export function checkProgress(from: number, to: number): number {
+export function compareProgress(from: number, to: number): number {
   const diff = Math.abs(to - from);
   if (diff < EPSILON) {
     return 0;
@@ -368,7 +223,7 @@ export function checkProgress(from: number, to: number): number {
   }
 }
 
-function findNearestIndexInPath(
+export function findNearestIndexInPath(
   path: RaceSegmentNode[],
   progress: number
 ): number | null {
@@ -381,7 +236,7 @@ function findNearestIndexInPath(
   while (left <= right) {
     const mid = Math.floor((left + right) / 2);
     const midNode = path[mid];
-    const comparison = checkProgress(progress, midNode.progress);
+    const comparison = compareProgress(progress, midNode.progress);
     if (comparison === 1) {
       index = mid;
       right = mid - 1;

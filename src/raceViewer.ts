@@ -2,8 +2,8 @@ import * as child_process from "child_process";
 import * as fs from "fs";
 import { RaceCorner } from "./raceCorner";
 import { LerpAngle, Vector2D } from "./raceMath";
-import { calcTrackBounds, RaceTrack } from "./raceTrack";
-import { RaceTrackNode } from "./raceTrackNode";
+import { RaceTrack } from "./raceTrack";
+import { RaceTracker } from "./raceTracker";
 
 export interface HorseTurnState {
   id: number;
@@ -24,12 +24,12 @@ export interface RaceLog {
 
 export function generateRaceWebGLHtml(
   raceTrack: RaceTrack,
-  racePathfinder: RaceTrackNode,
+  raceTracker: RaceTracker,
   logs: RaceLog[],
   intervalMs: number = 50
 ): string {
   const segments = raceTrack.segments;
-  const { minX, minY, width, height } = calcTrackBounds(raceTrack, 160, 60);
+  const { minX, minY, width, height } = raceTrack.calcTrackBounds(160, 60);
   const horseColors = [
     "#e74c3c",
     "#3498db",
@@ -73,7 +73,7 @@ export function generateRaceWebGLHtml(
     color: "#000000",
   });
   const sampleNodes: { x: number; y: number }[] = [];
-  const nodes = racePathfinder.nodes;
+  const nodes = raceTracker.getNodes();
   for (const prNodes of nodes.values()) {
     for (const laNodes of prNodes) {
       for (const node of laNodes) {

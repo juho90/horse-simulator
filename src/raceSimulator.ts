@@ -1,11 +1,9 @@
 import { RaceHorse } from "./raceHorse";
-import { RaceTrack } from "./raceTrack";
-import { RaceTrackNode } from "./raceTrackNode";
+import { RaceTracker } from "./raceTracker";
 import { HorseTurnState, RaceLog } from "./raceViewer";
 
 export function runRaceSimulator(
-  track: RaceTrack,
-  pathfinder: RaceTrackNode,
+  raceTracker: RaceTracker,
   horses: RaceHorse[]
 ): RaceLog[] {
   const logs: RaceLog[] = [];
@@ -17,7 +15,7 @@ export function runRaceSimulator(
     for (; index < horses.length; index++) {
       const horse = horses[index];
       if (!horse.finished) {
-        horse.moveOnTrack(turn, pathfinder, horses);
+        horse.moveOnTrack(turn, raceTracker, horses);
       }
       const horseState = {
         id: horse.horseId,

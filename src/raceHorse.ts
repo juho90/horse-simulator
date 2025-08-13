@@ -1,7 +1,7 @@
 import { Horse } from "./horse";
 import { EPSILON } from "./raceMath";
 import { RaceSegmentNode } from "./raceSegment";
-import { RaceTrackNode } from "./raceTrackNode";
+import { RaceTracker } from "./raceTracker";
 
 export class RaceHorse {
   horseId: number;
@@ -48,7 +48,7 @@ export class RaceHorse {
 
   moveOnTrack(
     turn: number,
-    raceTrackNode: RaceTrackNode,
+    raceTrackNode: RaceTracker,
     others: RaceHorse[]
   ): void {
     const accel = Math.min(this.accel + 0.2, this.maxAccel);

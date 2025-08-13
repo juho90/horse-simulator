@@ -84,7 +84,7 @@ export class Horse {
 export function createSampleHorses(): Horse[] {
   return [
     new Horse(1, "번개", {
-      strength: 95, // 매우 높은 힘 - 최고속도 우수
+      strength: 55, // 매우 높은 힘 - 최고속도 우수
       endurance: 70, // 평균 지구력 - 보통 스태미나
       agility: 85, // 높은 민첩성 - 빠른 가속과 코너링
       intelligence: 75, // 평균 이상 지능 - 좋은 판단력

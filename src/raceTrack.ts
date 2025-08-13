@@ -98,6 +98,47 @@ export class RaceTrack {
       };
     }
   }
+
+  calcTrackBounds(
+    marginX: number,
+    marginY: number
+  ): {
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+    width: number;
+    height: number;
+  } {
+    const segments = this.segments;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    segments.forEach((seg) => {
+      const b = seg.getBounds();
+      if (b.minX < minX) {
+        minX = b.minX;
+      }
+      if (b.maxX > maxX) {
+        maxX = b.maxX;
+      }
+      if (b.minY < minY) {
+        minY = b.minY;
+      }
+      if (b.maxY > maxY) {
+        maxY = b.maxY;
+      }
+    });
+    const trackWidth = 160;
+    minX -= trackWidth + marginX;
+    maxX += trackWidth + marginX;
+    minY -= trackWidth + marginY;
+    maxY += trackWidth + marginY;
+    const width = maxX - minX;
+    const height = maxY - minY;
+    return { minX, maxX, minY, maxY, width, height };
+  }
 }
 
 export function createTrack(segmentCount: number): RaceTrack {
@@ -144,46 +185,4 @@ export function convertTrackForRace(raceTrack: {
     }
   }
   return new RaceTrack(raceTrack.width, raceTrack.height, raceSegments);
-}
-
-export function calcTrackBounds(
-  raceTrack: RaceTrack,
-  marginX: number,
-  marginY: number
-): {
-  minX: number;
-  maxX: number;
-  minY: number;
-  maxY: number;
-  width: number;
-  height: number;
-} {
-  const segments = raceTrack.segments;
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minY = Infinity;
-  let maxY = -Infinity;
-  segments.forEach((seg) => {
-    const b = seg.getBounds();
-    if (b.minX < minX) {
-      minX = b.minX;
-    }
-    if (b.maxX > maxX) {
-      maxX = b.maxX;
-    }
-    if (b.minY < minY) {
-      minY = b.minY;
-    }
-    if (b.maxY > maxY) {
-      maxY = b.maxY;
-    }
-  });
-  const trackWidth = 160;
-  minX -= trackWidth + marginX;
-  maxX += trackWidth + marginX;
-  minY -= trackWidth + marginY;
-  maxY += trackWidth + marginY;
-  const width = maxX - minX;
-  const height = maxY - minY;
-  return { minX, maxX, minY, maxY, width, height };
 }
