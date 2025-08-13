@@ -7,6 +7,7 @@ export class RaceTrackNode {
   private gridNodes: Map<string, RaceSegmentNode[]>;
   private segmentNodes: Map<number, RaceSegmentNode[][]>;
   private allNodes: RaceSegmentNode[][][];
+  private laLength: number;
 
   constructor(
     track: RaceTrack,
@@ -17,13 +18,21 @@ export class RaceTrackNode {
     gridResolution: number = 150
   ) {
     this.progressResolution = progressResolution;
+    let laMaxIndex = 0;
+    for (
+      let lane = trackPadding;
+      lane <= trackWidth - trackPadding;
+      lane += nodeResolution
+    ) {
+      ++laMaxIndex;
+    }
     const gridNodes = new Map<string, RaceSegmentNode[]>();
     const segmentNodes = new Map<number, RaceSegmentNode[][]>();
     const allNodes: RaceSegmentNode[][][] = Array.from(
       { length: progressResolution },
       () => []
     );
-    for (const segment of track.segments) {
+    for (const segment of track.getSegments()) {
       const newNodes: RaceSegmentNode[][] = [];
       const sampleNodes = segment.getNodes(
         trackWidth,
@@ -31,13 +40,8 @@ export class RaceTrackNode {
         trackPadding
       );
       const segmentLength = segment.length;
-      const segmentProgress = segmentLength / track.trackLength;
-      let laIndex = 0;
-      for (
-        let lane = trackPadding;
-        lane <= trackWidth - trackPadding;
-        lane += nodeResolution
-      ) {
+      const segmentProgress = segmentLength / track.getTrackLength();
+      for (let laIndex = 0; laIndex < laMaxIndex; ++laIndex) {
         const laNodes = sampleNodes[laIndex];
         for (const node of laNodes) {
           const nodeKey = gridKey(node.x, node.y, gridResolution);
@@ -79,27 +83,31 @@ export class RaceTrackNode {
             laNodes.push(newNode);
           }
         }
-        laIndex++;
       }
       segmentNodes.set(segment.segmentIndex, newNodes);
     }
     this.gridNodes = gridNodes;
     this.segmentNodes = segmentNodes;
     this.allNodes = allNodes;
+    this.laLength = laMaxIndex;
+  }
+
+  getLaneLength(): number {
+    return this.laLength;
   }
 
   getNodes(): RaceSegmentNode[][][] {
     return this.allNodes;
   }
 
-  getProgressNodes(prIndex: number) {
+  getProgressNodes(prIndex: number): RaceSegmentNode[][] {
     if (prIndex < 0 || this.progressResolution <= prIndex) {
       throw new Error(`Progress index out of bounds: ${prIndex}`);
     }
     return this.allNodes[prIndex];
   }
 
-  getLaneNodes(prIndex: number, laneIndex: number) {
+  getLaneNodes(prIndex: number, laneIndex: number): RaceSegmentNode[] {
     const prNodes = this.getProgressNodes(prIndex);
     if (laneIndex < 0 || prNodes.length <= laneIndex) {
       throw new Error(`Lane index out of bounds: ${laneIndex}`);
@@ -183,6 +191,35 @@ export class RaceTrackNode {
       throw new Error(`Progress index out of bounds: ${prIndex}`);
     }
     return (prIndex + 1) % this.progressResolution;
+  }
+
+  getSegmentNodes(segmentIndex: number): RaceSegmentNode[][] {
+    const segmentNodes = this.segmentNodes.get(segmentIndex);
+    if (!segmentNodes) {
+      throw new Error(`Segment index out of bounds: ${segmentIndex}`);
+    }
+    return segmentNodes;
+  }
+
+  getSegmentLaneNodes(
+    segmentIndex: number,
+    laneIndex: number
+  ): RaceSegmentNode[] {
+    const segmentNodes = this.getSegmentNodes(segmentIndex);
+    if (laneIndex < 0 || segmentNodes.length <= laneIndex) {
+      throw new Error(`Lane index out of bounds: ${laneIndex}`);
+    }
+    return segmentNodes[laneIndex];
+  }
+
+  getSegmentGateNodes(segmentIndex: number): RaceSegmentNode[] {
+    const segmentNodes = this.getSegmentNodes(segmentIndex);
+    const gateNodes: RaceSegmentNode[] = [];
+    for (const laneNodes of segmentNodes) {
+      const firstNode = laneNodes[0];
+      gateNodes.push(firstNode);
+    }
+    return gateNodes;
   }
 }
 

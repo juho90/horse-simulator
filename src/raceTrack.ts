@@ -4,12 +4,12 @@ import { RaceSegment } from "./raceSegment";
 import { generateClosedTrackSegments } from "./raceTrackHelper";
 
 export class RaceTrack {
-  width: number;
-  height: number;
-  segments: RaceSegment[];
-  trackLength: number;
-  raceLength: number;
-  totalLaps: number;
+  private width: number;
+  private height: number;
+  private segments: RaceSegment[];
+  private trackLength: number;
+  private raceLength: number;
+  private totalLaps: number;
 
   constructor(
     width: number,
@@ -42,6 +42,25 @@ export class RaceTrack {
     this.totalLaps = totalLaps;
   }
 
+  getTrackLength(): number {
+    return this.trackLength;
+  }
+
+  getSegmentsLength(): number {
+    return this.segments.length;
+  }
+
+  getSegments(): RaceSegment[] {
+    return this.segments;
+  }
+
+  getSegment(index: number): RaceSegment {
+    if (index < 0 || this.segments.length <= index) {
+      throw new Error(`${index}번째 세그먼트 인덱스가 범위를 벗어났습니다.`);
+    }
+    return this.segments[index];
+  }
+
   getFirstSegment(): RaceSegment {
     if (this.segments.length === 0) {
       throw new Error("트랙에 세그먼트가 없습니다.");
@@ -54,13 +73,6 @@ export class RaceTrack {
       throw new Error("트랙에 세그먼트가 없습니다.");
     }
     return this.segments[this.segments.length - 1];
-  }
-
-  getSegment(index: number): RaceSegment {
-    if (index < 0 || index >= this.segments.length) {
-      throw new Error("세그먼트 인덱스가 범위를 벗어났습니다.");
-    }
-    return this.segments[index];
   }
 
   getGoalPosition(): { x: number; y: number } {

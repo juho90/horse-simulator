@@ -29,7 +29,7 @@ export class RaceTracker {
     this.raceTrack = raceTrack;
     this.trackPadding = trackPadding;
     this.nodeResolution = nodeResolution;
-    this.raceLaneStrategy = new RaceLaneStrategy(raceTrack);
+    this.raceLaneStrategy = new RaceLaneStrategy(raceTrack, this);
     this.raceTrackNode = new RaceTrackNode(
       raceTrack,
       TRACK_WIDTH,
@@ -38,12 +38,20 @@ export class RaceTracker {
     );
   }
 
+  getLaneLength(): number {
+    return this.raceTrackNode.getLaneLength();
+  }
+
   getNodes(): RaceSegmentNode[][][] {
     return this.raceTrackNode.getNodes();
   }
 
   getGateNodes(): RaceSegmentNode[] {
     return this.raceTrackNode.getGateNodes();
+  }
+
+  getSegmentNodes(segmentIndex: number): RaceSegmentNode[][] {
+    return this.raceTrackNode.getSegmentNodes(segmentIndex);
   }
 
   findNextPosInPath(

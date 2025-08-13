@@ -28,7 +28,7 @@ export function generateRaceWebGLHtml(
   logs: RaceLog[],
   intervalMs: number = 50
 ): string {
-  const segments = raceTrack.segments;
+  const segments = raceTrack.getSegments();
   const { minX, minY, width, height } = raceTrack.calcTrackBounds(160, 60);
   const horseColors = [
     "#e74c3c",
