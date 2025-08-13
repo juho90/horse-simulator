@@ -26,7 +26,7 @@ export function generateRaceWebGLHtml(
   raceTrack: RaceTrack,
   racePathfinder: RaceTrackNode,
   logs: RaceLog[],
-  intervalMs: number = 200
+  intervalMs: number = 50
 ): string {
   const segments = raceTrack.segments;
   const { minX, minY, width, height } = calcTrackBounds(raceTrack, 160, 60);
@@ -376,7 +376,7 @@ export function generateRaceWebGLHtml(
     <button id="next-btn">⏭</button>
     <span id="turn-info">1 / 1</span>
     <input type="range" id="turn-slider" min="0" max="0" value="0">
-    <label>속도: <input type="range" id="speed-slider" min="50" max="1000" value="200"></label>
+    <label>속도: <input type="range" id="speed-slider" min="50" max="1000"></label>
   </div>
   <div id="main-layout">
     <div id="canvas-wrap">
