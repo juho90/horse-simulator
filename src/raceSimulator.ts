@@ -26,7 +26,7 @@ export function runRaceSimulator(
         accel: horse.accel,
         stamina: horse.stamina,
         distance: horse.raceDistance,
-        pathPoints: horse.path?.map((p) => ({ x: p.x, y: p.y })),
+        pathPoints: [], // horse.path?.map((p) => ({ x: p.x, y: p.y })),
       } as HorseTurnState;
       horseStates[index] = horseState;
     }

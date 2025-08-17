@@ -2,6 +2,7 @@ import { RaceHorse } from "./raceHorse";
 import { Distance } from "./raceMath";
 import { RaceSegmentNode, SegmentType } from "./raceSegment";
 import { RaceTrack } from "./raceTrack";
+import { RaceTracker } from "./raceTracker";
 
 export enum LaneChangeReason {
   SAFETY_COLLISION_AVOIDANCE = "collision_avoidance",
@@ -21,9 +22,12 @@ export interface LaneChangeDecision {
 }
 
 export class RaceLaneStrategy {
-  track: RaceTrack;
-  constructor(track: RaceTrack) {
-    this.track = track;
+  private raceTrack: RaceTrack;
+  private raceTracker: RaceTracker;
+
+  constructor(raceTrack: RaceTrack, raceTracker: RaceTracker) {
+    this.raceTrack = raceTrack;
+    this.raceTracker = raceTracker;
   }
 
   decideLaneChange(
@@ -130,12 +134,32 @@ export class RaceLaneStrategy {
       }
       const distance = Distance(horse, other);
       if (distance < horse.speed) {
-        const safeLane =
-          horse.raceLane < 5 ? horse.raceLane + 1 : horse.raceLane - 1;
+        const safeLane = this.findSafestLane(horse, others);
         return { risk: true, safeLane };
       }
     }
     return { risk: false, safeLane: horse.raceLane };
+  }
+
+  private findSafestLane(horse: RaceHorse, others: RaceHorse[]): number {
+    const maxLanes = this.raceTracker.getLaneLength();
+    const candidates = [];
+
+    for (let offset = 1; offset <= 3; offset++) {
+      const leftLane = horse.raceLane - offset;
+      const rightLane = horse.raceLane + offset;
+
+      if (leftLane >= 0) candidates.push(leftLane);
+      if (rightLane < maxLanes) candidates.push(rightLane);
+    }
+
+    for (const lane of candidates) {
+      if (this.isLaneClearForMove(horse, lane, others)) {
+        return lane;
+      }
+    }
+
+    return horse.raceLane;
   }
 
   private checkPressureLevel(horse: RaceHorse, others: RaceHorse[]) {
@@ -150,9 +174,13 @@ export class RaceLaneStrategy {
       }
     }
     if (nearbyCount >= 3) {
+      const maxLanes = this.raceTracker.getLaneLength();
       const reliefLane =
-        horse.raceLane < 5 ? horse.raceLane + 2 : horse.raceLane - 2;
-      return { high: true, reliefLane: Math.max(0, Math.min(9, reliefLane)) };
+        horse.raceLane < maxLanes / 2 ? horse.raceLane + 2 : horse.raceLane - 2;
+      return {
+        high: true,
+        reliefLane: Math.max(0, Math.min(maxLanes - 1, reliefLane)),
+      };
     }
     return { high: false, reliefLane: horse.raceLane };
   }
@@ -163,9 +191,12 @@ export class RaceLaneStrategy {
     others: RaceHorse[]
   ) {
     const nextSegmentIndex =
-      (node.segmentIndex + 1) % this.track.segments.length;
-    const nextSegment = this.track.segments[nextSegmentIndex];
-    if (nextSegment.type === SegmentType.CORNER && horse.raceLane > 2) {
+      (node.segmentIndex + 1) % this.raceTrack.getSegmentsLength();
+    const nextSegment = this.raceTrack.getSegment(nextSegmentIndex);
+    const maxLanes = this.raceTracker.getLaneLength();
+    const midLane = Math.floor(maxLanes / 2);
+
+    if (nextSegment.type === SegmentType.CORNER && horse.raceLane > midLane) {
       const targetLane = Math.max(0, horse.raceLane - 2);
       return { shouldMove: true, targetLane };
     }
@@ -174,6 +205,7 @@ export class RaceLaneStrategy {
 
   private checkOvertakeChance(horse: RaceHorse, others: RaceHorse[]) {
     const overtakeDistance = horse.speed * 2.0;
+    const maxLanes = this.raceTracker.getLaneLength();
     for (const other of others) {
       if (horse.horseId === other.horseId) {
         continue;
@@ -183,11 +215,12 @@ export class RaceLaneStrategy {
       }
       const distance = Distance(horse, other);
       if (distance < overtakeDistance && horse.speed > other.speed * 1.1) {
+        const midLane = Math.floor(maxLanes / 2);
         const targetLane =
-          horse.raceLane > 5 ? horse.raceLane - 1 : horse.raceLane + 1;
+          horse.raceLane > midLane ? horse.raceLane - 1 : horse.raceLane + 1;
         return {
           possible: true,
-          targetLane: Math.max(0, Math.min(9, targetLane)),
+          targetLane: Math.max(0, Math.min(maxLanes - 1, targetLane)),
         };
       }
     }
@@ -200,12 +233,12 @@ export class RaceLaneStrategy {
       return { beneficial: false, targetLane: horse.raceLane };
     }
     const nextSegmentIndex =
-      (currentNode.segmentIndex + 1) % this.track.segments.length;
-    const nextSegment = this.track.segments[nextSegmentIndex];
+      (currentNode.segmentIndex + 1) % this.raceTrack.getSegmentsLength();
+    const nextSegment = this.raceTrack.getSegment(nextSegmentIndex);
     let bestLane = horse.raceLane;
     let shortestDistance = Infinity;
     let foundBetter = false;
-    for (let lane = 0; lane < 10; lane++) {
+    for (let lane = 0; lane < this.raceTracker.getLaneLength(); lane++) {
       if (Math.abs(lane - horse.raceLane) > 2) {
         continue;
       }
@@ -215,7 +248,7 @@ export class RaceLaneStrategy {
       const nextLaneDistance = this.calculateDistanceToNextSegment(
         horse,
         lane,
-        nextSegment
+        nextSegmentIndex
       );
       const laneChangeCost =
         Math.abs(lane - horse.raceLane) * horse.speed * 0.1;
@@ -233,12 +266,12 @@ export class RaceLaneStrategy {
   }
 
   private getCurrentNode(horse: RaceHorse): RaceSegmentNode | null {
-    for (let i = 0; i < this.track.segments.length; i++) {
-      const segment = this.track.segments[i];
+    for (let i = 0; i < this.raceTrack.getSegmentsLength(); i++) {
+      const segment = this.raceTrack.getSegment(i);
       const segmentProgress = horse.progress - segment.getCumulativeProgress();
       if (
         segmentProgress >= 0 &&
-        segmentProgress <= segment.length / this.track.trackLength
+        segmentProgress <= segment.length / this.raceTrack.getTrackLength()
       ) {
         return {
           segmentIndex: i,
@@ -255,13 +288,24 @@ export class RaceLaneStrategy {
   private calculateDistanceToNextSegment(
     horse: RaceHorse,
     targetLane: number,
-    nextSegment: any
+    nextSegmentIndex: number
   ): number {
-    const approxNextX = nextSegment.startPoint?.x || horse.x;
-    const approxNextY = nextSegment.startPoint?.y || horse.y;
-    const laneOffset = (targetLane - 5) * 15;
-    const targetX = approxNextX + laneOffset;
-    const targetY = approxNextY;
+    try {
+      const nextSegmentNodes =
+        this.raceTracker.getSegmentNodes(nextSegmentIndex);
+      if (
+        nextSegmentNodes &&
+        nextSegmentNodes[targetLane] &&
+        nextSegmentNodes[targetLane].length > 0
+      ) {
+        const firstNode = nextSegmentNodes[targetLane][0];
+        return Distance(horse, firstNode);
+      }
+    } catch (error) {}
+    const maxLanes = this.raceTracker.getLaneLength();
+    const laneOffset = (targetLane - Math.floor(maxLanes / 2)) * 15;
+    const targetX = horse.x + laneOffset;
+    const targetY = horse.y + 50;
     return Distance(horse, { x: targetX, y: targetY });
   }
 

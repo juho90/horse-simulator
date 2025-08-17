@@ -74,16 +74,17 @@ export function generateRaceWebGLHtml(
   });
   const sampleNodes: { x: number; y: number }[] = [];
   const nodes = raceTracker.getNodes();
-  for (const prNodes of nodes.values()) {
-    for (const laNodes of prNodes) {
-      for (const node of laNodes) {
-        sampleNodes.push({
-          x: node.x - minX,
-          y: node.y - minY,
-        });
-      }
-    }
-  }
+  // for debug
+  // for (const prNodes of nodes.values()) {
+  //   for (const laNodes of prNodes) {
+  //     for (const node of laNodes) {
+  //       sampleNodes.push({
+  //         x: node.x - minX,
+  //         y: node.y - minY,
+  //       });
+  //     }
+  //   }
+  // }
   const goalPosition = raceTrack.getGoalPosition();
   const js = `
     const logs = ${JSON.stringify(logs)};
