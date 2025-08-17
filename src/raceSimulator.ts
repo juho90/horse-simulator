@@ -18,15 +18,15 @@ export function runRaceSimulator(
         horse.moveOnTrack(turn, raceTracker, horses);
       }
       const horseState = {
-        id: horse.horseId,
-        name: horse.name,
+        id: horse.getHorseId(),
+        name: horse.getHorseName(),
         x: horse.x,
         y: horse.y,
-        speed: horse.speed,
-        accel: horse.accel,
-        stamina: horse.stamina,
+        speed: horse.getHorseSpeed(),
+        accel: horse.getHorseAccel(),
+        stamina: horse.getHorseStamina(),
         distance: horse.raceDistance,
-        pathPoints: [], // horse.path?.map((p) => ({ x: p.x, y: p.y })),
+        pathPoints: [], // for debug: horse.path?.map((p) => ({ x: p.x, y: p.y })),
       } as HorseTurnState;
       horseStates[index] = horseState;
     }

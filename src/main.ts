@@ -1,6 +1,6 @@
 import * as path from "path";
-import { createSampleHorses } from "./horse";
 import { RaceHorse } from "./raceHorse";
+import { createSampleHorses } from "./raceHorseStatus";
 import { RaceMonitor } from "./raceMonitor";
 import { runRaceSimulator } from "./raceSimulator";
 import { createTrack } from "./raceTrack";

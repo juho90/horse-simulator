@@ -1,20 +1,13 @@
-import { Horse } from "./horse";
+import { RaceHorseStatus } from "./raceHorseStatus";
 import { EPSILON } from "./raceMath";
 import { RaceSegmentNode } from "./raceSegment";
 import { RaceTracker } from "./raceTracker";
 
 export class RaceHorse {
-  horseId: number;
-  name: string;
-  maxSpeed: number;
-  maxAccel: number;
-  maxStamina: number;
-  staminaConsumption: number;
-  staminaRecovery: number;
-  reaction: number;
-  speed: number;
-  accel: number;
-  stamina: number;
+  private status: RaceHorseStatus;
+  private speed: number;
+  private accel: number;
+  private stamina: number;
   x: number;
   y: number;
   raceLane: number;
@@ -25,25 +18,38 @@ export class RaceHorse {
 
   path: RaceSegmentNode[] = [];
 
-  constructor(horse: Horse, gateNode: RaceSegmentNode) {
+  constructor(horse: RaceHorseStatus, gateNode: RaceSegmentNode) {
     if (EPSILON < gateNode.progress) {
       throw new Error("Gate node progress should be zero");
     }
-    this.horseId = horse.horseId;
-    this.name = horse.name;
-    this.maxSpeed = horse.calculateMaxSpeed();
-    this.maxAccel = horse.calculateMaxAcceleration();
-    this.maxStamina = horse.calculateMaxStamina();
-    this.staminaConsumption = horse.calculateStaminaConsumption();
-    this.staminaRecovery = horse.calculateStaminaRecovery();
-    this.reaction = horse.calculateReaction();
-    this.speed = 0;
-    this.accel = this.maxAccel;
-    this.stamina = this.maxStamina;
+    this.status = horse;
+    this.speed = horse.calculateStartSpeed();
+    this.accel = 0;
+    this.stamina = horse.calculateMaxStamina();
     this.x = gateNode.x;
     this.y = gateNode.y;
     this.raceLane = gateNode.lane;
     this.raceDistance = 0;
+  }
+
+  getHorseId(): number {
+    return this.status.horseId;
+  }
+
+  getHorseName(): string {
+    return this.status.name;
+  }
+
+  getHorseSpeed(): number {
+    return this.speed;
+  }
+
+  getHorseAccel(): number {
+    return this.accel;
+  }
+
+  getHorseStamina(): number {
+    return this.stamina;
   }
 
   moveOnTrack(
@@ -51,8 +57,11 @@ export class RaceHorse {
     raceTrackNode: RaceTracker,
     others: RaceHorse[]
   ): void {
-    const accel = Math.min(this.accel + 0.2, this.maxAccel);
-    const speed = Math.min(this.speed + accel, this.maxSpeed);
+    const maxSpeed = this.status.calculateMaxSpeed();
+    const maxAccel = this.status.calculateMaxAcceleration();
+    const addAccel = this.status.calculateAccelerationPerTurn();
+    const accel = Math.min(this.accel + addAccel, maxAccel);
+    const speed = Math.min(this.speed + accel, maxSpeed);
     let remainingDistance = speed;
     do {
       let nextPos = raceTrackNode.findNextPosInPath(

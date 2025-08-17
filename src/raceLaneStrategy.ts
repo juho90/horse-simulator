@@ -129,11 +129,11 @@ export class RaceLaneStrategy {
 
   private checkCollisionRisk(horse: RaceHorse, others: RaceHorse[]) {
     for (const other of others) {
-      if (horse.horseId === other.horseId) {
+      if (horse.getHorseId() === other.getHorseId()) {
         continue;
       }
       const distance = Distance(horse, other);
-      if (distance < horse.speed) {
+      if (distance < horse.getHorseSpeed()) {
         const safeLane = this.findSafestLane(horse, others);
         return { risk: true, safeLane };
       }
@@ -165,11 +165,11 @@ export class RaceLaneStrategy {
   private checkPressureLevel(horse: RaceHorse, others: RaceHorse[]) {
     let nearbyCount = 0;
     for (const other of others) {
-      if (horse.horseId === other.horseId) {
+      if (horse.getHorseId() === other.getHorseId()) {
         continue;
       }
       const distance = Distance(horse, other);
-      if (distance < horse.speed) {
+      if (distance < horse.getHorseSpeed()) {
         nearbyCount++;
       }
     }
@@ -204,17 +204,20 @@ export class RaceLaneStrategy {
   }
 
   private checkOvertakeChance(horse: RaceHorse, others: RaceHorse[]) {
-    const overtakeDistance = horse.speed * 2.0;
+    const overtakeDistance = horse.getHorseSpeed() * 2.0;
     const maxLanes = this.raceTracker.getLaneLength();
     for (const other of others) {
-      if (horse.horseId === other.horseId) {
+      if (horse.getHorseId() === other.getHorseId()) {
         continue;
       }
       if (other.raceLane !== horse.raceLane) {
         continue;
       }
       const distance = Distance(horse, other);
-      if (distance < overtakeDistance && horse.speed > other.speed * 1.1) {
+      if (
+        distance < overtakeDistance &&
+        horse.getHorseSpeed() > other.getHorseSpeed() * 1.1
+      ) {
         const midLane = Math.floor(maxLanes / 2);
         const targetLane =
           horse.raceLane > midLane ? horse.raceLane - 1 : horse.raceLane + 1;
@@ -251,7 +254,7 @@ export class RaceLaneStrategy {
         nextSegmentIndex
       );
       const laneChangeCost =
-        Math.abs(lane - horse.raceLane) * horse.speed * 0.1;
+        Math.abs(lane - horse.raceLane) * horse.getHorseSpeed() * 0.1;
       const totalCost = nextLaneDistance + laneChangeCost;
       if (totalCost < shortestDistance) {
         shortestDistance = totalCost;
@@ -315,14 +318,14 @@ export class RaceLaneStrategy {
     others: RaceHorse[]
   ): boolean {
     for (const other of others) {
-      if (horse.horseId === other.horseId) {
+      if (horse.getHorseId() === other.getHorseId()) {
         continue;
       }
       if (other.raceLane !== targetLane) {
         continue;
       }
       const distance = Distance(horse, other);
-      if (distance < horse.speed) {
+      if (distance < horse.getHorseSpeed()) {
         return false;
       }
     }

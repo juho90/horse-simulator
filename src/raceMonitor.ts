@@ -1,5 +1,5 @@
 import * as fs from "fs";
-import { convertHorsesForRace, Horse } from "./horse";
+import { convertHorsesForRace, RaceHorseStatus } from "./raceHorseStatus";
 import { convertTrackForRace, RaceTrack } from "./raceTrack";
 
 export class RaceMonitor {
@@ -15,7 +15,7 @@ export class RaceMonitor {
 
   async saveInitialRaceState(
     track: RaceTrack,
-    horses: Horse[],
+    horses: RaceHorseStatus[],
     filename = "race-initial-state.json"
   ): Promise<void> {
     const initialState = {
@@ -31,7 +31,7 @@ export class RaceMonitor {
 
   async loadInitialRaceState(
     filename = "race-initial-state.json"
-  ): Promise<{ track: RaceTrack; horses: Horse[] }> {
+  ): Promise<{ track: RaceTrack; horses: RaceHorseStatus[] }> {
     const data = await fs.promises.readFile(filename, "utf-8");
     const initialState = JSON.parse(data);
     const track = convertTrackForRace(initialState.track);
