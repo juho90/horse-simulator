@@ -143,22 +143,22 @@ export class RaceLaneStrategy {
 
   private findSafestLane(horse: RaceHorse, others: RaceHorse[]): number {
     const maxLanes = this.raceTracker.getLaneLength();
-    const candidates = [];
-
+    const candidates: number[] = [];
     for (let offset = 1; offset <= 3; offset++) {
       const leftLane = horse.raceLane - offset;
       const rightLane = horse.raceLane + offset;
-
-      if (leftLane >= 0) candidates.push(leftLane);
-      if (rightLane < maxLanes) candidates.push(rightLane);
+      if (leftLane >= 0) {
+        candidates.push(leftLane);
+      }
+      if (rightLane < maxLanes) {
+        candidates.push(rightLane);
+      }
     }
-
     for (const lane of candidates) {
       if (this.isLaneClearForMove(horse, lane, others)) {
         return lane;
       }
     }
-
     return horse.raceLane;
   }
 
