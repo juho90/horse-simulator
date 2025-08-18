@@ -1,14 +1,7 @@
-export enum RunningStyle {
-  FRONT_RUNNER = "선행마",
-  STALKER = "선입마",
-  CLOSER = "추입마",
-  VERSATILE = "자유마",
-}
-
 export class RaceHorseStatus {
   horseId: number;
   name: string;
-  runningStyle: RunningStyle;
+  runningStyle: "FRONT_RUNNER" | "STALKER" | "CLOSER" | "VERSATILE";
   strength: number;
   endurance: number;
   agility: number;
@@ -18,7 +11,7 @@ export class RaceHorseStatus {
   constructor(
     horseId: number,
     name: string,
-    runningStyle: RunningStyle,
+    runningStyle: "FRONT_RUNNER" | "STALKER" | "CLOSER" | "VERSATILE",
     stats: {
       strength: number;
       endurance: number;
@@ -42,16 +35,16 @@ export class RaceHorseStatus {
     const startAccelRange = 0.2;
     let runningStyleModifier = 1.0;
     switch (this.runningStyle) {
-      case RunningStyle.FRONT_RUNNER:
+      case "FRONT_RUNNER":
         runningStyleModifier = 1.3;
         break;
-      case RunningStyle.STALKER:
+      case "STALKER":
         runningStyleModifier = 1.1;
         break;
-      case RunningStyle.CLOSER:
+      case "CLOSER":
         runningStyleModifier = 0.8;
         break;
-      case RunningStyle.VERSATILE:
+      case "VERSATILE":
         runningStyleModifier = 1.0;
         break;
     }
@@ -90,16 +83,16 @@ export class RaceHorseStatus {
     const maxSpeed = this.calculateMaxSpeed();
     let runningStyleModifier = 1.0;
     switch (this.runningStyle) {
-      case RunningStyle.FRONT_RUNNER:
+      case "FRONT_RUNNER":
         runningStyleModifier = 1.1;
         break;
-      case RunningStyle.STALKER:
+      case "STALKER":
         runningStyleModifier = 1.3;
         break;
-      case RunningStyle.CLOSER:
+      case "CLOSER":
         runningStyleModifier = 1.5;
         break;
-      case RunningStyle.VERSATILE:
+      case "VERSATILE":
         runningStyleModifier = 1.1;
         break;
     }
@@ -110,16 +103,16 @@ export class RaceHorseStatus {
     const maxAccel = this.calculateStartAccel();
     let runningStyleModifier = 1.0;
     switch (this.runningStyle) {
-      case RunningStyle.FRONT_RUNNER:
+      case "FRONT_RUNNER":
         runningStyleModifier = 0.05;
         break;
-      case RunningStyle.STALKER:
+      case "STALKER":
         runningStyleModifier = 0.08;
         break;
-      case RunningStyle.CLOSER:
+      case "CLOSER":
         runningStyleModifier = 0.11;
         break;
-      case RunningStyle.VERSATILE:
+      case "VERSATILE":
         runningStyleModifier = 0.05;
         break;
     }
@@ -129,42 +122,42 @@ export class RaceHorseStatus {
 
 export function createSampleHorses(): RaceHorseStatus[] {
   return [
-    new RaceHorseStatus(1, "번개", RunningStyle.FRONT_RUNNER, {
+    new RaceHorseStatus(1, "번개", "FRONT_RUNNER", {
       strength: 75,
       endurance: 70,
       agility: 85,
       intelligence: 75,
       spirit: 80,
     }),
-    new RaceHorseStatus(2, "지구력왕", RunningStyle.STALKER, {
+    new RaceHorseStatus(2, "지구력왕", "STALKER", {
       strength: 80,
       endurance: 95,
       agility: 85,
       intelligence: 85,
       spirit: 90,
     }),
-    new RaceHorseStatus(3, "민첩이", RunningStyle.CLOSER, {
+    new RaceHorseStatus(3, "민첩이", "CLOSER", {
       strength: 70,
       endurance: 75,
       agility: 95,
       intelligence: 80,
       spirit: 70,
     }),
-    new RaceHorseStatus(4, "균형잡힌", RunningStyle.VERSATILE, {
+    new RaceHorseStatus(4, "균형잡힌", "VERSATILE", {
       strength: 80,
       endurance: 80,
       agility: 80,
       intelligence: 80,
       spirit: 80,
     }),
-    new RaceHorseStatus(5, "천재마", RunningStyle.VERSATILE, {
+    new RaceHorseStatus(5, "천재마", "VERSATILE", {
       strength: 85,
       endurance: 70,
       agility: 75,
       intelligence: 95,
       spirit: 85,
     }),
-    new RaceHorseStatus(6, "파워하우스", RunningStyle.FRONT_RUNNER, {
+    new RaceHorseStatus(6, "파워하우스", "FRONT_RUNNER", {
       strength: 98,
       endurance: 70,
       agility: 80,
@@ -175,11 +168,11 @@ export function createSampleHorses(): RaceHorseStatus[] {
 }
 
 export function createRandomHorse(id: number, name: string): RaceHorseStatus {
-  const runningStyles = [
-    RunningStyle.FRONT_RUNNER,
-    RunningStyle.STALKER,
-    RunningStyle.CLOSER,
-    RunningStyle.VERSATILE,
+  const runningStyles: Array<RaceHorseStatus["runningStyle"]> = [
+    "FRONT_RUNNER",
+    "STALKER",
+    "CLOSER",
+    "VERSATILE",
   ];
   const runningStyleIndex = Math.floor(Math.random() * runningStyles.length);
   const runningStyle = runningStyles[runningStyleIndex];
@@ -196,7 +189,7 @@ export function convertHorsesForRace(
   horses: {
     horseId: number;
     name: string;
-    runningStyle: RunningStyle;
+    runningStyle: "FRONT_RUNNER" | "STALKER" | "CLOSER" | "VERSATILE";
     strength: number;
     endurance: number;
     agility: number;
