@@ -175,10 +175,10 @@ export function createTrack(segmentCount: number): RaceTrack {
   return new RaceTrack(segmentPattern);
 }
 
-export function convertTrackForRace(segments: RaceSegment[]) {
-  const raceSegments = new Array<RaceSegment>(segments.length);
-  for (let index = 0; index < segments.length; index++) {
-    const parseSegment = segments[index] as RaceSegment;
+export function convertTrackForRace(raceTrack: { segments: RaceSegment[] }) {
+  const raceSegments = new Array<RaceSegment>(raceTrack.segments.length);
+  for (let index = 0; index < raceTrack.segments.length; index++) {
+    const parseSegment = raceTrack.segments[index] as RaceSegment;
     if (parseSegment.type === "line") {
       const lineSegment = parseSegment as RaceLine;
       raceSegments[index] = new RaceLine(
