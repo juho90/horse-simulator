@@ -1,22 +1,15 @@
 import { RaceCorner } from "./raceCorner";
+import { RaceHorse } from "./raceHorse";
 import { RaceLine } from "./raceLine";
 import { RaceSegment } from "./raceSegment";
 import { generateClosedTrackSegments } from "./raceTrackHelper";
 
 export class RaceTrack {
-  private width: number;
-  private height: number;
   private segments: RaceSegment[];
   private trackLength: number;
   private raceLength: number;
-  private totalLaps: number;
 
-  constructor(
-    width: number,
-    height: number,
-    segments: RaceSegment[],
-    raceLength: number | null = null
-  ) {
+  constructor(segments: RaceSegment[], raceLength: number | null = null) {
     let trackLength = 0;
     for (const segment of segments) {
       trackLength += segment.length;
@@ -33,21 +26,35 @@ export class RaceTrack {
       const calcRaceLength = trackLength * (minMultiplier + randomMultiplier);
       raceLength = Math.round(calcRaceLength / 100) * 100;
     }
-    const totalLaps = Math.floor(raceLength / trackLength);
-    this.width = width;
-    this.height = height;
     this.segments = segments;
     this.trackLength = trackLength;
     this.raceLength = raceLength;
-    this.totalLaps = totalLaps;
   }
 
   getTrackLength(): number {
     return this.trackLength;
   }
 
+  getRaceLength(): number {
+    return this.raceLength;
+  }
+
   getSegmentsLength(): number {
     return this.segments.length;
+  }
+
+  isLastSpurt(raceHorse: RaceHorse): boolean {
+    const raceLength =
+      this.getTrackLength() * raceHorse.lap +
+      this.getTrackLength() * raceHorse.progress;
+    return raceLength >= this.getRaceLength() * 0.8;
+  }
+
+  isFinished(raceHorse: RaceHorse): boolean {
+    const raceLength =
+      this.getTrackLength() * raceHorse.lap +
+      this.getTrackLength() * raceHorse.progress;
+    return raceLength >= this.getRaceLength();
   }
 
   getSegments(): RaceSegment[] {
@@ -165,16 +172,10 @@ export function createTrack(segmentCount: number): RaceTrack {
     allX.push(bounds.minX, bounds.maxX);
     allY.push(bounds.minY, bounds.maxY);
   });
-  const width = Math.max(...allX) - Math.min(...allX) + 200;
-  const height = Math.max(...allY) - Math.min(...allY) + 200;
-  return new RaceTrack(width, height, segmentPattern);
+  return new RaceTrack(segmentPattern);
 }
 
-export function convertTrackForRace(raceTrack: {
-  width: number;
-  height: number;
-  segments: RaceSegment[];
-}) {
+export function convertTrackForRace(raceTrack: { segments: RaceSegment[] }) {
   const raceSegments = new Array<RaceSegment>(raceTrack.segments.length);
   for (let index = 0; index < raceTrack.segments.length; index++) {
     const parseSegment = raceTrack.segments[index] as RaceSegment;
@@ -196,5 +197,5 @@ export function convertTrackForRace(raceTrack: {
       );
     }
   }
-  return new RaceTrack(raceTrack.width, raceTrack.height, raceSegments);
+  return new RaceTrack(raceSegments);
 }

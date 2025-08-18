@@ -37,42 +37,9 @@ export class RaceHorseStatus {
     this.spirit = stats.spirit;
   }
 
-  calculateMaxSpeed(): number {
-    const baseSpeed = 18.0;
-    const speedRange = 5.0;
-    const strengthWeight = 0.7;
-    const agilityWeight = 0.3;
-    const statValue =
-      (this.strength * strengthWeight + this.agility * agilityWeight) / 100;
-    const maxSpeed = baseSpeed + speedRange * statValue;
-    return maxSpeed;
-  }
-
-  calculateMaxAcceleration(): number {
-    const baseAccel = 0.5;
-    const accelRange = 0.2;
-    const agilityWeight = 0.3;
-    const strengthWeight = 0.2;
-    const statValue =
-      (this.agility * agilityWeight + this.strength * strengthWeight) / 100;
-    const maxAccel = baseAccel + accelRange * statValue;
-    return maxAccel;
-  }
-
-  calculateMaxStamina(): number {
-    const baseStamina = 80;
-    const staminaRange = 20;
-    const enduranceWeight = 0.8;
-    const spiritWeight = 0.2;
-    const statValue =
-      (this.endurance * enduranceWeight + this.spirit * spiritWeight) / 100;
-    const maxStamina = baseStamina + staminaRange * statValue;
-    return maxStamina;
-  }
-
-  calculateStartSpeed(): number {
-    const baseStartSpeed = 8.0;
-    const startSpeedRange = 4.0;
+  calculateStartAccel(): number {
+    const baseStartAccel = 0.2;
+    const startAccelRange = 0.2;
     let runningStyleModifier = 1.0;
     switch (this.runningStyle) {
       case RunningStyle.FRONT_RUNNER:
@@ -92,32 +59,87 @@ export class RaceHorseStatus {
     const spiritWeight = 0.2;
     const statValue =
       (this.agility * agilityWeight + this.spirit * spiritWeight) / 100;
-    const startSpeed =
-      (baseStartSpeed + startSpeedRange * statValue) * runningStyleModifier;
-    const result = Math.max(3.0, Math.min(15.0, startSpeed));
-    return result;
+    const startAccel =
+      (baseStartAccel + startAccelRange * statValue) * runningStyleModifier;
+    return startAccel;
   }
 
-  calculateAccelerationPerTurn(timeToTop: number = 8): number {
-    const maxAccel = this.calculateMaxAcceleration();
-    const result = maxAccel / Math.max(1, timeToTop);
-    return result;
+  calculateMaxSpeed(): number {
+    const baseSpeed = 18.0;
+    const speedRange = 5.0;
+    const strengthWeight = 0.7;
+    const agilityWeight = 0.3;
+    const statValue =
+      (this.strength * strengthWeight + this.agility * agilityWeight) / 100;
+    const maxSpeed = baseSpeed + speedRange * statValue;
+    return maxSpeed;
+  }
+
+  calculateMaxStamina(): number {
+    const baseStamina = 80;
+    const staminaRange = 20;
+    const enduranceWeight = 0.8;
+    const spiritWeight = 0.2;
+    const statValue =
+      (this.endurance * enduranceWeight + this.spirit * spiritWeight) / 100;
+    const maxStamina = baseStamina + staminaRange * statValue;
+    return maxStamina;
+  }
+
+  calculateLastSpurtSpeed(): number {
+    const maxSpeed = this.calculateMaxSpeed();
+    let runningStyleModifier = 1.0;
+    switch (this.runningStyle) {
+      case RunningStyle.FRONT_RUNNER:
+        runningStyleModifier = 1.1;
+        break;
+      case RunningStyle.STALKER:
+        runningStyleModifier = 1.3;
+        break;
+      case RunningStyle.CLOSER:
+        runningStyleModifier = 1.5;
+        break;
+      case RunningStyle.VERSATILE:
+        runningStyleModifier = 1.1;
+        break;
+    }
+    return maxSpeed * runningStyleModifier;
+  }
+
+  calculateLastSpurtAccel(): number {
+    const maxAccel = this.calculateStartAccel();
+    let runningStyleModifier = 1.0;
+    switch (this.runningStyle) {
+      case RunningStyle.FRONT_RUNNER:
+        runningStyleModifier = 0.05;
+        break;
+      case RunningStyle.STALKER:
+        runningStyleModifier = 0.08;
+        break;
+      case RunningStyle.CLOSER:
+        runningStyleModifier = 0.11;
+        break;
+      case RunningStyle.VERSATILE:
+        runningStyleModifier = 0.05;
+        break;
+    }
+    return maxAccel + runningStyleModifier;
   }
 }
 
 export function createSampleHorses(): RaceHorseStatus[] {
   return [
     new RaceHorseStatus(1, "번개", RunningStyle.FRONT_RUNNER, {
-      strength: 55,
+      strength: 75,
       endurance: 70,
       agility: 85,
       intelligence: 75,
       spirit: 80,
     }),
     new RaceHorseStatus(2, "지구력왕", RunningStyle.STALKER, {
-      strength: 60,
+      strength: 80,
       endurance: 95,
-      agility: 65,
+      agility: 85,
       intelligence: 85,
       spirit: 90,
     }),
@@ -136,7 +158,7 @@ export function createSampleHorses(): RaceHorseStatus[] {
       spirit: 80,
     }),
     new RaceHorseStatus(5, "천재마", RunningStyle.VERSATILE, {
-      strength: 65,
+      strength: 85,
       endurance: 70,
       agility: 75,
       intelligence: 95,
@@ -144,10 +166,10 @@ export function createSampleHorses(): RaceHorseStatus[] {
     }),
     new RaceHorseStatus(6, "파워하우스", RunningStyle.FRONT_RUNNER, {
       strength: 98,
-      endurance: 50,
-      agility: 60,
+      endurance: 70,
+      agility: 80,
       intelligence: 70,
-      spirit: 65,
+      spirit: 85,
     }),
   ];
 }
@@ -162,11 +184,11 @@ export function createRandomHorse(id: number, name: string): RaceHorseStatus {
   const runningStyleIndex = Math.floor(Math.random() * runningStyles.length);
   const runningStyle = runningStyles[runningStyleIndex];
   return new RaceHorseStatus(id, name, runningStyle, {
-    strength: Math.floor(Math.random() * 60) + 40,
-    endurance: Math.floor(Math.random() * 60) + 40,
-    agility: Math.floor(Math.random() * 60) + 40,
-    intelligence: Math.floor(Math.random() * 60) + 40,
-    spirit: Math.floor(Math.random() * 60) + 40,
+    strength: Math.floor(Math.random() * 30) + 70,
+    endurance: Math.floor(Math.random() * 30) + 70,
+    agility: Math.floor(Math.random() * 30) + 70,
+    intelligence: Math.floor(Math.random() * 30) + 70,
+    spirit: Math.floor(Math.random() * 30) + 70,
   });
 }
 

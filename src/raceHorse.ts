@@ -14,7 +14,6 @@ export class RaceHorse {
   raceDistance: number;
   lap: number = 0;
   progress: number = 0;
-  finished: boolean = false;
 
   path: RaceSegmentNode[] = [];
 
@@ -23,8 +22,8 @@ export class RaceHorse {
       throw new Error("Gate node progress should be zero");
     }
     this.status = horse;
-    this.speed = horse.calculateStartSpeed();
-    this.accel = 0;
+    this.speed = 0;
+    this.accel = horse.calculateStartAccel();
     this.stamina = horse.calculateMaxStamina();
     this.x = gateNode.x;
     this.y = gateNode.y;
@@ -52,15 +51,32 @@ export class RaceHorse {
     return this.stamina;
   }
 
+  calculateMaxSpeed(lastSpurt: boolean): number {
+    if (!lastSpurt) {
+      return this.status.calculateMaxSpeed();
+    }
+    return this.status.calculateLastSpurtSpeed();
+  }
+
+  calculateAccel(maxSpeed: number, lastSpurt: boolean): number {
+    if (maxSpeed <= this.speed) {
+      return 0;
+    }
+    if (!lastSpurt) {
+      return this.status.calculateStartAccel();
+    } else {
+      return this.status.calculateLastSpurtAccel();
+    }
+  }
+
   moveOnTrack(
     turn: number,
+    lastSpurt: boolean,
     raceTrackNode: RaceTracker,
     others: RaceHorse[]
   ): void {
-    const maxSpeed = this.status.calculateMaxSpeed();
-    const maxAccel = this.status.calculateMaxAcceleration();
-    const addAccel = this.status.calculateAccelerationPerTurn();
-    const accel = Math.min(this.accel + addAccel, maxAccel);
+    const maxSpeed = this.calculateMaxSpeed(lastSpurt);
+    const accel = this.calculateAccel(maxSpeed, lastSpurt);
     const speed = Math.min(this.speed + accel, maxSpeed);
     let remainingDistance = speed;
     do {

@@ -16,12 +16,18 @@ async function runSimulateMode() {
   const raceHorses: RaceHorse[] = horses.map((horse, index) => {
     return new RaceHorse(horse, gateNodes[index]);
   });
-  const logs = runRaceSimulator(raceTracker, raceHorses);
+  const { finishedHorses, logs } = runRaceSimulator(
+    raceTrack,
+    raceTracker,
+    raceHorses
+  );
   const htmlString = generateRaceWebGLHtml(raceTrack, raceTracker, logs);
   const outPath = path.resolve(__dirname, "../race-result.html");
   testRaceWebGL(outPath, htmlString);
   const monitor = new RaceMonitor();
   await monitor.saveInitialRaceState(raceTrack, horses);
+  const finishedHorseStr = finishedHorses.join(", ");
+  console.log(`Finished horses: ${finishedHorseStr}`);
 }
 
 async function runReSimulateMode() {
@@ -32,10 +38,16 @@ async function runReSimulateMode() {
   const raceHorses: RaceHorse[] = horses.map((horse, index) => {
     return new RaceHorse(horse, gateNodes[index]);
   });
-  const logs = runRaceSimulator(raceTracker, raceHorses);
+  const { finishedHorses, logs } = runRaceSimulator(
+    raceTrack,
+    raceTracker,
+    raceHorses
+  );
   const htmlString = generateRaceWebGLHtml(raceTrack, raceTracker, logs);
   const outPath = path.resolve(__dirname, "../race-result-replay.html");
   testRaceWebGL(outPath, htmlString);
+  const finishedHorseStr = finishedHorses.join(", ");
+  console.log(`Finished horses: ${finishedHorseStr}`);
 }
 
 async function main() {

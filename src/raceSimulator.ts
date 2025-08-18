@@ -1,37 +1,52 @@
 import { RaceHorse } from "./raceHorse";
+import { RaceTrack } from "./raceTrack";
 import { RaceTracker } from "./raceTracker";
 import { HorseTurnState, RaceLog } from "./raceViewer";
 
 export function runRaceSimulator(
+  raceTrack: RaceTrack,
   raceTracker: RaceTracker,
-  horses: RaceHorse[]
-): RaceLog[] {
+  raceHorses: RaceHorse[]
+): { finishedHorses: number[]; logs: RaceLog[] } {
+  const finishedHorses: number[] = [];
   const logs: RaceLog[] = [];
   let turn = 0;
   const maxTurns = 2000;
-  while (horses.some((h) => !h.finished) && turn < maxTurns) {
-    let horseStates: HorseTurnState[] = new Array(horses.length);
+  let lastSpurt = false;
+  while (finishedHorses.length < raceHorses.length && turn < maxTurns) {
+    let horseStates: HorseTurnState[] = new Array(raceHorses.length);
     let index = 0;
-    for (; index < horses.length; index++) {
-      const horse = horses[index];
-      if (!horse.finished) {
-        horse.moveOnTrack(turn, raceTracker, horses);
+    for (; index < raceHorses.length; index++) {
+      const raceHorse = raceHorses[index];
+      if (!raceTrack.isFinished(raceHorse)) {
+        raceHorse.moveOnTrack(turn, lastSpurt, raceTracker, raceHorses);
+        if (raceTrack.isFinished(raceHorse)) {
+          finishedHorses.push(raceHorse.getHorseId());
+        }
       }
       const horseState = {
-        id: horse.getHorseId(),
-        name: horse.getHorseName(),
-        x: horse.x,
-        y: horse.y,
-        speed: horse.getHorseSpeed(),
-        accel: horse.getHorseAccel(),
-        stamina: horse.getHorseStamina(),
-        distance: horse.raceDistance,
+        id: raceHorse.getHorseId(),
+        name: raceHorse.getHorseName(),
+        x: raceHorse.x,
+        y: raceHorse.y,
+        speed: raceHorse.getHorseSpeed(),
+        accel: raceHorse.getHorseAccel(),
+        stamina: raceHorse.getHorseStamina(),
+        distance: raceHorse.raceDistance,
         pathPoints: [], // for debug: horse.path?.map((p) => ({ x: p.x, y: p.y })),
       } as HorseTurnState;
       horseStates[index] = horseState;
     }
+    if (!lastSpurt) {
+      for (const raceHorse of raceHorses) {
+        if (raceTrack.isLastSpurt(raceHorse)) {
+          lastSpurt = true;
+          break;
+        }
+      }
+    }
     logs.push({ turn, horseStates });
     turn++;
   }
-  return logs;
+  return { finishedHorses, logs };
 }
