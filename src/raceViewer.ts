@@ -203,7 +203,7 @@ export function generateRaceWebGLHtml(
       ctx.save();
       ctx.font = 'bold 18px sans-serif';
       ctx.fillStyle = '#222';
-      ctx.fillText('TURN: ' + (turnIdx+1) + ' / ' + totalTurns, width - 120, 30);
+      ctx.fillText('TURN: ' + (turnIdx + 1) + ' / ' + totalTurns, width - 120, 30);
       ctx.restore();
     }
     function drawStatusPanel(turnIdx) {

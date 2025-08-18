@@ -13,6 +13,26 @@ export function runRaceSimulator(
   let turn = 0;
   const maxTurns = 2000;
   let lastSpurt = false;
+  if (turn === 0) {
+    let horseStates: HorseTurnState[] = new Array(raceHorses.length);
+    for (let index = 0; index < raceHorses.length; index++) {
+      const raceHorse = raceHorses[index];
+      const horseState = {
+        id: raceHorse.getHorseId(),
+        name: raceHorse.getHorseName(),
+        x: raceHorse.x,
+        y: raceHorse.y,
+        speed: raceHorse.getHorseSpeed(),
+        accel: raceHorse.getHorseAccel(),
+        stamina: raceHorse.getHorseStamina(),
+        distance: raceHorse.raceDistance,
+        pathPoints: [], // for debug: horse.path?.map((p) => ({ x: p.x, y: p.y })),
+      } as HorseTurnState;
+      horseStates[index] = horseState;
+    }
+    logs.push({ turn, horseStates });
+    turn++;
+  }
   while (finishedHorses.length < raceHorses.length && turn < maxTurns) {
     let horseStates: HorseTurnState[] = new Array(raceHorses.length);
     let index = 0;
